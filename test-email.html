@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email API Test</title>
+</head>
+<body>
+    <h1>Email API Test</h1>
+    <input type="email" id="emailInput" placeholder="Enter email" value="494159635@qq.com">
+    <button onclick="testSendCode()">Send Verification Code</button>
+    <div id="result"></div>
+
+    <script>
+        async function testSendCode() {
+            const email = document.getElementById('emailInput').value;
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.innerHTML = '<div style="color: blue;">Sending request...</div>';
+
+            try {
+                console.log('Sending request to:', 'http://localhost:3001/api/email/send-verification-code');
+                console.log('Email:', email);
+
+                // 先测试简单的GET请求
+                const healthResponse = await fetch('http://localhost:3001/api/health');
+                console.log('Health check status:', healthResponse.status);
+
+                if (!healthResponse.ok) {
+                    throw new Error('Backend server is not responding');
+                }
+
+                // 然后发送邮件验证请求
+                const response = await fetch('http://localhost:3001/api/email/send-verification-code', {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Language': 'en'
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                console.log('Response headers:', [...response.headers.entries()]);
+
+                const data = await response.json();
+                console.log('Response data:', data);
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div style="color: green;">Success: ${data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">Error: ${data.message}</div>`;
+                }
+            } catch (error) {
+                console.error('Request failed:', error);
+                resultDiv.innerHTML = `<div style="color: red;">Network Error: ${error.message}<br>Check console for details</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

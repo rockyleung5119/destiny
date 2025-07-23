@@ -1,0 +1,37 @@
+{
+  "FortuneTellingForm": {
+    "title": "命运分析",
+    "description": "输入您的信息，通过传统中华命理学方法获得全面的命运分析。",
+    "nameLabel": "姓名",
+    "genderLabel": "性别",
+    "male": "男",
+    "female": "女",
+    "birthDateLabel": "出生日期和时间",
+    "birthPlaceLabel": "出生地点",
+    "birthPlacePlaceholder": "例如：北京，中国",
+    "facePhotoLabel": "面部照片（可选）",
+    "palmPhotoLabel": "手掌照片（可选）",
+    "uploadButton": "上传",
+    "submitButton": "开始命运分析",
+    "loadingText": "正在分析您的命运...",
+    "analyzingTitle": "正在分析您的命运",
+    "successMessage": "分析完成！",
+    "resultTitle": "您的命运分析结果",
+    "overallScore": "综合评分",
+    "career": "事业",
+    "wealth": "财富",
+    "relationship": "感情",
+    "health": "健康",
+    "progressMessages": {
+      "analyzing": "正在分析命盘...",
+      "calculating": "正在计算命理格局...",
+      "generating": "正在生成运势报告...",
+      "completing": "即将完成..."
+    }
+  },
+  "LocaleSwitcher": {
+    "label": "语言",
+    "en": "英语",
+    "zh": "中文"
+  }
+}

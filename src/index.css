@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 五颜六色静态白色背景 */
+
+/* 五颜六色静态白色背景 */
+.shimmer-background {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #fff5f5 8%,    /* 红色白 */
+    #fef3c7 16%,   /* 琥珀白 */
+    #ecfdf5 24%,   /* 翡翠白 */
+    #eff6ff 32%,   /* 蓝色白 */
+    #f3e8ff 40%,   /* 紫色白 */
+    #fdf4ff 48%,   /* 紫红白 */
+    #fff1f2 56%,   /* 玫瑰白 */
+    #fffbeb 64%,   /* 橙色白 */
+    #f0fdf4 72%,   /* 绿色白 */
+    #f0f9ff 80%,   /* 天蓝白 */
+    #faf5ff 88%,   /* 紫罗兰白 */
+    #ffffff 100%
+  );
+}
+
+
+
+
+
+

@@ -1,0 +1,141 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // User profile
+  gender       String?
+  birthDate    DateTime?
+  birthPlace   String?
+  latitude     Float?
+  longitude    Float?
+  timezone     String?
+
+  // Subscription info
+  subscriptionType String @default("free") // free, regular, annual, lifetime
+  subscriptionEnd  DateTime?
+  stripeCustomerId String?
+
+  // Analysis records
+  analyses Analysis[]
+  
+  // Push notification settings
+  pushSettings PushSettings?
+
+  @@map("users")
+}
+
+model Analysis {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Input data
+  name         String
+  gender       String
+  birthDate    DateTime
+  birthPlace   String
+  latitude     Float?
+  longitude    Float?
+  faceImageUrl String?
+  palmImageUrl String?
+  
+  // Analysis type
+  analysisType String // bazi, ziwei, daily, comprehensive
+  
+  // Results
+  overallScore Int?
+  careerScore  Int?
+  wealthScore  Int?
+  loveScore    Int?
+  healthScore  Int?
+  
+  // Detailed analysis (JSON)
+  baziData     String? // JSON string
+  ziweiData    String? // JSON string
+  predictions  String? // JSON string
+  advice       String? // JSON string
+  
+  // AI analysis
+  aiPrompt     String?
+  aiResponse   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("analyses")
+}
+
+model PushSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Email notifications
+  emailEnabled     Boolean @default(true)
+  dailyFortune     Boolean @default(true)
+  specialAlerts    Boolean @default(true)
+  
+  // Browser notifications
+  browserEnabled   Boolean @default(false)
+  pushEndpoint     String?
+  pushKeys         String? // JSON string
+  
+  // Timing preferences
+  preferredTime    String @default("09:00") // HH:mm format
+  timezone         String @default("UTC")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("push_settings")
+}
+
+model Cache {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // JSON string
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("cache")
+}
+
+model ApiUsage {
+  id        String   @id @default(cuid())
+  userId    String?
+  endpoint  String
+  method    String
+  tokens    Int?     // For AI API usage
+  cost      Float?   // Cost in USD
+  success   Boolean
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@map("api_usage")
+}
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String // JSON string
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}

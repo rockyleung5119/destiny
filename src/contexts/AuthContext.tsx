@@ -1,0 +1,163 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authAPI } from '../services/api';
+
+interface User {
+  id: number;
+  email: string;
+  name: string;
+  gender?: string;
+  birthYear?: number;
+  birthMonth?: number;
+  birthDay?: number;
+  birthHour?: number;
+  birthPlace?: string;
+  isEmailVerified: boolean;
+  profileUpdatedCount: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string; user?: User }>;
+  register: (userData: any) => Promise<{ success: boolean; message: string; user?: User }>;
+  logout: () => void;
+  updateUser: (userData: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const isAuthenticated = !!user;
+
+  // Check for existing auth on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('authToken');
+      const savedUser = localStorage.getItem('user');
+
+      if (token && savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          
+          // Optionally verify token with server
+          // const response = await authAPI.verifyToken();
+          // if (!response.success) {
+          //   logout();
+          // }
+        } catch (error) {
+          console.error('Error parsing saved user data:', error);
+          logout();
+        }
+      }
+      
+      setIsLoading(false);
+    };
+
+    initAuth();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await authAPI.login({ email, password });
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+        localStorage.setItem('authToken', response.token || '');
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Login error:', error);
+      return {
+        success: false,
+        message: 'Login failed. Please try again.'
+      };
+    }
+  };
+
+  const register = async (userData: any) => {
+    try {
+      const response = await authAPI.register(userData);
+      
+      if (response.success && response.user) {
+        setUser(response.user);
+        localStorage.setItem('authToken', response.token || '');
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Registration error:', error);
+      return {
+        success: false,
+        message: 'Registration failed. Please try again.'
+      };
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  };
+
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const response = await authAPI.getProfile();
+      if (response.success && response.user) {
+        setUser(response.user);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    isAuthenticated,
+    isLoading,
+    login,
+    register,
+    logout,
+    updateUser,
+    refreshUser
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export default AuthContext;

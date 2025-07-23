@@ -1,0 +1,37 @@
+{
+  "FortuneTellingForm": {
+    "title": "Destiny Analysis",
+    "description": "Enter your information to get a comprehensive analysis of your destiny using traditional Chinese fortune telling methods.",
+    "nameLabel": "Full Name",
+    "genderLabel": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "birthDateLabel": "Date and Time of Birth",
+    "birthPlaceLabel": "Place of Birth",
+    "birthPlacePlaceholder": "e.g., New York, USA",
+    "facePhotoLabel": "Facial Photo (Optional)",
+    "palmPhotoLabel": "Palm Photo (Optional)",
+    "uploadButton": "Upload",
+    "submitButton": "Start Destiny Analysis",
+    "loadingText": "Analyzing your destiny...",
+    "analyzingTitle": "Analyzing Your Destiny",
+    "successMessage": "Analysis complete!",
+    "resultTitle": "Your Destiny Analysis Results",
+    "overallScore": "Overall Score",
+    "career": "Career",
+    "wealth": "Wealth",
+    "relationship": "Relationship",
+    "health": "Health",
+    "progressMessages": {
+      "analyzing": "Analyzing birth chart...",
+      "calculating": "Calculating destiny patterns...",
+      "generating": "Generating fortune report...",
+      "completing": "Almost complete..."
+    }
+  },
+  "LocaleSwitcher": {
+    "label": "Language",
+    "en": "English",
+    "zh": "Chinese"
+  }
+}

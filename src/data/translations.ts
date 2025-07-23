@@ -1,0 +1,885 @@
+import { Translations } from '../types';
+
+export const translations: Translations = {
+  en: {
+    // Navigation
+    home: 'Home',
+    services: 'Services',
+    about: 'About',
+    contact: 'Contact',
+    login: 'Login',
+    membership: 'Membership',
+    backToHome: 'Back to Home',
+    
+    // Hero Section
+    heroTitle: 'Unlock Your Cosmic Destiny',
+    heroSubtitle: 'Ancient Wisdom Meets Modern Insight',
+    heroDescription: 'Discover the secrets written in the stars through traditional Chinese divination. Our master practitioners combine millennia-old techniques with celestial timing to reveal your true path.',
+    getReading: 'Get Your Reading',
+    learnMore: 'Learn More',
+    
+    // Services
+    servicesTitle: 'AI Divination Services',
+    servicesSubtitle: 'Instant AI-Powered Fortune Analysis',
+    aiPowered: 'AI Powered Analysis',
+    analyzing: 'Analyzing...',
+    startAnalysis: 'Start Analysis',
+    
+    // AI Features
+    aiFeatures: 'AI-Powered Features',
+    aiFeaturesDescription: 'Experience the future of divination with our advanced AI algorithms',
+    instantAnalysis: 'Instant Analysis',
+    instantAnalysisDesc: 'Get your fortune reading in seconds with our AI engine',
+    preciseResults: 'Precise Results',
+    preciseResultsDesc: 'Advanced algorithms ensure accurate and detailed predictions',
+    personalizedInsights: 'Personalized Insights',
+    personalizedInsightsDesc: 'Tailored readings based on your unique cosmic profile',
+    
+    baziTitle: 'BaZi (Eight Characters)',
+    baziDescription: 'AI-powered comprehensive life analysis based on your birth date and time, revealing personality traits, career prospects, and life cycles.',
+    
+    dailyFortuneTitle: 'Daily Fortune',
+    dailyFortuneDescription: 'AI analysis of your daily fortune based on celestial movements and cosmic energy patterns for today\'s guidance.',
+    
+    tarotTitle: 'Celestial Tarot Reading',
+    tarotDescription: 'AI-enhanced tarot reading combining Eastern wisdom with Western divination for insights into your future.',
+    
+    luckyItemsTitle: 'Lucky Items & Colors',
+    luckyItemsDescription: 'AI-decoded lucky colors, numbers, and items based on your cosmic profile to enhance your fortune and energy.',
+    
+    // About Section
+    aboutTitle: 'The Ancient Art of Divination',
+    aboutSubtitle: 'Connecting Heaven, Earth, and Humanity',
+    aboutDescription: 'For over 4,000 years, Chinese divination has guided emperors, scholars, and common people alike. Our practice honors this sacred tradition while adapting to modern life with AI technology.',
+    
+    traditionTitle: 'Sacred Tradition',
+    traditionDescription: 'Rooted in Taoist philosophy and the I Ching, our methods have been refined across dynasties.',
+    
+    cosmicTitle: 'Cosmic Timing',
+    cosmicDescription: 'Understanding the celestial movements and their influence on earthly affairs.',
+    
+    wisdomTitle: 'Ancient Wisdom',
+    wisdomDescription: 'Preserving and sharing the knowledge passed down through generations of masters.',
+    
+    // Membership Plans
+    membershipPlans: 'Membership Plans',
+    membershipSubtitle: 'Choose the perfect plan for your cosmic journey',
+    specialOffer: 'Limited Time Offer - Save Up to 83%',
+    
+    singleReading: 'Single Reading',
+    monthlyPlan: 'Monthly Plan',
+    yearlyPlan: 'Yearly Plan',
+    perReading: 'per reading',
+    perMonth: 'per month',
+    perYear: 'per year',
+    save83: 'Save 83%',
+    mostPopular: 'Most Popular',
+    
+    // Plan Features
+    oneTimeAccess: 'One-time access to any service',
+    basicAnalysis: 'Basic AI analysis',
+    instantResults: 'Instant results',
+    emailSupport: 'Email support',
+    limitedUse: 'Limited to 1 use',
+    unlimitedReadings: 'Unlimited fortune readings',
+    advancedAnalysis: 'Advanced AI analysis',
+    dailyInsights: 'Daily cosmic insights',
+    prioritySupport: 'Priority support',
+    personalizedReports: 'Personalized reports',
+    historyTracking: 'Reading history tracking',
+    premiumAnalysis: 'Premium AI analysis',
+    earlyAccess: 'Early access to new features',
+    unlimitedAccess: 'Unlimited Access',
+    creditsRemaining: 'credits remaining',
+    
+    selectPlan: 'Select Plan',
+    compareFeatures: 'Compare Features',
+    features: 'Features',
+
+    // Service Permissions
+    loginRequired: 'Login Required',
+    loginRequiredDesc: 'Please log in to access this divination service and unlock your cosmic insights.',
+    upgradeRequired: 'Upgrade Required',
+    upgradeRequiredDesc: 'This premium service requires a higher membership plan to access advanced features.',
+    noCreditsLeft: 'No Credits Remaining',
+    noCreditsLeftDesc: 'You have used all your free credits for today. Upgrade to continue your spiritual journey.',
+    membershipExpired: 'Membership Expired',
+    membershipExpiredDesc: 'Your membership has expired. Please renew to continue accessing premium services.',
+    accessDenied: 'Access Denied',
+    accessDeniedDesc: 'You do not have permission to access this service.',
+    requestedService: 'Requested Service',
+    loginNow: 'Login Now',
+    upgradePlan: 'Upgrade Plan',
+    renewMembership: 'Renew Membership',
+    cancel: 'Cancel',
+    ok: 'OK',
+
+    // Privacy Policy
+    privacyProtection: 'Privacy Protection',
+    privacyDescription: 'Your personal information and cosmic data are protected with enterprise-grade security',
+    dataProtection: 'Data Protection',
+    dataProtectionDesc: 'All personal data is encrypted and stored securely with industry-standard protocols',
+    encryption: 'End-to-End Encryption',
+    encryptionDesc: 'Your readings and personal information are encrypted from device to server',
+    noTracking: 'No Third-Party Tracking',
+    noTrackingDesc: 'We never share your data with advertisers or third-party tracking services',
+    secureStorage: 'Secure Storage',
+    secureStorageDesc: 'Data is stored in certified secure facilities with regular security audits',
+    userControl: 'User Control',
+    userControlDesc: 'You have full control over your data and can delete it at any time',
+    transparency: 'Full Transparency',
+    transparencyDesc: 'Clear privacy policies with no hidden data collection or usage',
+    privacyCommitment: 'Our Privacy Commitment',
+    privacyCommitmentText: 'We are committed to protecting your privacy and maintaining the confidentiality of your cosmic journey. Your trust is sacred to us, and we employ the highest standards of data protection to ensure your personal information remains secure.',
+    
+    // Login/Register
+    loginSubtitle: 'Access Your Cosmic Journey',
+    register: 'Register',
+    nameLabel: 'Full Name',
+    emailLabel: 'Email Address',
+    passwordLabel: 'Password',
+    confirmPasswordLabel: 'Confirm Password',
+    genderLabel: 'Gender',
+    birthDateLabel: 'Birth Date & Time',
+    namePlaceholder: 'Enter your full name',
+    emailPlaceholder: 'Enter your email',
+    passwordPlaceholder: 'Enter your password',
+    confirmPasswordPlaceholder: 'Confirm your password',
+    selectGender: 'Select Gender',
+    male: 'Male',
+    female: 'Female',
+    year: 'Year',
+    month: 'Month',
+    day: 'Day',
+    hour: 'Hour',
+    forgotPassword: 'Forgot Password?',
+    loginButton: 'Sign In',
+    registerButton: 'Create Account',
+    orContinueWith: 'Or continue with',
+    termsAgreement: 'By registering, you agree to our',
+    termsOfService: 'Terms of Service',
+    and: 'and',
+    privacyPolicy: 'Privacy Policy',
+
+    // Error Messages
+    emailAlreadyRegistered: 'This email is already registered. Please use a different email or login directly.',
+    invalidCredentials: 'Invalid email or password. Please check and try again.',
+    registrationSuccess: 'Registration successful! Welcome to Destiny Divination.',
+    validationError: 'Registration information is incorrect. Please check and try again.',
+    operationFailed: 'Operation failed. Please try again later.',
+    emailVerificationRequired: 'Please verify your email address first.',
+    passwordMismatch: 'The passwords do not match.',
+    pleaseEnterName: 'Please enter your name.',
+    pleaseEnterEmail: 'Please enter your email address.',
+    pleaseEnterPassword: 'Please enter your password.',
+    emailVerificationSuccess: 'Email verification successful.',
+    verificationCodeSent: 'Verification code has been sent to your email. Please check your inbox (valid for 5 minutes).',
+
+    // Footer
+    footerTagline: 'Illuminating paths through celestial wisdom',
+    quickLinks: 'Quick Links',
+    contactInfo: 'Contact Information',
+    accountInfo: 'Account',
+    support: 'Support',
+    followUs: 'Follow Us',
+    
+    // Prices
+    price: 'Price',
+    duration: 'Duration',
+    minutes: 'minutes',
+    selectService: 'Select a Service',
+  },
+  
+  zh: {
+    // Navigation
+    home: '首页',
+    services: '服务',
+    about: '关于',
+    contact: '联系',
+    login: '登录',
+    membership: '会员',
+    backToHome: '返回主页',
+    
+    // Hero Section
+    heroTitle: '揭开你的宇宙命运',
+    heroSubtitle: '古老智慧与现代洞察',
+    heroDescription: '通过传统中华占卜艺术，探索星辰中隐藏的秘密。我们的AI算法将千年古法与现代科技结合，为您揭示真正的人生道路。',
+    getReading: '获取占卜',
+    learnMore: '了解更多',
+    
+    // Services
+    servicesTitle: 'AI占卜服务',
+    servicesSubtitle: '即时AI智能命理分析',
+    aiPowered: 'AI智能分析',
+    analyzing: '分析中...',
+    startAnalysis: '开始分析',
+    
+    // AI Features
+    aiFeatures: 'AI智能功能',
+    aiFeaturesDescription: '体验我们先进AI算法带来的占卜未来',
+    instantAnalysis: '即时分析',
+    instantAnalysisDesc: '通过我们的AI引擎在几秒内获得您的命理解读',
+    preciseResults: '精准结果',
+    preciseResultsDesc: '先进算法确保准确详细的预测',
+    personalizedInsights: '个性化洞察',
+    personalizedInsightsDesc: '基于您独特宇宙档案的定制化解读',
+    
+    baziTitle: '八字命理',
+    baziDescription: 'AI智能全面人生分析，基于您的出生日期和时间，揭示性格特质、事业前景和生命周期。',
+    
+    dailyFortuneTitle: '每日运程',
+    dailyFortuneDescription: 'AI分析基于天体运动和宇宙能量模式的每日运势，为今日提供指导。',
+    
+    tarotTitle: '天体塔罗占卜',
+    tarotDescription: 'AI增强塔罗占卜，结合东方智慧与西方占卜，洞察您的未来。',
+    
+    luckyItemsTitle: '幸运物品颜色',
+    luckyItemsDescription: 'AI解码基于您宇宙档案的幸运颜色、数字和物品，增强您的运势和能量。',
+    
+    // About Section
+    aboutTitle: '古老的占卜艺术',
+    aboutSubtitle: '连接天地人三才',
+    aboutDescription: '四千多年来，中华占卜艺术指引着帝王、学者和平民百姓。我们的实践尊重这一神圣传统，同时运用AI技术适应现代生活。',
+    
+    traditionTitle: '神圣传统',
+    traditionDescription: '根植于道家哲学和易经，我们的方法在历朝历代中得到完善。',
+    
+    cosmicTitle: '宇宙时机',
+    cosmicDescription: '理解天体运动及其对人间事务的影响。',
+    
+    wisdomTitle: '古老智慧',
+    wisdomDescription: '保存和分享历代大师传承的知识。',
+    
+    // Membership Plans
+    membershipPlans: '会员套餐',
+    membershipSubtitle: '为您的宇宙之旅选择完美计划',
+    specialOffer: '限时优惠 - 最高节省83%',
+    
+    singleReading: '单次占卜',
+    monthlyPlan: '月度套餐',
+    yearlyPlan: '年度套餐',
+    perReading: '每次',
+    perMonth: '每月',
+    perYear: '每年',
+    save83: '节省83%',
+    mostPopular: '最受欢迎',
+    
+    // Plan Features
+    oneTimeAccess: '一次性访问任何服务',
+    basicAnalysis: '基础AI分析',
+    instantResults: '即时结果',
+    emailSupport: '邮件支持',
+    limitedUse: '限制1次使用',
+    unlimitedReadings: '无限算命功能',
+    advancedAnalysis: '高级AI分析',
+    dailyInsights: '每日宇宙洞察',
+    prioritySupport: '优先支持',
+    personalizedReports: '个性化报告',
+    historyTracking: '占卜历史追踪',
+    premiumAnalysis: '高端AI分析',
+    earlyAccess: '新功能抢先体验',
+    unlimitedAccess: '无限使用',
+    creditsRemaining: '剩余积分',
+    
+    selectPlan: '选择套餐',
+    compareFeatures: '功能对比',
+    features: '功能',
+
+    // Service Permissions
+    loginRequired: '需要登录',
+    loginRequiredDesc: '请登录以访问此占卜服务，解锁您的宇宙洞察。',
+    upgradeRequired: '需要升级',
+    upgradeRequiredDesc: '此高级服务需要更高级别的会员计划才能访问高级功能。',
+    noCreditsLeft: '积分已用完',
+    noCreditsLeftDesc: '您今日的免费积分已用完。升级会员以继续您的灵性之旅。',
+    membershipExpired: '会员已过期',
+    membershipExpiredDesc: '您的会员资格已过期。请续费以继续访问高级服务。',
+    accessDenied: '访问被拒绝',
+    accessDeniedDesc: '您没有权限访问此服务。',
+    requestedService: '请求的服务',
+    loginNow: '立即登录',
+    upgradePlan: '升级套餐',
+    renewMembership: '续费会员',
+    cancel: '取消',
+    ok: '确定',
+
+    // Privacy Policy
+    privacyProtection: '隐私保护',
+    privacyDescription: '您的个人信息和宇宙数据受到企业级安全保护',
+    dataProtection: '数据保护',
+    dataProtectionDesc: '所有个人数据都经过加密，并按照行业标准协议安全存储',
+    encryption: '端到端加密',
+    encryptionDesc: '您的占卜和个人信息从设备到服务器全程加密',
+    noTracking: '无第三方追踪',
+    noTrackingDesc: '我们绝不与广告商或第三方追踪服务分享您的数据',
+    secureStorage: '安全存储',
+    secureStorageDesc: '数据存储在经过认证的安全设施中，定期进行安全审计',
+    userControl: '用户控制',
+    userControlDesc: '您对自己的数据拥有完全控制权，可随时删除',
+    transparency: '完全透明',
+    transparencyDesc: '清晰的隐私政策，无隐藏的数据收集或使用',
+    privacyCommitment: '我们的隐私承诺',
+    privacyCommitmentText: '我们致力于保护您的隐私，维护您宇宙之旅的机密性。您的信任对我们来说是神圣的，我们采用最高标准的数据保护来确保您的个人信息安全。',
+    
+    // Login/Register
+    loginSubtitle: '开启您的宇宙之旅',
+    register: '注册',
+    nameLabel: '姓名',
+    emailLabel: '电子邮箱',
+    passwordLabel: '密码',
+    confirmPasswordLabel: '确认密码',
+    genderLabel: '性别',
+    birthDateLabel: '生辰八字',
+    namePlaceholder: '请输入您的姓名',
+    emailPlaceholder: '请输入您的邮箱',
+    passwordPlaceholder: '请输入密码',
+    confirmPasswordPlaceholder: '请确认密码',
+    selectGender: '选择性别',
+    male: '男',
+    female: '女',
+    year: '年',
+    month: '月',
+    day: '日',
+    hour: '时',
+    forgotPassword: '忘记密码？',
+    loginButton: '登录',
+    registerButton: '创建账户',
+    orContinueWith: '或使用以下方式继续',
+    termsAgreement: '注册即表示您同意我们的',
+    termsOfService: '服务条款',
+    and: '和',
+    privacyPolicy: '隐私政策',
+
+    // Error Messages
+    emailAlreadyRegistered: '该邮箱已被注册，请使用其他邮箱或直接登录',
+    invalidCredentials: '邮箱或密码错误，请检查后重试',
+    registrationSuccess: '注册成功！欢迎加入命运占卜',
+    validationError: '注册信息填写有误，请检查后重试',
+    operationFailed: '操作失败，请稍后重试',
+    emailVerificationRequired: '请先验证邮箱地址',
+    passwordMismatch: '两次输入的密码不一致',
+    pleaseEnterName: '请输入姓名',
+    pleaseEnterEmail: '请输入邮箱地址',
+    pleaseEnterPassword: '请输入密码',
+    emailVerificationSuccess: '邮箱验证成功',
+    verificationCodeSent: '验证码已发送到您的邮箱，请查收（5分钟内有效）',
+
+    // Footer
+    footerTagline: '以天体智慧照亮人生道路',
+    quickLinks: '快速链接',
+    contactInfo: '联系信息',
+    accountInfo: '账户',
+    support: '支持',
+    followUs: '关注我们',
+    
+    // Prices
+    price: '价格',
+    duration: '时长',
+    minutes: '分钟',
+    selectService: '选择服务',
+  },
+  
+  es: {
+    // Navigation
+    home: 'Inicio',
+    services: 'Servicios',
+    about: 'Acerca',
+    contact: 'Contacto',
+    login: 'Iniciar Sesión',
+    membership: 'Membresía',
+    backToHome: 'Volver al Inicio',
+    
+    // Hero Section
+    heroTitle: 'Desbloquea tu Destino Cósmico',
+    heroSubtitle: 'Sabiduría Antigua Encuentra Perspicacia Moderna',
+    heroDescription: 'Descubre los secretos escritos en las estrellas a través de la adivinación tradicional china. Nuestros algoritmos de IA combinan técnicas milenarias con tecnología moderna para revelar tu verdadero camino.',
+    getReading: 'Obtener Lectura',
+    learnMore: 'Saber Más',
+    
+    // Services
+    servicesTitle: 'Servicios de Adivinación IA',
+    servicesSubtitle: 'Análisis de Fortuna Instantáneo con IA',
+    aiPowered: 'Análisis con IA',
+    analyzing: 'Analizando...',
+    startAnalysis: 'Iniciar Análisis',
+    
+    // AI Features
+    aiFeatures: 'Características con IA',
+    aiFeaturesDescription: 'Experimenta el futuro de la adivinación con nuestros algoritmos avanzados de IA',
+    instantAnalysis: 'Análisis Instantáneo',
+    instantAnalysisDesc: 'Obtén tu lectura de fortuna en segundos con nuestro motor de IA',
+    preciseResults: 'Resultados Precisos',
+    preciseResultsDesc: 'Algoritmos avanzados aseguran predicciones precisas y detalladas',
+    personalizedInsights: 'Perspectivas Personalizadas',
+    personalizedInsightsDesc: 'Lecturas adaptadas basadas en tu perfil cósmico único',
+    
+    baziTitle: 'BaZi (Ocho Caracteres)',
+    baziDescription: 'Análisis integral de vida con IA basado en tu fecha y hora de nacimiento, revelando rasgos de personalidad, perspectivas profesionales y ciclos de vida.',
+    
+    dailyFortuneTitle: 'Fortuna Diaria',
+    dailyFortuneDescription: 'Análisis con IA de tu fortuna diaria basado en movimientos celestiales y patrones de energía cósmica para la guía de hoy.',
+    
+    tarotTitle: 'Lectura de Tarot Celestial',
+    tarotDescription: 'Lectura de tarot mejorada con IA que combina la sabiduría oriental con la adivinación occidental para perspectivas sobre tu futuro.',
+    
+    luckyItemsTitle: 'Objetos y Colores de Suerte',
+    luckyItemsDescription: 'Colores, números y objetos de suerte decodificados con IA basados en tu perfil cósmico para mejorar tu fortuna y energía.',
+    
+    // About Section
+    aboutTitle: 'El Arte Antiguo de la Adivinación',
+    aboutSubtitle: 'Conectando Cielo, Tierra y Humanidad',
+    aboutDescription: 'Durante más de 4,000 años, la adivinación china ha guiado a emperadores, eruditos y gente común por igual. Nuestra práctica honra esta tradición sagrada mientras se adapta a la vida moderna con tecnología IA.',
+    
+    traditionTitle: 'Tradición Sagrada',
+    traditionDescription: 'Enraizada en la filosofía taoísta y el I Ching, nuestros métodos han sido refinados a través de dinastías.',
+    
+    cosmicTitle: 'Timing Cósmico',
+    cosmicDescription: 'Comprender los movimientos celestiales y su influencia en los asuntos terrenales.',
+    
+    wisdomTitle: 'Sabiduría Antigua',
+    wisdomDescription: 'Preservar y compartir el conocimiento transmitido a través de generaciones de maestros.',
+    
+    // Membership Plans
+    membershipPlans: 'Planes de Membresía',
+    membershipSubtitle: 'Elige el plan perfecto para tu viaje cósmico',
+    specialOffer: 'Oferta por Tiempo Limitado - Ahorra Hasta 83%',
+    
+    singleReading: 'Lectura Individual',
+    monthlyPlan: 'Plan Mensual',
+    yearlyPlan: 'Plan Anual',
+    perReading: 'por lectura',
+    perMonth: 'por mes',
+    perYear: 'por año',
+    save83: 'Ahorra 83%',
+    mostPopular: 'Más Popular',
+    
+    // Plan Features
+    oneTimeAccess: 'Acceso único a cualquier servicio',
+    basicAnalysis: 'Análisis básico con IA',
+    instantResults: 'Resultados instantáneos',
+    emailSupport: 'Soporte por email',
+    unlimitedReadings: 'Lecturas ilimitadas',
+    advancedAnalysis: 'Análisis avanzado con IA',
+    dailyInsights: 'Perspectivas cósmicas diarias',
+    prioritySupport: 'Soporte prioritario',
+    personalizedReports: 'Reportes personalizados',
+    historyTracking: 'Seguimiento del historial',
+    premiumAnalysis: 'Análisis premium con IA',
+    earlyAccess: 'Acceso temprano a nuevas funciones',
+    
+    selectPlan: 'Seleccionar Plan',
+    compareFeatures: 'Comparar Características',
+    features: 'Características',
+    
+    // Privacy Policy
+    privacyProtection: 'Protección de Privacidad',
+    privacyDescription: 'Tu información personal y datos cósmicos están protegidos con seguridad de nivel empresarial',
+    dataProtection: 'Protección de Datos',
+    dataProtectionDesc: 'Todos los datos personales están encriptados y almacenados de forma segura con protocolos estándar de la industria',
+    encryption: 'Encriptación de Extremo a Extremo',
+    encryptionDesc: 'Tus lecturas e información personal están encriptadas desde el dispositivo hasta el servidor',
+    noTracking: 'Sin Seguimiento de Terceros',
+    noTrackingDesc: 'Nunca compartimos tus datos con anunciantes o servicios de seguimiento de terceros',
+    secureStorage: 'Almacenamiento Seguro',
+    secureStorageDesc: 'Los datos se almacenan en instalaciones seguras certificadas con auditorías de seguridad regulares',
+    userControl: 'Control del Usuario',
+    userControlDesc: 'Tienes control total sobre tus datos y puedes eliminarlos en cualquier momento',
+    transparency: 'Transparencia Total',
+    transparencyDesc: 'Políticas de privacidad claras sin recopilación o uso oculto de datos',
+    privacyCommitment: 'Nuestro Compromiso de Privacidad',
+    privacyCommitmentText: 'Estamos comprometidos a proteger tu privacidad y mantener la confidencialidad de tu viaje cósmico. Tu confianza es sagrada para nosotros, y empleamos los más altos estándares de protección de datos para asegurar que tu información personal permanezca segura.',
+    
+    // Login/Register
+    loginSubtitle: 'Accede a tu Viaje Cósmico',
+    register: 'Registrarse',
+    nameLabel: 'Nombre Completo',
+    emailLabel: 'Correo Electrónico',
+    passwordLabel: 'Contraseña',
+    confirmPasswordLabel: 'Confirmar Contraseña',
+    genderLabel: 'Género',
+    birthDateLabel: 'Fecha y Hora de Nacimiento',
+    namePlaceholder: 'Ingresa tu nombre completo',
+    emailPlaceholder: 'Ingresa tu correo',
+    passwordPlaceholder: 'Ingresa tu contraseña',
+    confirmPasswordPlaceholder: 'Confirma tu contraseña',
+    selectGender: 'Seleccionar Género',
+    male: 'Masculino',
+    female: 'Femenino',
+    year: 'Año',
+    month: 'Mes',
+    day: 'Día',
+    hour: 'Hora',
+    forgotPassword: '¿Olvidaste tu contraseña?',
+    loginButton: 'Iniciar Sesión',
+    registerButton: 'Crear Cuenta',
+    orContinueWith: 'O continúa con',
+    termsAgreement: 'Al registrarte, aceptas nuestros',
+    termsOfService: 'Términos de Servicio',
+    and: 'y',
+    privacyPolicy: 'Política de Privacidad',
+
+    // Error Messages
+    emailAlreadyRegistered: 'Este correo ya está registrado. Por favor usa un correo diferente o inicia sesión directamente.',
+    invalidCredentials: 'Correo o contraseña inválidos. Por favor verifica e intenta de nuevo.',
+    registrationSuccess: '¡Registro exitoso! Bienvenido a Destiny Divination.',
+    validationError: 'La información de registro es incorrecta. Por favor verifica e intenta de nuevo.',
+    operationFailed: 'Operación fallida. Por favor intenta más tarde.',
+    emailVerificationRequired: 'Por favor verifica tu dirección de correo primero.',
+    passwordMismatch: 'Las contraseñas no coinciden.',
+    pleaseEnterName: 'Por favor ingresa tu nombre.',
+    pleaseEnterEmail: 'Por favor ingresa tu dirección de correo.',
+    pleaseEnterPassword: 'Por favor ingresa tu contraseña.',
+    emailVerificationSuccess: 'Verificación de correo exitosa.',
+    verificationCodeSent: 'El código de verificación ha sido enviado a tu correo. Por favor revisa tu bandeja de entrada (válido por 5 minutos).',
+
+    // Footer
+    footerTagline: 'Iluminando caminos a través de la sabiduría celestial',
+    quickLinks: 'Enlaces Rápidos',
+    contactInfo: 'Información de Contacto',
+    accountInfo: 'Cuenta',
+    support: 'Soporte',
+    followUs: 'Síguenos',
+    
+    // Prices
+    price: 'Precio',
+    duration: 'Duración',
+    minutes: 'minutos',
+    selectService: 'Seleccionar Servicio',
+  },
+  
+  fr: {
+    // Navigation
+    home: 'Accueil',
+    services: 'Services',
+    about: 'À Propos',
+    contact: 'Contact',
+    login: 'Connexion',
+    membership: 'Adhésion',
+    backToHome: 'Retour à l\'Accueil',
+    
+    // Hero Section
+    heroTitle: 'Déverrouillez Votre Destin Cosmique',
+    heroSubtitle: 'Sagesse Ancienne Rencontre Perspicacité Moderne',
+    heroDescription: 'Découvrez les secrets écrits dans les étoiles grâce à la divination traditionnelle chinoise. Nos algorithmes IA combinent des techniques millénaires avec la technologie moderne pour révéler votre vrai chemin.',
+    getReading: 'Obtenir Lecture',
+    learnMore: 'En Savoir Plus',
+    
+    // Services
+    servicesTitle: 'Services de Divination IA',
+    servicesSubtitle: 'Analyse de Fortune Instantanée avec IA',
+    aiPowered: 'Analyse IA',
+    analyzing: 'Analyse en cours...',
+    startAnalysis: 'Commencer l\'Analyse',
+    
+    // AI Features
+    aiFeatures: 'Fonctionnalités IA',
+    aiFeaturesDescription: 'Découvrez l\'avenir de la divination avec nos algorithmes IA avancés',
+    instantAnalysis: 'Analyse Instantanée',
+    instantAnalysisDesc: 'Obtenez votre lecture de fortune en secondes avec notre moteur IA',
+    preciseResults: 'Résultats Précis',
+    preciseResultsDesc: 'Les algorithmes avancés assurent des prédictions précises et détaillées',
+    personalizedInsights: 'Perspectives Personnalisées',
+    personalizedInsightsDesc: 'Lectures adaptées basées sur votre profil cosmique unique',
+    
+    baziTitle: 'BaZi (Huit Caractères)',
+    baziDescription: 'Analyse complète de la vie avec IA basée sur votre date et heure de naissance, révélant les traits de personnalité, perspectives de carrière et cycles de vie.',
+    
+    dailyFortuneTitle: 'Fortune Quotidienne',
+    dailyFortuneDescription: 'Analyse IA de votre fortune quotidienne basée sur les mouvements célestes et les modèles d\'énergie cosmique pour les conseils d\'aujourd\'hui.',
+    
+    tarotTitle: 'Lecture de Tarot Céleste',
+    tarotDescription: 'Lecture de tarot améliorée par IA combinant la sagesse orientale avec la divination occidentale pour des aperçus sur votre futur.',
+    
+    luckyItemsTitle: 'Objets et Couleurs Porte-Bonheur',
+    luckyItemsDescription: 'Couleurs, nombres et objets porte-bonheur décodés par IA basés sur votre profil cosmique pour améliorer votre fortune et énergie.',
+    
+    // About Section
+    aboutTitle: 'L\'Art Ancien de la Divination',
+    aboutSubtitle: 'Connecter Ciel, Terre et Humanité',
+    aboutDescription: 'Depuis plus de 4 000 ans, la divination chinoise a guidé empereurs, érudits et gens ordinaires. Notre pratique honore cette tradition sacrée tout en s\'adaptant à la vie moderne avec la technologie IA.',
+    
+    traditionTitle: 'Tradition Sacrée',
+    traditionDescription: 'Enracinée dans la philosophie taoïste et le I Ching, nos méthodes ont été raffinées à travers les dynasties.',
+    
+    cosmicTitle: 'Timing Cosmique',
+    cosmicDescription: 'Comprendre les mouvements célestes et leur influence sur les affaires terrestres.',
+    
+    wisdomTitle: 'Sagesse Ancienne',
+    wisdomDescription: 'Préserver et partager la connaissance transmise à travers des générations de maîtres.',
+    
+    // Membership Plans
+    membershipPlans: 'Plans d\'Adhésion',
+    membershipSubtitle: 'Choisissez le plan parfait pour votre voyage cosmique',
+    specialOffer: 'Offre Limitée - Économisez Jusqu\'à 83%',
+    
+    singleReading: 'Lecture Unique',
+    monthlyPlan: 'Plan Mensuel',
+    yearlyPlan: 'Plan Annuel',
+    perReading: 'par lecture',
+    perMonth: 'par mois',
+    perYear: 'par an',
+    save83: 'Économisez 83%',
+    mostPopular: 'Le Plus Populaire',
+    
+    // Plan Features
+    oneTimeAccess: 'Accès unique à tout service',
+    basicAnalysis: 'Analyse IA de base',
+    instantResults: 'Résultats instantanés',
+    emailSupport: 'Support par email',
+    unlimitedReadings: 'Lectures illimitées',
+    advancedAnalysis: 'Analyse IA avancée',
+    dailyInsights: 'Perspectives cosmiques quotidiennes',
+    prioritySupport: 'Support prioritaire',
+    personalizedReports: 'Rapports personnalisés',
+    historyTracking: 'Suivi de l\'historique',
+    premiumAnalysis: 'Analyse IA premium',
+    earlyAccess: 'Accès anticipé aux nouvelles fonctionnalités',
+    
+    selectPlan: 'Sélectionner le Plan',
+    compareFeatures: 'Comparer les Fonctionnalités',
+    features: 'Fonctionnalités',
+    
+    // Privacy Policy
+    privacyProtection: 'Protection de la Vie Privée',
+    privacyDescription: 'Vos informations personnelles et données cosmiques sont protégées avec une sécurité de niveau entreprise',
+    dataProtection: 'Protection des Données',
+    dataProtectionDesc: 'Toutes les données personnelles sont chiffrées et stockées en sécurité avec des protocoles standards de l\'industrie',
+    encryption: 'Chiffrement de Bout en Bout',
+    encryptionDesc: 'Vos lectures et informations personnelles sont chiffrées de l\'appareil au serveur',
+    noTracking: 'Aucun Suivi Tiers',
+    noTrackingDesc: 'Nous ne partageons jamais vos données avec des annonceurs ou des services de suivi tiers',
+    secureStorage: 'Stockage Sécurisé',
+    secureStorageDesc: 'Les données sont stockées dans des installations sécurisées certifiées avec des audits de sécurité réguliers',
+    userControl: 'Contrôle Utilisateur',
+    userControlDesc: 'Vous avez un contrôle total sur vos données et pouvez les supprimer à tout moment',
+    transparency: 'Transparence Totale',
+    transparencyDesc: 'Politiques de confidentialité claires sans collecte ou utilisation cachée de données',
+    privacyCommitment: 'Notre Engagement de Confidentialité',
+    privacyCommitmentText: 'Nous nous engageons à protéger votre vie privée et à maintenir la confidentialité de votre voyage cosmique. Votre confiance est sacrée pour nous, et nous employons les plus hauts standards de protection des données pour assurer que vos informations personnelles restent sécurisées.',
+    
+    // Login/Register
+    loginSubtitle: 'Accédez à Votre Voyage Cosmique',
+    register: 'S\'inscrire',
+    nameLabel: 'Nom Complet',
+    emailLabel: 'Adresse Email',
+    passwordLabel: 'Mot de Passe',
+    confirmPasswordLabel: 'Confirmer le Mot de Passe',
+    genderLabel: 'Genre',
+    birthDateLabel: 'Date et Heure de Naissance',
+    namePlaceholder: 'Entrez votre nom complet',
+    emailPlaceholder: 'Entrez votre email',
+    passwordPlaceholder: 'Entrez votre mot de passe',
+    confirmPasswordPlaceholder: 'Confirmez votre mot de passe',
+    selectGender: 'Sélectionner le Genre',
+    male: 'Masculin',
+    female: 'Féminin',
+    year: 'Année',
+    month: 'Mois',
+    day: 'Jour',
+    hour: 'Heure',
+    forgotPassword: 'Mot de passe oublié?',
+    loginButton: 'Se Connecter',
+    registerButton: 'Créer un Compte',
+    orContinueWith: 'Ou continuer avec',
+    termsAgreement: 'En vous inscrivant, vous acceptez nos',
+    termsOfService: 'Conditions de Service',
+    and: 'et',
+    privacyPolicy: 'Politique de Confidentialité',
+
+    // Error Messages
+    emailAlreadyRegistered: 'Cet email est déjà enregistré. Veuillez utiliser un email différent ou vous connecter directement.',
+    invalidCredentials: 'Email ou mot de passe invalide. Veuillez vérifier et réessayer.',
+    registrationSuccess: 'Inscription réussie ! Bienvenue dans Destiny Divination.',
+    validationError: 'Les informations d\'inscription sont incorrectes. Veuillez vérifier et réessayer.',
+    operationFailed: 'Opération échouée. Veuillez réessayer plus tard.',
+    emailVerificationRequired: 'Veuillez d\'abord vérifier votre adresse email.',
+    passwordMismatch: 'Les mots de passe ne correspondent pas.',
+    pleaseEnterName: 'Veuillez entrer votre nom.',
+    pleaseEnterEmail: 'Veuillez entrer votre adresse email.',
+    pleaseEnterPassword: 'Veuillez entrer votre mot de passe.',
+    emailVerificationSuccess: 'Vérification d\'email réussie.',
+    verificationCodeSent: 'Le code de vérification a été envoyé à votre email. Veuillez vérifier votre boîte de réception (valide pendant 5 minutes).',
+
+    // Footer
+    footerTagline: 'Illuminant les chemins à travers la sagesse céleste',
+    quickLinks: 'Liens Rapides',
+    contactInfo: 'Informations de Contact',
+    accountInfo: 'Compte',
+    support: 'Support',
+    followUs: 'Suivez-Nous',
+    
+    // Prices
+    price: 'Prix',
+    duration: 'Durée',
+    minutes: 'minutes',
+    selectService: 'Sélectionner Service',
+  },
+  
+  ja: {
+    // Navigation
+    home: 'ホーム',
+    services: 'サービス',
+    about: 'について',
+    contact: 'お問い合わせ',
+    login: 'ログイン',
+    membership: 'メンバーシップ',
+    backToHome: 'ホームに戻る',
+    
+    // Hero Section
+    heroTitle: 'あなたの宇宙の運命を解き明かす',
+    heroSubtitle: '古代の知恵と現代の洞察',
+    heroDescription: '伝統的な中国占いを通じて、星に書かれた秘密を発見してください。私たちのAIアルゴリズムは、千年の技術と現代テクノロジーを組み合わせて、あなたの真の道を明らかにします。',
+    getReading: '占いを受ける',
+    learnMore: '詳しく学ぶ',
+    
+    // Services
+    servicesTitle: 'AI占いサービス',
+    servicesSubtitle: '即座のAI運勢分析',
+    aiPowered: 'AI分析',
+    analyzing: '分析中...',
+    startAnalysis: '分析開始',
+    
+    // AI Features
+    aiFeatures: 'AI機能',
+    aiFeaturesDescription: '先進的なAIアルゴリズムで占いの未来を体験',
+    instantAnalysis: '即座の分析',
+    instantAnalysisDesc: 'AIエンジンで数秒で運勢を読み取り',
+    preciseResults: '正確な結果',
+    preciseResultsDesc: '先進アルゴリズムが正確で詳細な予測を保証',
+    personalizedInsights: '個人化された洞察',
+    personalizedInsightsDesc: 'あなた独自の宇宙プロファイルに基づくカスタマイズされた読み取り',
+    
+    baziTitle: '八字（八文字）',
+    baziDescription: 'AI搭載の包括的な人生分析で、生年月日と時間に基づき、性格特性、キャリア展望、人生周期を明らかにします。',
+    
+    dailyFortuneTitle: '毎日の運勢',
+    dailyFortuneDescription: '天体の動きと宇宙エネルギーパターンに基づく毎日の運勢のAI分析で、今日のガイダンスを提供。',
+    
+    tarotTitle: '天体タロット占い',
+    tarotDescription: 'AI強化タロット占いで東洋の知恵と西洋の占いを組み合わせ、あなたの未来への洞察を得ます。',
+    
+    luckyItemsTitle: 'ラッキーアイテム・カラー',
+    luckyItemsDescription: 'あなたの宇宙プロファイルに基づくAI解読のラッキーカラー、数字、アイテムで運勢とエネルギーを向上。',
+    
+    // About Section
+    aboutTitle: '占いの古代芸術',
+    aboutSubtitle: '天・地・人を結ぶ',
+    aboutDescription: '4,000年以上にわたって、中国の占いは皇帝、学者、一般人を同様に導いてきました。私たちの実践は、この神聖な伝統を尊重しながらAI技術で現代生活に適応しています。',
+    
+    traditionTitle: '神聖な伝統',
+    traditionDescription: '道教哲学と易経に根ざし、私たちの方法は王朝を通じて洗練されてきました。',
+    
+    cosmicTitle: '宇宙のタイミング',
+    cosmicDescription: '天体の動きと地上の事柄への影響を理解する。',
+    
+    wisdomTitle: '古代の知恵',
+    wisdomDescription: '世代を超えて受け継がれた師匠の知識を保存し共有する。',
+    
+    // Membership Plans
+    membershipPlans: 'メンバーシッププラン',
+    membershipSubtitle: 'あなたの宇宙の旅に最適なプランを選択',
+    specialOffer: '期間限定オファー - 最大83%節約',
+    
+    singleReading: '単発占い',
+    monthlyPlan: '月額プラン',
+    yearlyPlan: '年額プラン',
+    perReading: '1回あたり',
+    perMonth: '月額',
+    perYear: '年額',
+    save83: '83%節約',
+    mostPopular: '最も人気',
+    
+    // Plan Features
+    oneTimeAccess: '任意のサービスへの1回アクセス',
+    basicAnalysis: '基本AI分析',
+    instantResults: '即座の結果',
+    emailSupport: 'メールサポート',
+    unlimitedReadings: '無制限占い',
+    advancedAnalysis: '高度なAI分析',
+    dailyInsights: '毎日の宇宙洞察',
+    prioritySupport: '優先サポート',
+    personalizedReports: 'パーソナライズされたレポート',
+    historyTracking: '履歴追跡',
+    premiumAnalysis: 'プレミアムAI分析',
+    earlyAccess: '新機能への早期アクセス',
+    
+    selectPlan: 'プランを選択',
+    compareFeatures: '機能比較',
+    features: '機能',
+    
+    // Privacy Policy
+    privacyProtection: 'プライバシー保護',
+    privacyDescription: 'あなたの個人情報と宇宙データは企業レベルのセキュリティで保護されています',
+    dataProtection: 'データ保護',
+    dataProtectionDesc: 'すべての個人データは暗号化され、業界標準プロトコルで安全に保存されます',
+    encryption: 'エンドツーエンド暗号化',
+    encryptionDesc: 'あなたの占いと個人情報はデバイスからサーバーまで暗号化されます',
+    noTracking: 'サードパーティ追跡なし',
+    noTrackingDesc: '広告主やサードパーティ追跡サービスとデータを共有することはありません',
+    secureStorage: 'セキュア保存',
+    secureStorageDesc: 'データは認定されたセキュア施設に保存され、定期的なセキュリティ監査を実施',
+    userControl: 'ユーザーコントロール',
+    userControlDesc: 'あなたのデータを完全にコントロールでき、いつでも削除可能',
+    transparency: '完全な透明性',
+    transparencyDesc: '隠れたデータ収集や使用のない明確なプライバシーポリシー',
+    privacyCommitment: '私たちのプライバシーコミットメント',
+    privacyCommitmentText: '私たちはあなたのプライバシーを保護し、宇宙の旅の機密性を維持することをお約束します。あなたの信頼は私たちにとって神聖であり、個人情報の安全を確保するために最高水準のデータ保護を採用しています。',
+    
+    // Login/Register
+    loginSubtitle: 'あなたの宇宙の旅にアクセス',
+    register: '登録',
+    nameLabel: '氏名',
+    emailLabel: 'メールアドレス',
+    passwordLabel: 'パスワード',
+    confirmPasswordLabel: 'パスワード確認',
+    genderLabel: '性別',
+    birthDateLabel: '生年月日時',
+    namePlaceholder: 'お名前を入力してください',
+    emailPlaceholder: 'メールアドレスを入力',
+    passwordPlaceholder: 'パスワードを入力',
+    confirmPasswordPlaceholder: 'パスワードを確認',
+    selectGender: '性別を選択',
+    male: '男性',
+    female: '女性',
+    year: '年',
+    month: '月',
+    day: '日',
+    hour: '時',
+    forgotPassword: 'パスワードを忘れましたか？',
+    loginButton: 'ログイン',
+    registerButton: 'アカウント作成',
+    orContinueWith: 'または以下で続行',
+    termsAgreement: '登録することで、当社の',
+    termsOfService: '利用規約',
+    and: 'と',
+    privacyPolicy: 'プライバシーポリシー',
+
+    // Error Messages
+    emailAlreadyRegistered: 'このメールアドレスは既に登録されています。別のメールアドレスを使用するか、直接ログインしてください。',
+    invalidCredentials: 'メールアドレスまたはパスワードが正しくありません。確認して再試行してください。',
+    registrationSuccess: '登録成功！Destiny Divinationへようこそ。',
+    validationError: '登録情報に誤りがあります。確認して再試行してください。',
+    operationFailed: '操作に失敗しました。後でもう一度お試しください。',
+    emailVerificationRequired: '最初にメールアドレスを確認してください。',
+    passwordMismatch: 'パスワードが一致しません。',
+    pleaseEnterName: 'お名前を入力してください。',
+    pleaseEnterEmail: 'メールアドレスを入力してください。',
+    pleaseEnterPassword: 'パスワードを入力してください。',
+    emailVerificationSuccess: 'メール確認が成功しました。',
+    verificationCodeSent: '確認コードがメールに送信されました。受信トレイをご確認ください（5分間有効）。',
+
+    // Footer
+    footerTagline: '天体の知恵で道を照らす',
+    quickLinks: 'クイックリンク',
+    contactInfo: '連絡先情報',
+    accountInfo: 'アカウント',
+    support: 'サポート',
+    followUs: 'フォローする',
+    
+    // Prices
+    price: '価格',
+    duration: '時間',
+    minutes: '分',
+    selectService: 'サービスを選択',
+  },
+};

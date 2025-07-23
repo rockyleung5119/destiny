@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1890ff;
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            background: #1890ff;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #40a9ff;
+        }
+        .demo-form {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .result {
+            background: #e6f7ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #1890ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔮 命理分析系统</h1>
+        <p style="text-align: center; font-size: 18px; color: #666; margin-bottom: 30px;">
+            基于传统中华命理学的现代化分析系统<br>
+            集成八字、紫微斗数与AI技术，为您提供个性化的命运分析
+        </p>
+
+        <div style="text-align: center; margin-bottom: 30px;">
+            <a href="#demo" class="btn">🚀 开始体验</a>
+            <a href="/" class="btn">📱 Next.js版本</a>
+        </div>
+
+        <div id="demo" class="demo-form">
+            <h3>📝 个人信息</h3>
+            <form id="analysisForm">
+                <div class="form-group">
+                    <label for="name">姓名:</label>
+                    <input type="text" id="name" name="name" required placeholder="请输入您的姓名">
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">性别:</label>
+                    <select id="gender" name="gender" required>
+                        <option value="">请选择</option>
+                        <option value="male">男</option>
+                        <option value="female">女</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="birthDate">出生日期时间:</label>
+                    <input type="datetime-local" id="birthDate" name="birthDate" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="birthPlace">出生地点:</label>
+                    <input type="text" id="birthPlace" name="birthPlace" required placeholder="例如：北京，中国">
+                </div>
+                
+                <button type="submit" class="btn" style="width: 100%; margin: 20px 0 0 0;">
+                    🔮 开始命运分析
+                </button>
+            </form>
+        </div>
+
+        <div id="result" class="result" style="display: none;">
+            <h3>🎉 分析结果</h3>
+            <div id="resultContent"></div>
+        </div>
+
+        <div style="margin-top: 40px; padding: 20px; background: #f0f2f5; border-radius: 8px;">
+            <h3>✨ 系统特色</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+                <div>
+                    <strong>🔮 传统命理</strong><br>
+                    <small>完整的八字和紫微斗数计算</small>
+                </div>
+                <div>
+                    <strong>📊 可视化展示</strong><br>
+                    <small>图表化展示分析结果</small>
+                </div>
+                <div>
+                    <strong>🌍 多语言支持</strong><br>
+                    <small>中英文双语界面</small>
+                </div>
+                <div>
+                    <strong>📱 响应式设计</strong><br>
+                    <small>支持手机、平板、电脑</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            // 显示加载状态
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.innerHTML = `
+                <div style="text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🔮</div>
+                    <h3>正在分析您的命运...</h3>
+                    <p>请稍候，我们正在计算您的八字和紫微斗数...</p>
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+            
+            // 模拟分析过程
+            setTimeout(() => {
+                const mockResult = {
+                    overallScore: Math.floor(Math.random() * 40) + 60,
+                    career: Math.floor(Math.random() * 40) + 60,
+                    wealth: Math.floor(Math.random() * 40) + 60,
+                    love: Math.floor(Math.random() * 40) + 60,
+                    health: Math.floor(Math.random() * 40) + 60
+                };
+                
+                resultContent.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <div style="font-size: 48px; font-weight: bold; color: #1890ff;">
+                            ${mockResult.overallScore}/100
+                        </div>
+                        <p>综合运势评分</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
+                            <h4>🏆 事业</h4>
+                            <div style="font-size: 24px; font-weight: bold; color: #52c41a;">
+                                ${mockResult.career}/100
+                            </div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
+                            <h4>💰 财运</h4>
+                            <div style="font-size: 24px; font-weight: bold; color: #fa8c16;">
+                                ${mockResult.wealth}/100
+                            </div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
+                            <h4>💕 感情</h4>
+                            <div style="font-size: 24px; font-weight: bold; color: #eb2f96;">
+                                ${mockResult.love}/100
+                            </div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
+                            <h4>🏥 健康</h4>
+                            <div style="font-size: 24px; font-weight: bold; color: #52c41a;">
+                                ${mockResult.health}/100
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 6px;">
+                        <h4>📊 八字信息</h4>
+                        <p>年柱: 庚午(金) | 月柱: 辛巳(金) | 日柱: 甲子(木) | 时柱: 丙寅(火)</p>
+                        <p><strong>分析建议:</strong> 您的命格中金木相克，需要注意平衡发展。事业上宜稳扎稳打，财运方面可适当投资，感情上要多沟通理解。</p>
+                    </div>
+                `;
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
