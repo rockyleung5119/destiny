@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { authAPI, membershipAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface MembershipPlan {
   id: string;
   name: string;
-  level: 'free' | 'single' | 'monthly' | 'yearly';
+  level: 'single' | 'monthly' | 'yearly';
   features: string[];
   price: string;
   period?: string;
@@ -18,11 +19,11 @@ export interface UserMembership {
   hasUnlimitedAccess?: boolean; // 是否有无限使用权限
 }
 
-// 默认免费计划
-const FREE_PLAN: MembershipPlan = {
-  id: 'free',
-  name: 'Free Plan',
-  level: 'free',
+// 默认无会员状态
+const NO_MEMBERSHIP: MembershipPlan = {
+  id: 'none',
+  name: 'No Membership',
+  level: 'single', // 默认级别
   features: [],
   price: '$0',
 };
@@ -42,7 +43,7 @@ const MEMBERSHIP_PLANS: Record<string, MembershipPlan> = {
     name: 'Monthly Plan',
     level: 'monthly',
     features: ['unlimited_readings', 'advanced_analysis', 'daily_insights', 'priority_support', 'personalized_reports', 'history_tracking'],
-    price: '$9.99',
+    price: '$19.9',
     period: 'per month',
   },
   yearly: {
@@ -50,7 +51,7 @@ const MEMBERSHIP_PLANS: Record<string, MembershipPlan> = {
     name: 'Yearly Plan',
     level: 'yearly',
     features: ['unlimited_readings', 'premium_analysis', 'daily_insights', 'personalized_reports', 'history_tracking', 'early_access'],
-    price: '$99.99',
+    price: '$188',
     period: 'per year',
   },
 };
@@ -60,24 +61,26 @@ const SERVICE_PERMISSIONS: Record<string, string[]> = {
   'bazi': ['paid_access'],
   'daily-fortune': ['paid_access'],
   'tarot': ['paid_access'],
-  'lucky-items': ['paid_access'],
+  'luckyitems': ['paid_access'],
 };
 
 // 付费功能列表
 const PAID_FEATURES = ['one_time_access', 'unlimited_readings', 'advanced_analysis', 'premium_analysis'];
 
 export const useMembership = () => {
+  const { isAuthenticated, user } = useAuth();
   const [membership, setMembership] = useState<UserMembership | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkMembership = async () => {
       try {
-        const isLoggedIn = authAPI.isLoggedIn();
-        if (!isLoggedIn) {
-          // 未登录用户使用免费计划
+        setIsLoading(true); // 确保在检查时显示加载状态
+
+        if (!isAuthenticated || !user) {
+          // 未登录用户没有会员
           setMembership({
-            plan: FREE_PLAN,
+            plan: NO_MEMBERSHIP,
             isActive: false,
           });
           setIsLoading(false);
@@ -86,27 +89,45 @@ export const useMembership = () => {
 
         // 从后端API获取用户会员信息
         const response = await membershipAPI.getStatus();
-        if (response.success && response.membership) {
-          const membershipData = response.membership;
-          const plan = membershipData.plan || FREE_PLAN;
+        if (response.success && response.data) {
+          const membershipData = response.data;
 
-          setMembership({
-            plan,
-            isActive: membershipData.isActive || false,
-            expiresAt: membershipData.expiresAt ? new Date(membershipData.expiresAt) : undefined,
-            remainingCredits: membershipData.remainingCredits,
-          });
+          // 如果没有会员计划，设置为未激活状态
+          if (!membershipData.plan_id) {
+            setMembership({
+              plan: NO_MEMBERSHIP,
+              isActive: false,
+            });
+          } else {
+            // 根据后端返回的计划ID创建计划对象
+            const plan = {
+              id: membershipData.plan_id,
+              name: membershipData.plan?.name || 'Membership Plan',
+              level: membershipData.plan_id,
+              features: membershipData.features || [],
+              price: membershipData.plan?.price || 0,
+              hasCreditsLimit: membershipData.plan_id === 'single'
+            };
+
+            setMembership({
+              plan,
+              isActive: membershipData.is_active || false,
+              expiresAt: membershipData.expires_at ? new Date(membershipData.expires_at) : undefined,
+              remainingCredits: membershipData.remaining_credits,
+              hasUnlimitedAccess: !plan.hasCreditsLimit
+            });
+          }
         } else {
-          // 默认免费计划
+          // 默认无会员状态
           setMembership({
-            plan: FREE_PLAN,
+            plan: NO_MEMBERSHIP,
             isActive: false,
           });
         }
       } catch (error) {
         console.error('Error checking membership:', error);
         setMembership({
-          plan: FREE_PLAN,
+          plan: NO_MEMBERSHIP,
           isActive: false,
         });
       } finally {
@@ -115,22 +136,27 @@ export const useMembership = () => {
     };
 
     checkMembership();
-  }, []);
+  }, [isAuthenticated, user]); // 依赖于认证状态和用户信息
 
   // 检查是否为付费会员
   const isPaidMember = (): boolean => {
     if (!membership) return false;
-    return membership.plan.level !== 'free' && membership.isActive;
+    return membership.plan.id !== 'none' && membership.isActive;
   };
 
   // 检查是否有权限访问特定服务 - 简化为付费检查
   const hasServiceAccess = (serviceId: string): boolean => {
     if (!membership) return false;
 
-    // 免费用户无法访问任何服务
-    if (membership.plan.level === 'free') return false;
+    // 没有会员的用户无法访问任何服务
+    if (membership.plan.id === 'none') return false;
 
-    // 付费用户可以访问所有服务
+    // 月度和年度会员可以访问所有服务
+    if (membership.plan.level === 'monthly' || membership.plan.level === 'yearly') {
+      return membership.isActive;
+    }
+
+    // 其他付费用户也可以访问所有服务
     return membership.isActive && isPaidMember();
   };
 
@@ -153,7 +179,12 @@ export const useMembership = () => {
       return { allowed: false, reason: 'requires_payment' };
     }
 
-    // 检查是否有无限使用权限（monthly, yearly会员）
+    // 月度和年度会员有无限使用权限
+    if (membership.plan.level === 'monthly' || membership.plan.level === 'yearly') {
+      return { allowed: true };
+    }
+
+    // 检查是否有无限使用权限标识
     if (membership.hasUnlimitedAccess) {
       return { allowed: true };
     }
@@ -197,6 +228,12 @@ export const useMembership = () => {
 
   const consumeCredit = () => {
     if (!membership) return;
+
+    // 月度和年度会员有无限使用权限，不需要扣除积分
+    if (membership.plan.level === 'monthly' || membership.plan.level === 'yearly') {
+      console.log('月度/年度会员无需消耗积分');
+      return;
+    }
 
     // 如果有无限使用权限，不需要扣除积分
     if (membership.hasUnlimitedAccess) {

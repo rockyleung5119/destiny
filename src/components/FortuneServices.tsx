@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Calendar, Sparkles, Gift, Lock, Crown, AlertCircle, Loader2 } from 'lucide-react';
 import { fortuneAPI, MembershipStatus, FortuneResponse, handleFortuneError, checkFeatureAccess, formatFortuneResult, getFeatureNames, shouldUpgrade } from '../services/fortuneApi';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 
 interface FortuneServicesProps {
   isLoggedIn: boolean;

@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = process.env.DB_PATH || './database/destiny.db';
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'database', 'destiny.db');
 const DB_DIR = path.dirname(DB_PATH);
 
 // 确保数据库目录存在
@@ -39,6 +39,7 @@ const initDatabase = async () => {
           birth_day INTEGER,
           birth_hour INTEGER,
           birth_place VARCHAR(100),
+          timezone VARCHAR(50) DEFAULT 'Asia/Shanghai',
           is_email_verified BOOLEAN DEFAULT FALSE,
           profile_updated_count INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -74,6 +75,21 @@ const initDatabase = async () => {
         )
       `);
 
+      // 通用验证码表（用于各种验证场景）
+      db.run(`
+        CREATE TABLE IF NOT EXISTS verification_codes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email VARCHAR(255) NOT NULL,
+          code VARCHAR(10) NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          expires_at DATETIME NOT NULL,
+          attempts INTEGER DEFAULT 0,
+          is_used BOOLEAN DEFAULT FALSE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(email, type, code)
+        )
+      `);
+
       // 添加缺失的字段（如果不存在）
       db.run(`
         ALTER TABLE users ADD COLUMN profile_updated_count INTEGER DEFAULT 0
@@ -91,6 +107,26 @@ const initDatabase = async () => {
         // 忽略字段已存在的错误
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding timezone column:', err);
+        }
+      });
+
+      // 添加Stripe客户ID字段
+      db.run(`
+        ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255)
+      `, (err) => {
+        // 忽略字段已存在的错误
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding stripe_customer_id column:', err);
+        }
+      });
+
+      // 添加Stripe订阅ID字段到会员表
+      db.run(`
+        ALTER TABLE memberships ADD COLUMN stripe_subscription_id VARCHAR(255)
+      `, (err) => {
+        // 忽略字段已存在的错误
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding stripe_subscription_id column:', err);
         }
       });
 

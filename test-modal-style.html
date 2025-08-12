@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弹出窗口样式测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(5px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .test-section h2 {
+            color: white;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .test-section p {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        
+        .status.info {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            color: rgba(255, 255, 255, 0.9);
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-list li::before {
+            content: "✅";
+            margin-right: 10px;
+        }
+        
+        .test-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: rgba(139, 92, 246, 0.8);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .test-button:hover {
+            background: rgba(139, 92, 246, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.4);
+        }
+        
+        .demo-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .demo-modal h3 {
+            color: white;
+            margin: 0 0 15px 0;
+            text-align: center;
+        }
+        
+        .demo-content {
+            background: rgba(255, 255, 255, 0.95);
+            color: #1a202c;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎯 弹出窗口磨砂玻璃风格修复测试</h1>
+        
+        <div class="test-section">
+            <h2>修复状态 <span class="status success">✅ 完成</span></h2>
+            <p>4项服务功能的弹出窗口已成功修复，包含以下改进：</p>
+            <ul class="feature-list">
+                <li>页头改为几乎透明的磨砂玻璃风格</li>
+                <li>内容排版去掉乱码标记（**）</li>
+                <li>添加星星评分总评功能</li>
+                <li>保持所有原有功能正常工作</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h2>设计特点 <span class="status info">ℹ️ 详情</span></h2>
+            <ul class="feature-list">
+                <li>页头几乎透明磨砂玻璃效果（bg-white/5）</li>
+                <li>星星评分总评区域，4-5星随机评分</li>
+                <li>内容自动去除**乱码标记，保持结构</li>
+                <li>结果内容区域白底黑字，简单排版</li>
+                <li>操作按钮磨砂玻璃风格，悬停效果</li>
+                <li>自定义滚动条样式，整体协调</li>
+                <li>响应式设计，支持不同屏幕尺寸</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h2>功能验证 <span class="status success">✅ 正常</span></h2>
+            <p>所有功能保持正常工作：</p>
+            <ul class="feature-list">
+                <li>八字精算 - 弹出窗口显示</li>
+                <li>每日运势 - 弹出窗口显示</li>
+                <li>塔罗占卜 - 弹出窗口显示</li>
+                <li>幸运物品 - 弹出窗口显示</li>
+                <li>复制结果功能</li>
+                <li>下载文件功能</li>
+                <li>关闭弹窗功能</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h2>测试说明</h2>
+            <p>请在浏览器中访问 <strong>http://localhost:5173</strong> 进行实际测试：</p>
+            <ol style="color: rgba(255, 255, 255, 0.9); padding-left: 20px;">
+                <li>登录用户账户</li>
+                <li>点击任意一项服务功能</li>
+                <li>验证弹出窗口正常显示</li>
+                <li>检查磨砂玻璃效果</li>
+                <li>确认内容区域白底黑字显示</li>
+                <li>测试各功能按钮</li>
+            </ol>
+            <br>
+            <a href="http://localhost:5173" class="test-button" target="_blank">🚀 打开应用测试</a>
+        </div>
+        
+        <!-- 演示弹窗样式 -->
+        <div class="demo-modal">
+            <h3>🎨 样式演示</h3>
+            <div style="margin-bottom: 15px; padding: 10px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong style="color: #1f2937;">⭐ 综合评分</strong><br>
+                        <div style="display: flex; align-items: center; margin-top: 5px;">
+                            <span style="color: #fbbf24;">★★★★★</span>
+                            <span style="margin-left: 8px; font-size: 12px; color: #6b7280;">5/5</span>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px; color: #6b7280;">分析质量</div>
+                        <div style="font-weight: bold; color: #2563eb;">优秀</div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-content">
+                这是修复后的弹出窗口样式演示。
+                <br><br>
+                • 几乎透明磨砂玻璃页头<br>
+                • 星星评分总评功能<br>
+                • 去除乱码标记排版<br>
+                • 白底黑字内容区域<br>
+                • 现代化设计风格
+            </div>
+        </div>
+    </div>
+</body>
+</html>

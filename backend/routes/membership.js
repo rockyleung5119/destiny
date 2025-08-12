@@ -6,7 +6,7 @@ const { authenticateToken, requireEmailVerification } = require('../middleware/a
 
 const router = express.Router();
 
-// 会员计划定义
+// 会员计划定义 - 只保留单次付费、月度和年度会员
 const MEMBERSHIP_PLANS = {
   single: {
     id: 'single',
@@ -23,7 +23,7 @@ const MEMBERSHIP_PLANS = {
     name: 'Monthly Plan',
     level: 'monthly',
     features: ['unlimited_readings', 'advanced_analysis', 'daily_insights', 'priority_support', 'personalized_reports', 'history_tracking'],
-    price: 9.99,
+    price: 19.9,
     period: 'per month',
     duration: 30 * 24 * 60 * 60 * 1000, // 30天
     hasCreditsLimit: false // 月度会员无积分限制，无限使用
@@ -33,7 +33,7 @@ const MEMBERSHIP_PLANS = {
     name: 'Yearly Plan',
     level: 'yearly',
     features: ['unlimited_readings', 'premium_analysis', 'daily_insights', 'personalized_reports', 'history_tracking', 'early_access'],
-    price: 99.99,
+    price: 188,
     period: 'per year',
     duration: 365 * 24 * 60 * 60 * 1000, // 365天
     hasCreditsLimit: false // 年度会员无积分限制，无限使用
@@ -57,24 +57,22 @@ router.get('/plans', asyncHandler(async (req, res) => {
 router.get('/status', authenticateToken, asyncHandler(async (req, res) => {
   const membership = await dbGet(`
     SELECT plan_id, is_active, expires_at, remaining_credits, created_at, updated_at
-    FROM memberships 
-    WHERE user_id = ? AND is_active = TRUE
+    FROM memberships
+    WHERE user_id = ? AND is_active = 1
     ORDER BY created_at DESC LIMIT 1
   `, [req.user.id]);
 
   if (!membership) {
     return res.json({
       success: true,
-      membership: {
-        planId: 'free',
-        isActive: false,
-        plan: {
-          id: 'free',
-          name: 'Free Plan',
-          level: 'free',
-          features: [],
-          price: 0
-        }
+      data: {
+        plan_id: null,
+        is_active: false,
+        expires_at: null,
+        remaining_credits: 0,
+        created_at: null,
+        updated_at: null,
+        plan: null
       }
     });
   }
@@ -93,16 +91,14 @@ router.get('/status', authenticateToken, asyncHandler(async (req, res) => {
 
     return res.json({
       success: true,
-      membership: {
-        planId: 'free',
-        isActive: false,
-        plan: {
-          id: 'free',
-          name: 'Free Plan',
-          level: 'free',
-          features: [],
-          price: 0
-        }
+      data: {
+        plan_id: null,
+        is_active: false,
+        expires_at: null,
+        remaining_credits: 0,
+        created_at: null,
+        updated_at: null,
+        plan: null
       }
     });
   }
@@ -111,13 +107,13 @@ router.get('/status', authenticateToken, asyncHandler(async (req, res) => {
   
   res.json({
     success: true,
-    membership: {
-      planId: membership.plan_id,
-      isActive: membership.is_active,
-      expiresAt: membership.expires_at,
-      remainingCredits: membership.remaining_credits,
-      createdAt: membership.created_at,
-      updatedAt: membership.updated_at,
+    data: {
+      plan_id: membership.plan_id,
+      is_active: membership.is_active,
+      expires_at: membership.expires_at,
+      remaining_credits: membership.remaining_credits,
+      created_at: membership.created_at,
+      updated_at: membership.updated_at,
       plan
     }
   });
@@ -147,8 +143,8 @@ router.post('/upgrade', authenticateToken, requireEmailVerification, asyncHandle
 
   // 检查用户是否已有活跃会员
   const existingMembership = await dbGet(`
-    SELECT id, plan_id FROM memberships 
-    WHERE user_id = ? AND is_active = TRUE
+    SELECT id, plan_id FROM memberships
+    WHERE user_id = ? AND is_active = 1
   `, [req.user.id]);
 
   if (existingMembership) {
@@ -204,12 +200,12 @@ router.post('/check-access', authenticateToken, asyncHandler(async (req, res) =>
   // 获取用户会员状态
   const membership = await dbGet(`
     SELECT plan_id, is_active, expires_at, remaining_credits
-    FROM memberships 
-    WHERE user_id = ? AND is_active = TRUE
+    FROM memberships
+    WHERE user_id = ? AND is_active = 1
     ORDER BY created_at DESC LIMIT 1
   `, [req.user.id]);
 
-  // 免费用户无法访问任何服务
+  // 没有会员的用户无法访问任何服务
   if (!membership) {
     return res.json({
       success: true,
@@ -263,7 +259,7 @@ router.post('/consume-credit', authenticateToken, asyncHandler(async (req, res) 
   const membership = await dbGet(`
     SELECT id, plan_id, remaining_credits
     FROM memberships
-    WHERE user_id = ? AND is_active = TRUE
+    WHERE user_id = ? AND is_active = 1
     ORDER BY created_at DESC LIMIT 1
   `, [req.user.id]);
 

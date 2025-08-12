@@ -17,9 +17,11 @@ const authenticateToken = async (req, res, next) => {
     // 验证JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // 检查用户是否存在
+    // 检查用户是否存在，获取完整用户信息（包含算命所需的出生信息和时区）
     const user = await dbGet(
-      'SELECT id, email, name, is_email_verified FROM users WHERE id = ?',
+      `SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour,
+              birth_place, timezone, is_email_verified, profile_updated_count
+       FROM users WHERE id = ?`,
       [decoded.userId]
     );
 
@@ -63,7 +65,9 @@ const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await dbGet(
-        'SELECT id, email, name, is_email_verified FROM users WHERE id = ?',
+        `SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour,
+                birth_place, timezone, is_email_verified, profile_updated_count
+         FROM users WHERE id = ?`,
         [decoded.userId]
       );
       

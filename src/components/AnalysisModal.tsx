@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, MapPin, User, Sparkles, Star, TrendingUp, Heart, Shield } from 'lucide-react';
 import { authAPI, userAPI } from '../services/api';
-import { AIAnalysisDisplay } from './AIAnalysisDisplay';
+import CleanAnalysisDisplay from './CleanAnalysisDisplay';
 import { useTranslation } from 'react-i18next';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 
 interface AnalysisModalProps {
   isOpen: boolean;
@@ -60,18 +60,7 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
       setStep('loading');
       setError(null);
 
-      // 首先尝试从localStorage获取用户信息
-      const currentUser = authAPI.getCurrentUser();
-      if (currentUser) {
-        // 如果localStorage中有完整的用户信息，直接使用
-        if (currentUser.birthYear && currentUser.birthMonth && currentUser.birthDay) {
-          setUserProfile(currentUser);
-          startAnalysis(currentUser);
-          return;
-        }
-      }
-
-      // 如果localStorage中的信息不完整，从服务器获取
+      // 直接从服务器获取最新的用户信息，确保数据是最新的
       const response = await userAPI.getProfile();
       if (response.success && response.user) {
         const user = response.user;
@@ -166,21 +155,30 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white/60 backdrop-blur-sm rounded-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden shadow-2xl border border-white/20">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-800">{serviceName}</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b bg-white/60 backdrop-blur-sm">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-white/30 rounded-lg backdrop-blur-sm">
+              <Sparkles className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{serviceName}</h2>
+              <p className="text-sm text-gray-600 hidden sm:block">专业AI算命分析报告</p>
+            </div>
+          </div>
           <button
             onClick={handleClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-6 h-6 text-gray-700" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="overflow-y-auto max-h-[calc(95vh-80px)] bg-gray-50">
+          <div className="p-4 sm:p-6">
           {step === 'loading' && (
             <div className="text-center py-12">
               <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
@@ -270,15 +268,23 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
 
 
           {step === 'result' && result && (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {/* 如果有AI分析内容，优先显示AI分析 */}
               {result.aiAnalysis ? (
                 <div className="w-full">
-                  <AIAnalysisDisplay
-                    content={result.aiAnalysis}
-                    type={result.analysisType as 'bazi' | 'daily' | 'tarot' | 'lucky'}
-                    language={currentLanguage}
-                  />
+                  <div style={{
+                    whiteSpace: 'pre-wrap',
+                    fontSize: '16px',
+                    lineHeight: '1.6',
+                    color: '#333',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    padding: '20px',
+                    backgroundColor: '#fff',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    {result.aiAnalysis}
+                  </div>
                 </div>
               ) : (
                 <>
@@ -418,22 +424,26 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
               )}
 
               {/* 操作按钮 */}
-              <div className="flex justify-center gap-4 mt-8">
-                <button
-                  onClick={resetModal}
-                  className="px-6 py-3 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors"
-                >
-                  {currentLanguage === 'zh' ? '重新分析' : 'Reanalyze'}
-                </button>
-                <button
-                  onClick={handleClose}
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors"
-                >
-                  {currentLanguage === 'zh' ? '完成' : 'Done'}
-                </button>
+              {/* 底部操作栏 */}
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 mt-8 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+                  <button
+                    onClick={resetModal}
+                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm"
+                  >
+                    {currentLanguage === 'zh' ? '重新分析' : 'Reanalyze'}
+                  </button>
+                  <button
+                    onClick={handleClose}
+                    className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                  >
+                    {currentLanguage === 'zh' ? '完成' : 'Done'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

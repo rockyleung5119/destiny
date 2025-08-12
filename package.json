@@ -1,36 +1,28 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "indicate-top-fortune-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --mode production",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:preview": "vite build && vite preview"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^2.9.0",
+    "@stripe/stripe-js": "^2.4.0",
     "antd": "^5.26.6",
     "axios": "^1.11.0",
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.0",
-    "express": "^4.21.2",
-    "helmet": "^8.1.0",
     "i18next": "^25.3.2",
-    "joi": "^17.13.3",
-    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.344.0",
-    "nodemailer": "^7.0.5",
-    "rate-limiter-flexible": "^7.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^15.6.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.6.3",
-    "remark-gfm": "^4.0.1",
-    "sqlite3": "^5.1.7",
-    "uuid": "^11.1.0"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

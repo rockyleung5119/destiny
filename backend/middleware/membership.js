@@ -1,6 +1,6 @@
 // 会员权限检查中间件
 const { dbGet, dbRun } = require('../config/database');
-const { getLocalizedMessage } = require('../utils/i18n');
+// 移除国际化功能，简化系统
 
 // 检查用户会员状态
 const checkMembership = async (req, res, next) => {
@@ -85,12 +85,11 @@ const checkFeatureAccess = (requiredPlan) => {
         });
       }
 
-      // 定义会员等级
+      // 定义会员等级 - 只保留单次付费、月度和年度会员
       const planHierarchy = {
-        'free': 0,
-        'basic': 1,
-        'premium': 2,
-        'lifetime': 3
+        'single': 1,
+        'monthly': 2,
+        'yearly': 3
       };
 
       const userPlanLevel = planHierarchy[membership.plan_id] || 0;
@@ -124,8 +123,9 @@ const deductCredit = async (req, res, next) => {
   try {
     const membership = req.membership;
     
-    // 如果是无限制会员（lifetime或premium），跳过扣费
-    if (['lifetime', 'premium'].includes(membership.plan_id)) {
+    // 如果是无限制会员（monthly或yearly），跳过扣费
+    // single 计划需要扣除积分
+    if (['monthly', 'yearly'].includes(membership.plan_id)) {
       return next();
     }
 
@@ -171,7 +171,7 @@ const getMembershipStatus = async (req, res) => {
         success: true,
         data: {
           hasMembership: false,
-          plan: 'free',
+          plan: null,
           isActive: false,
           expiresAt: null,
           remainingCredits: 0,
@@ -193,27 +193,21 @@ const getMembershipStatus = async (req, res) => {
       isActive = isActive && (now <= expiryDate);
     }
 
-    // 定义各会员等级的功能权限
+    // 定义各会员等级的功能权限 - 只保留单次付费、月度和年度会员
     const planFeatures = {
-      'free': {
-        dailyFortune: false,
-        baziAnalysis: false,
-        tarotReading: false,
-        luckyItems: false
-      },
-      'basic': {
-        dailyFortune: true,
-        baziAnalysis: false,
-        tarotReading: false,
-        luckyItems: true
-      },
-      'premium': {
+      'single': {
         dailyFortune: true,
         baziAnalysis: true,
         tarotReading: true,
         luckyItems: true
       },
-      'lifetime': {
+      'monthly': {
+        dailyFortune: true,
+        baziAnalysis: true,
+        tarotReading: true,
+        luckyItems: true
+      },
+      'yearly': {
         dailyFortune: true,
         baziAnalysis: true,
         tarotReading: true,
@@ -229,7 +223,12 @@ const getMembershipStatus = async (req, res) => {
         isActive: isActive,
         expiresAt: membership.expires_at,
         remainingCredits: membership.remaining_credits,
-        features: planFeatures[membership.plan_id] || planFeatures['free'],
+        features: planFeatures[membership.plan_id] || {
+          dailyFortune: false,
+          baziAnalysis: false,
+          tarotReading: false,
+          luckyItems: false
+        },
         memberSince: membership.created_at
       }
     });

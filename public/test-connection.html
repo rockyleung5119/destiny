@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔍 前后端连接测试</h1>
+        <p>这个页面用于测试前端是否能正常连接到后端服务器。</p>
+        
+        <button onclick="testBackendHealth()">测试后端健康检查</button>
+        <button onclick="testApiConnection()">测试API连接</button>
+        <button onclick="testUserLogin()">测试用户登录</button>
+        <button onclick="clearResults()">清除结果</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testBackendHealth() {
+            log('🧪 开始测试后端健康检查...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✅ 后端健康检查成功！', 'success');
+                    log(`📊 响应数据: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                } else {
+                    log(`❌ 后端健康检查失败: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 后端健康检查异常: ${error.message}`, 'error');
+                log('💡 可能的原因: 后端服务器未启动或端口不正确', 'info');
+            }
+        }
+        
+        async function testApiConnection() {
+            log('🧪 开始测试API连接...', 'info');
+            
+            try {
+                // 测试不需要认证的端点
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': 'http://localhost:5173'
+                    }
+                });
+                
+                if (response.ok) {
+                    log('✅ API连接正常！', 'success');
+                    log(`📊 响应头: <pre>${JSON.stringify(Object.fromEntries(response.headers), null, 2)}</pre>`, 'info');
+                } else {
+                    log(`❌ API连接失败: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ API连接异常: ${error.message}`, 'error');
+                if (error.message.includes('CORS')) {
+                    log('💡 可能的原因: CORS配置问题', 'info');
+                } else if (error.message.includes('fetch')) {
+                    log('💡 可能的原因: 网络连接问题或后端服务器未响应', 'info');
+                }
+            }
+        }
+        
+        async function testUserLogin() {
+            log('🧪 开始测试用户登录...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': 'http://localhost:5173'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    log('✅ 用户登录测试成功！', 'success');
+                    log(`📊 登录响应: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                } else {
+                    log(`❌ 用户登录测试失败: ${data.message || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 用户登录测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 页面加载时自动测试
+        window.onload = function() {
+            log('🚀 页面加载完成，开始自动测试...', 'info');
+            setTimeout(testBackendHealth, 1000);
+        };
+    </script>
+</body>
+</html>

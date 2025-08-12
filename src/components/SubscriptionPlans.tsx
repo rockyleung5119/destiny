@@ -30,6 +30,11 @@ import {
 
 const { Title, Paragraph, Text } = Typography;
 
+// 检查支付功能是否启用
+const isPaymentEnabled = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY &&
+  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY !== 'pk_test_51234567890abcdef' &&
+  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY !== 'pk_test_placeholder';
+
 interface SubscriptionPlan {
   id: string;
   name: string;
@@ -91,7 +96,6 @@ export const SubscriptionPlans: React.FC = () => {
         'AI-Enhanced Reports',
         'Image Upload Support',
         'Instant Results',
-        'Email Notifications',
         '50 Queries/day'
       ],
       limitations: {
@@ -154,6 +158,16 @@ export const SubscriptionPlans: React.FC = () => {
   const handleSubscribe = (planId: string) => {
     if (planId === 'free') {
       message.info('You are already on the free plan');
+      return;
+    }
+
+    // 检查支付功能是否启用
+    if (!isPaymentEnabled) {
+      Modal.info({
+        title: '支付功能暂时不可用',
+        content: '支付功能正在维护中，请稍后再试或联系客服获取帮助。',
+        okText: '确定'
+      });
       return;
     }
 

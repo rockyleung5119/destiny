@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Sparkles, Calendar, MapPin, User } from 'lucide-react';
+import { useLanguage } from '../../hooks/useLanguage';
 
 interface FormData {
   name: string;
@@ -36,6 +37,7 @@ interface AnalysisResult {
 export default function AnalysisFormPage() {
   const searchParams = useSearchParams();
   const serviceType = searchParams.get('service') || 'bazi';
+  const { currentLanguage, t } = useLanguage();
   
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -159,10 +161,10 @@ export default function AnalysisFormPage() {
                     health: '🏥'
                   };
                   const names = {
-                    career: '事业运势',
-                    wealth: '财运',
-                    love: '感情运势',
-                    health: '健康运势'
+                    career: t('careerFortune'),
+                    wealth: t('wealthFortune'),
+                    love: t('loveFortune'),
+                    health: t('healthFortune')
                   };
                   
                   return (

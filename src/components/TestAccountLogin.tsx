@@ -15,8 +15,7 @@ const TestAccountLogin: React.FC<TestAccountLoginProps> = ({ onLoginSuccess }) =
       if (onLoginSuccess) {
         onLoginSuccess();
       }
-      // 刷新页面以更新状态
-      window.location.reload();
+      // 不需要刷新页面，AuthContext会自动更新状态
     } else {
       alert(`登录失败：${result.error}`);
     }

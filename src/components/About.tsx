@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 import { BookOpen, Clock, Star } from 'lucide-react';
 
 const About: React.FC = () => {

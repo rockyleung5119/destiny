@@ -1,0 +1,22 @@
+{
+  "brandInfo": {
+    "name": "Indicate.Top",
+    "subtitle": "Ancient Divination Arts",
+    "tagline": "Illuminating paths through celestial wisdom",
+    "website": "https://indicate.top",
+    "support": "support@indicate.top"
+  },
+  "template": {
+    "file": "verification-email-indicate-top.html",
+    "subject": "Indicate.Top - Email Verification Code",
+    "language": "en"
+  },
+  "features": [
+    "基于您提供的设计风格",
+    "使用新的品牌信息：Indicate.Top",
+    "副标题：Ancient Divination Arts",
+    "标语：Illuminating paths through celestial wisdom",
+    "保持原有的视觉设计和布局",
+    "响应式设计，支持移动设备"
+  ]
+}

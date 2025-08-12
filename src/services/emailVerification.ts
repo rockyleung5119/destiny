@@ -9,30 +9,43 @@ export interface VerificationCode {
 }
 
 // 发送验证码
-export const sendVerificationCode = async (email: string): Promise<{ success: boolean; message: string }> => {
+export const sendVerificationCode = async (email: string, language: string = 'en'): Promise<{ success: boolean; message: string }> => {
   try {
+    console.log('🔄 sendVerificationCode called with:', { email, language });
+
     // 验证邮箱格式
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.log('❌ Invalid email format:', email);
       return { success: false, message: 'Invalid email format' };
     }
 
+    console.log('📡 Calling emailAPI.sendVerificationCode...');
     // 调用后端API发送验证码
-    const response = await emailAPI.sendVerificationCode(email);
+    const response = await emailAPI.sendVerificationCode(email, language);
+    console.log('📦 emailAPI response:', response);
 
-    if (response.success) {
+    if (response && response.success) {
+      console.log('✅ Email API returned success');
       return {
         success: true,
         message: response.message || 'Verification code has been sent to your email. Please check your inbox (valid for 5 minutes)'
       };
     } else {
+      console.log('❌ Email API returned failure:', response);
       return {
         success: false,
-        message: response.message || 'Failed to send verification code, please try again later'
+        message: response?.message || 'Failed to send verification code, please try again later'
       };
     }
   } catch (error) {
-    console.error('发送验证码失败:', error);
+    console.error('❌ sendVerificationCode error:', error);
+    console.error('❌ Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: typeof error,
+      error: error
+    });
 
     // 提取更详细的错误信息
     let errorMessage = 'Failed to send verification code, please try again later';

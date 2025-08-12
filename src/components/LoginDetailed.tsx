@@ -2,24 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { User, Lock, Mail, Eye, EyeOff, Star, Moon, Sun, Calendar, MapPin, Shield, Settings } from 'lucide-react';
 import { authAPI, RegisterData, LoginData } from '../services/api';
-import { mockLogin, mockRegister } from '../services/mockAuth';
+import { useAuth } from '../contexts/AuthContext';
+
 import EmailVerification from './EmailVerification';
 import ForgotPassword from './ForgotPassword';
 
 interface LoginDetailedProps {
   onLoginSuccess?: (user: any) => void;
   onShowSettings?: () => void;
+  onShowTerms?: () => void;
 }
 
-const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSettings }) => {
+const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSettings, onShowTerms }) => {
   const { t } = useLanguage();
+  const { login, register, logout, isAuthenticated } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -35,16 +38,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
     timezone: '',
   });
 
-  // 检查用户是否已登录
-  useEffect(() => {
-    const checkLoginStatus = () => {
-      setIsLoggedIn(authAPI.isLoggedIn());
-    };
-    checkLoginStatus();
-
-    // 使用模拟系统，无需API连接
-    console.log('使用模拟认证系统');
-  }, []);
+  // 不需要手动检查登录状态，AuthContext会自动管理
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,23 +47,23 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
     try {
       if (isLogin) {
-        // 登录逻辑 - 先尝试模拟登录，失败则使用真实API
+        // 登录逻辑
         console.log('Attempting login with:', { email: formData.email });
 
-        // 使用真实API登录
-        const loginData: LoginData = {
-          email: formData.email,
-          password: formData.password,
-        };
-
-        const response = await authAPI.login(loginData);
+        const response = await login(formData.email, formData.password);
         console.log('Login response:', response);
-        setMessage(`✅ ${response.message}`);
-        setIsLoggedIn(true);
 
-        // Call the success callback if provided
-        if (onLoginSuccess && response.user) {
-          onLoginSuccess(response.user);
+        if (response.success) {
+          setMessage(`✅ ${response.message}`);
+
+          // Call the success callback if provided
+          if (onLoginSuccess && response.user) {
+            onLoginSuccess(response.user);
+          }
+
+          // 登录成功，不需要刷新页面，AuthContext会自动更新状态
+        } else {
+          setMessage(`❌ ${response.message}`);
         }
       } else {
         // 注册逻辑
@@ -96,6 +90,9 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
         if (formData.password !== formData.confirmPassword) {
           throw new Error(t('passwordMismatch'));
         }
+        if (!agreeToTerms) {
+          throw new Error(t('mustAgreeToTerms'));
+        }
 
         // 检查邮箱是否已验证
         if (!isEmailVerified) {
@@ -113,16 +110,25 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
           birthMonth: formData.birthMonth ? parseInt(formData.birthMonth) : undefined,
           birthDay: formData.birthDay ? parseInt(formData.birthDay) : undefined,
           birthHour: formData.birthHour ? parseInt(formData.birthHour) : undefined,
+          birthMinute: formData.birthMinute ? parseInt(formData.birthMinute) : undefined,
+          birthPlace: formData.birthPlace || undefined,
+          timezone: formData.timezone || undefined,
         };
 
-        const response = await authAPI.register(registerData);
+        const response = await register(registerData);
         console.log('Registration response:', response);
-        setMessage(`✅ ${response.message}`);
-        setIsLoggedIn(true);
 
-        // Call the success callback if provided
-        if (onLoginSuccess && response.user) {
-          onLoginSuccess(response.user);
+        if (response.success) {
+          setMessage(`✅ ${response.message}`);
+
+          // Call the success callback if provided
+          if (onLoginSuccess && response.user) {
+            onLoginSuccess(response.user);
+          }
+
+          // 注册成功，不需要刷新页面，AuthContext会自动更新状态
+        } else {
+          setMessage(`❌ ${response.message}`);
         }
       }
     } catch (error) {
@@ -141,8 +147,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
   };
 
   const handleLogout = () => {
-    authAPI.logout();
-    setIsLoggedIn(false);
+    logout();
     setMessage('');
     setFormData({
       email: '',
@@ -213,20 +218,20 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                 </div>
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent mb-2">
-                Celestial Wisdom
+                Indicate.Top
               </h1>
               <p className="text-white/70 text-sm">Access Your Cosmic Journey</p>
             </div>
 
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               // 登录成功显示
               <div className="text-center space-y-6">
                 <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg">
                   <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <User className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">Welcome Back!</h3>
-                  <p className="text-gray-600 mb-4">You are now logged in and can access all our services.</p>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">{t('welcomeBack')}</h3>
+                  <p className="text-gray-600 mb-4">{t('welcomeBackDesc')}</p>
                   <div className="space-y-3">
                     <button
                       onClick={() => {
@@ -237,20 +242,20 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       }}
                       className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-lg font-semibold hover:from-yellow-300 hover:to-orange-400 transition-all duration-300"
                     >
-                      Explore Our Services
+                      {t('exploreServices')}
                     </button>
                     <button
                       onClick={onShowSettings}
                       className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-400 hover:to-purple-500 transition-all duration-300 flex items-center justify-center gap-2"
                     >
                       <Settings size={20} />
-                      Account Settings
+                      {t('accountSettings')}
                     </button>
                     <button
                       onClick={handleLogout}
                       className="w-full bg-gray-100 border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all duration-300"
                     >
-                      Logout
+                      {t('logout')}
                     </button>
                   </div>
                 </div>
@@ -279,7 +284,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-purple-600'
                     }`}
                   >
-                    Login
+                    {t('loginButton')}
                   </button>
                   <button
                     onClick={() => {
@@ -291,7 +296,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       !isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-purple-600'
                     }`}
                   >
-                    Register
+                    {t('register')}
                   </button>
                 </div>
 
@@ -300,7 +305,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                   {isLogin ? (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Address
+                        {t('emailLabel')}
                       </label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -311,7 +316,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           onChange={handleChange}
                           required
                           className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                          placeholder="Enter your email"
+                          placeholder={t('emailPlaceholder')}
                         />
                       </div>
                     </div>
@@ -328,7 +333,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                   {/* Password */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Password
+                      {t('passwordLabel')}
                     </label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -339,7 +344,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                         onChange={handleChange}
                         required
                         className="w-full pl-12 pr-12 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                        placeholder="Enter your password"
+                        placeholder={t('passwordPlaceholder')}
                       />
                       <button
                         type="button"
@@ -356,7 +361,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           onClick={() => setShowForgotPassword(true)}
                           className="text-purple-600 hover:text-purple-700 text-sm underline bg-transparent border-none cursor-pointer"
                         >
-                          Forgot Password? 忘记密码?
+                          {t('forgotPassword')}
                         </button>
                       </div>
                     )}
@@ -368,7 +373,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       {/* Confirm Password */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Confirm Password
+                          {t('confirmPasswordLabel')}
                         </label>
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -379,7 +384,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             onChange={handleChange}
                             required
                             className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                            placeholder="Confirm your password"
+                            placeholder={t('confirmPasswordPlaceholder')}
                           />
                         </div>
                       </div>
@@ -387,7 +392,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       {/* Full Name */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Full Name
+                          {t('nameLabel')}
                         </label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -398,7 +403,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             onChange={handleChange}
                             required
                             className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                            placeholder="Enter your full name"
+                            placeholder={t('namePlaceholder')}
                           />
                         </div>
                       </div>
@@ -406,7 +411,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       {/* Gender */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Gender
+                          {t('genderLabel')}
                         </label>
                         <select
                           name="gender"
@@ -415,9 +420,9 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           required
                           className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         >
-                          <option value="">Select Gender</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
+                          <option value="">{t('selectGender')}</option>
+                          <option value="male">{t('male')}</option>
+                          <option value="female">{t('female')}</option>
                         </select>
                       </div>
 
@@ -425,7 +430,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           <Calendar className="inline w-4 h-4 mr-2" />
-                          Birth Date
+                          {t('birthDateLabel')}
                         </label>
                         <div className="grid grid-cols-3 gap-2">
                           <select
@@ -435,7 +440,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             required
                             className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="">Year</option>
+                            <option value="">{t('year')}</option>
                             {years.map(year => (
                               <option key={year} value={year}>{year}</option>
                             ))}
@@ -447,7 +452,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             required
                             className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="">Month</option>
+                            <option value="">{t('month')}</option>
                             {months.map(month => (
                               <option key={month} value={month}>{month}</option>
                             ))}
@@ -459,7 +464,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             required
                             className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="">Day</option>
+                            <option value="">{t('day')}</option>
                             {days.map(day => (
                               <option key={day} value={day}>{day}</option>
                             ))}
@@ -471,7 +476,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           <Sun className="inline w-4 h-4 mr-2" />
-                          Birth Time (Optional for more accurate reading)
+                          {t('birthTimeOptional')}
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           <select
@@ -480,7 +485,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             onChange={handleChange}
                             className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="">Hour</option>
+                            <option value="">{t('hour')}</option>
                             {hours.map(hour => (
                               <option key={hour} value={hour}>
                                 {hour.toString().padStart(2, '0')}:00
@@ -493,7 +498,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             onChange={handleChange}
                             className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="">Minute</option>
+                            <option value="">{t('minute')}</option>
                             {minutes.map(minute => (
                               <option key={minute} value={minute}>
                                 {minute.toString().padStart(2, '0')}
@@ -507,7 +512,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           <MapPin className="inline w-4 h-4 mr-2" />
-                          Birth Place
+                          {t('birthPlace')}
                         </label>
                         <input
                           type="text"
@@ -515,14 +520,14 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           value={formData.birthPlace}
                           onChange={handleChange}
                           className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                          placeholder="City, Country (e.g., Beijing, China)"
+                          placeholder={t('birthPlacePlaceholder')}
                         />
                       </div>
 
                       {/* Timezone */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Timezone (Optional)
+                          {t('timezone')}
                         </label>
                         <select
                           name="timezone"
@@ -530,7 +535,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           onChange={handleChange}
                           className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         >
-                          <option value="">Select Timezone</option>
+                          <option value="">{t('selectTimezone')}</option>
                           <option value="UTC+8">UTC+8 (Beijing, Shanghai)</option>
                           <option value="UTC+9">UTC+9 (Tokyo, Seoul)</option>
                           <option value="UTC+7">UTC+7 (Bangkok, Jakarta)</option>
@@ -554,12 +559,38 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     </div>
                   )}
 
+                  {/* Terms of Service Agreement */}
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="agreeToTerms"
+                      checked={agreeToTerms}
+                      onChange={(e) => setAgreeToTerms(e.target.checked)}
+                      className="mt-1 w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                    />
+                    <label htmlFor="agreeToTerms" className="text-sm text-gray-700">
+                      {t('agreeToTerms')}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (onShowTerms) {
+                            onShowTerms();
+                          }
+                        }}
+                        className="ml-1 text-purple-600 hover:text-purple-800 underline bg-transparent border-none p-0 cursor-pointer"
+                      >
+                        {t('termsOfService')}
+                      </button>
+                    </label>
+                  </div>
+
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={isLoading || (!isLogin && !isEmailVerified)}
+                    disabled={isLoading || (!isLogin && !isEmailVerified) || !agreeToTerms}
                     className={`w-full py-3 rounded-lg font-semibold transition-all duration-300 transform shadow-lg flex items-center justify-center gap-2 ${
-                      isLoading || (!isLogin && !isEmailVerified)
+                      isLoading || (!isLogin && !isEmailVerified) || !agreeToTerms
                         ? 'bg-gray-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-300 hover:to-orange-400 hover:scale-105 hover:shadow-xl'
                     }`}
@@ -567,10 +598,10 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     {isLoading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        {isLogin ? 'Signing In...' : 'Creating Account...'}
+                        {isLogin ? t('loggingIn') : t('registering')}
                       </>
                     ) : (
-                      isLogin ? 'Sign In' : 'Create Account'
+                      isLogin ? t('loginButton') : t('registerButton')
                     )}
                   </button>
 
@@ -578,7 +609,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                   {!isLogin && !isEmailVerified && (
                     <div className="mt-3 text-center text-sm text-orange-600">
                       <Mail className="inline w-4 h-4 mr-1" />
-                      请先验证邮箱地址后才能创建账户
+                      {t('emailVerificationRequired')}
                     </div>
                   )}
                 </form>
@@ -595,9 +626,9 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Shield className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Privacy Protection</h3>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{t('privacyProtection')}</h3>
                 <p className="text-gray-600 text-sm">
-                  Your personal information and cosmic data are protected with enterprise-grade security
+                  {t('privacyDescription')}
                 </p>
               </div>
 
@@ -607,8 +638,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <Shield className="w-4 h-4 text-purple-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">Data Protection</h4>
-                    <p className="text-gray-600 text-xs">All personal data is encrypted and stored securely with industry-standard protocols</p>
+                    <h4 className="font-semibold text-gray-800 text-sm">{t('dataProtection')}</h4>
+                    <p className="text-gray-600 text-xs">{t('dataProtectionDesc')}</p>
                   </div>
                 </div>
 
@@ -617,8 +648,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <Lock className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">End-to-End Encryption</h4>
-                    <p className="text-gray-600 text-xs">Your readings and personal information are encrypted from device to server</p>
+                    <h4 className="font-semibold text-gray-800 text-sm">{t('encryption')}</h4>
+                    <p className="text-gray-600 text-xs">{t('encryptionDesc')}</p>
                   </div>
                 </div>
 
@@ -627,8 +658,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <Eye className="w-4 h-4 text-green-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">No Third-Party Tracking</h4>
-                    <p className="text-gray-600 text-xs">We never share your data with advertisers or third party tracking services</p>
+                    <h4 className="font-semibold text-gray-800 text-sm">{t('noTracking')}</h4>
+                    <p className="text-gray-600 text-xs">{t('noTrackingDesc')}</p>
                   </div>
                 </div>
 
@@ -637,8 +668,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <User className="w-4 h-4 text-orange-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">User Control</h4>
-                    <p className="text-gray-600 text-xs">You have full control over your data and can delete your account at any time</p>
+                    <h4 className="font-semibold text-gray-800 text-sm">{t('userControl')}</h4>
+                    <p className="text-gray-600 text-xs">{t('userControlDesc')}</p>
                   </div>
                 </div>
 
@@ -647,8 +678,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <Calendar className="w-4 h-4 text-indigo-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">Secure Storage</h4>
-                    <p className="text-gray-600 text-xs">Data is stored in certified secure facilities with regular security audits</p>
+                    <h4 className="font-semibold text-gray-800 text-sm">{t('secureStorage')}</h4>
+                    <p className="text-gray-600 text-xs">{t('secureStorageDesc')}</p>
                   </div>
                 </div>
 
@@ -657,8 +688,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <Star className="w-4 h-4 text-pink-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">Full Transparency</h4>
-                    <p className="text-gray-600 text-xs">Clear privacy policy with no hidden terms or data collection practices</p>
+                    <h4 className="font-semibold text-gray-800 text-sm">{t('transparency')}</h4>
+                    <p className="text-gray-600 text-xs">{t('transparencyDesc')}</p>
                   </div>
                 </div>
               </div>
@@ -666,6 +697,8 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
           </div>
         </div>
       </div>
+
+
     </section>
   );
 };

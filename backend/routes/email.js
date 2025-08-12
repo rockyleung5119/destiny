@@ -10,13 +10,14 @@ const {
   verifyCode,
   generateVerificationCode
 } = require('../services/emailService');
-const { getLocalizedMessage, getLanguageFromRequest } = require('../utils/i18n');
+// 移除国际化功能，简化系统
 
 const router = express.Router();
 
 // 验证schemas
 const sendCodeSchema = Joi.object({
-  email: Joi.string().email().required()
+  email: Joi.string().email().required(),
+  language: Joi.string().valid('en', 'zh', 'es', 'fr', 'ja').default('en')
 });
 
 const verifyCodeSchema = Joi.object({
@@ -26,19 +27,17 @@ const verifyCodeSchema = Joi.object({
 
 // 发送验证码
 router.post('/send-verification-code', emailRateLimit, asyncHandler(async (req, res) => {
-  const language = getLanguageFromRequest(req);
-
   // 验证输入数据
   const { error, value } = sendCodeSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,
-      message: getLocalizedMessage('validationError', language),
+      message: 'Validation error',
       details: error.details.map(d => d.message)
     });
   }
 
-  const { email } = value;
+  const { email, language } = value;
 
   // 检查是否在短时间内重复发送
   const recentCode = await dbGet(`
@@ -62,7 +61,7 @@ router.post('/send-verification-code', emailRateLimit, asyncHandler(async (req, 
     await saveVerificationCode(email, code);
 
     // 发送邮件
-    await sendVerificationEmail(email, code);
+    await sendVerificationEmail(email, code, language);
 
     // 开发环境下在控制台显示验证码
     if (process.env.NODE_ENV === 'development') {
@@ -71,7 +70,7 @@ router.post('/send-verification-code', emailRateLimit, asyncHandler(async (req, 
 
     res.json({
       success: true,
-      message: getLocalizedMessage('verificationCodeSent', language)
+      message: 'Verification code sent'
     });
   } catch (error) {
     console.error('Send verification code error:', error);
@@ -90,14 +89,12 @@ router.post('/send-verification-code', emailRateLimit, asyncHandler(async (req, 
 
 // 验证验证码
 router.post('/verify-code', asyncHandler(async (req, res) => {
-  const language = getLanguageFromRequest(req);
-
   // 验证输入数据
   const { error, value } = verifyCodeSchema.validate(req.body);
   if (error) {
     return res.status(400).json({
       success: false,
-      message: getLocalizedMessage('validationError', language),
+      message: 'Validation error',
       details: error.details.map(d => d.message)
     });
   }
@@ -120,7 +117,7 @@ router.post('/verify-code', asyncHandler(async (req, res) => {
 
       res.json({
         success: true,
-        message: getLocalizedMessage('emailVerificationSuccess', language)
+        message: 'Email verification successful'
       });
     } else {
       res.status(400).json({

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 import { X, Lock, Crown, Star, Zap, ArrowRight } from 'lucide-react';
 import { authAPI } from '../services/api';
 
@@ -10,6 +10,7 @@ interface ServicePermissionModalProps {
   reason: string;
   onLogin: () => void;
   onUpgrade: () => void;
+  onShowSettings?: () => void;
 }
 
 const ServicePermissionModal: React.FC<ServicePermissionModalProps> = ({
@@ -19,6 +20,7 @@ const ServicePermissionModal: React.FC<ServicePermissionModalProps> = ({
   reason,
   onLogin,
   onUpgrade,
+  onShowSettings,
 }) => {
   const { t } = useLanguage();
 
@@ -96,6 +98,28 @@ const ServicePermissionModal: React.FC<ServicePermissionModalProps> = ({
           },
         };
 
+      case 'incomplete_profile':
+        return {
+          icon: <Star className="w-16 h-16 text-blue-500" />,
+          title: t('profileIncomplete'),
+          description: t('profileIncompleteDesc'),
+          primaryAction: {
+            text: t('goToSettings'),
+            onClick: () => {
+              onClose();
+              if (onShowSettings) {
+                onShowSettings();
+              }
+            },
+            className: 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white',
+          },
+          secondaryAction: {
+            text: t('cancel'),
+            onClick: onClose,
+            className: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
+          },
+        };
+
       default:
         return {
           icon: <Lock className="w-16 h-16 text-gray-500" />,
@@ -113,14 +137,14 @@ const ServicePermissionModal: React.FC<ServicePermissionModalProps> = ({
   const content = getModalContent();
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-8 relative animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white/60 backdrop-blur-sm rounded-2xl max-w-md w-full p-8 relative animate-in fade-in zoom-in duration-200 border border-white/20 shadow-2xl">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors"
         >
-          <X className="w-5 h-5 text-gray-500" />
+          <X className="w-5 h-5 text-gray-700" />
         </button>
 
         {/* Content */}
@@ -136,13 +160,13 @@ const ServicePermissionModal: React.FC<ServicePermissionModalProps> = ({
           </h3>
 
           {/* Service Title */}
-          <div className="bg-gray-50 rounded-lg p-3 mb-4">
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white/30">
             <p className="text-sm text-gray-600 mb-1">{t('requestedService')}</p>
             <p className="font-semibold text-gray-800">{serviceTitle}</p>
           </div>
 
           {/* Description */}
-          <p className="text-gray-600 mb-8 leading-relaxed">
+          <p className="text-gray-700 mb-8 leading-relaxed">
             {content.description}
           </p>
 

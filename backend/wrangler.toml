@@ -1,0 +1,26 @@
+name = "destiny-backend"
+main = "worker.js"
+compatibility_date = "2024-08-01"
+
+[env.production]
+name = "destiny-backend-prod"
+
+# D1 数据库配置
+[[d1_databases]]
+binding = "DB"
+database_name = "destiny-db"
+database_id = "75232ebe-55ee-4468-9f78-f3414b934fa2"
+
+# 环境变量（在Cloudflare Dashboard中配置）
+[vars]
+NODE_ENV = "production"
+JWT_SECRET = "destiny-super-secret-jwt-key-for-production"
+DEEPSEEK_API_KEY = "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn"
+DEEPSEEK_BASE_URL = "https://api.siliconflow.cn/v1/chat/completions"
+DEEPSEEK_MODEL = "Pro/deepseek-ai/DeepSeek-R1"
+RESEND_API_KEY = "re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP"
+RESEND_FROM_EMAIL = "info@info.indicate.top"
+RESEND_FROM_NAME = "Indicate.Top"
+EMAIL_SERVICE = "resend"
+FRONTEND_URL = "https://fb824531.destiny-360.pages.dev"
+CORS_ORIGIN = "https://fb824531.destiny-360.pages.dev"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Services from './components/Services';
@@ -7,36 +8,22 @@ import About from './components/About';
 import Membership from './components/Membership';
 import LoginDetailed from './components/LoginDetailed';
 import Footer from './components/Footer';
-
+import TermsOfService from './components/TermsOfService';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
+import ContactPage from './components/ContactPage';
 
 import Navigation from './components/Navigation';
 import MemberSettings from './components/MemberSettings';
+import TestBaziDisplay from './components/TestBaziDisplay';
 
-function App() {
-  const [currentView, setCurrentView] = useState<'main' | 'settings'>('main');
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+import HealthCheck from './components/HealthCheck';
 
-  // Check login status on app load
-  useEffect(() => {
-    const checkLoginStatus = () => {
-      const token = localStorage.getItem('authToken');
-      const user = localStorage.getItem('user');
+// 内部组件，使用AuthContext
+function AppContent() {
+  const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact'>('main');
+  const { user, isAuthenticated, logout } = useAuth();
 
-      if (token && user) {
-        try {
-          setCurrentUser(JSON.parse(user));
-          setIsLoggedIn(true);
-        } catch (error) {
-          console.error('Error parsing user data:', error);
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-        }
-      }
-    };
-
-    checkLoginStatus();
-  }, []);
+  console.log('🔍 App render - currentView:', currentView, 'isAuthenticated:', isAuthenticated, 'user:', user);
 
   const handleShowSettings = () => {
     setCurrentView('settings');
@@ -47,49 +34,145 @@ function App() {
     setCurrentView('main');
   };
 
+  const handleShowTest = () => {
+    setCurrentView('test');
+  };
+
+  const handleShowTerms = () => {
+    setCurrentView('terms');
+  };
+
+  const handleShowPrivacy = () => {
+    setCurrentView('privacy');
+  };
+
+  const handleShowContact = () => {
+    setCurrentView('contact');
+  };
+
+  const handleScrollToMembership = () => {
+    const membershipSection = document.getElementById('membership');
+    if (membershipSection) {
+      membershipSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    setCurrentUser(null);
-    setIsLoggedIn(false);
+    logout();
     setCurrentView('main');
   };
 
-  const handleLoginSuccess = (user: any) => {
-    setCurrentUser(user);
-    setIsLoggedIn(true);
+  const handleLoginSuccess = (userData: any) => {
+    // AuthContext会自动处理用户状态更新
+    console.log('Login success:', userData);
   };
 
   if (currentView === 'settings') {
     return (
-      <LanguageProvider>
-        <div className="relative min-h-screen shimmer-background">
-          <MemberSettings onBack={handleBackToMain} />
+      <div className="relative min-h-screen shimmer-background">
+        <MemberSettings onBack={handleBackToMain} />
+      </div>
+    );
+  }
+
+  if (currentView === 'test') {
+    return (
+      <div className="relative min-h-screen">
+        <div className="fixed top-4 left-4 z-50">
+          <button
+            onClick={handleBackToMain}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            返回主页
+          </button>
         </div>
-      </LanguageProvider>
+        <div className="p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">测试页面</h2>
+          <p className="text-gray-600">测试功能正在开发中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'terms') {
+    return (
+        <div className="relative min-h-screen bg-gray-50">
+          <div className="fixed top-4 left-4 z-50">
+            <button
+              onClick={handleBackToMain}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              ← Back
+            </button>
+          </div>
+          <div className="pt-16">
+            <TermsOfService />
+          </div>
+        </div>
+    );
+  }
+
+  if (currentView === 'privacy') {
+    return (
+        <div className="relative min-h-screen bg-gray-50">
+          <div className="fixed top-4 left-4 z-50">
+            <button
+              onClick={handleBackToMain}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              ← Back
+            </button>
+          </div>
+          <div className="pt-16">
+            <PrivacyPolicyPage />
+          </div>
+        </div>
+    );
+  }
+
+  if (currentView === 'contact') {
+    return (
+        <ContactPage onBack={() => setCurrentView('main')} />
     );
   }
 
   return (
-    <LanguageProvider>
-      <div className="min-h-screen shimmer-background">
+    <div className="min-h-screen shimmer-background">
         <Header />
         <Hero />
         <Services onShowSettings={handleShowSettings} />
         <About />
         <Membership />
-        <LoginDetailed onLoginSuccess={handleLoginSuccess} onShowSettings={handleShowSettings} />
-        <Footer />
+        <LoginDetailed onLoginSuccess={handleLoginSuccess} onShowSettings={handleShowSettings} onShowTerms={handleShowTerms} />
+        <Footer
+          onShowTerms={handleShowTerms}
+          onShowPrivacy={handleShowPrivacy}
+          onScrollToMembership={handleScrollToMembership}
+          onShowContact={handleShowContact}
+        />
 
         {/* Navigation for logged in users */}
         <Navigation
-          isLoggedIn={isLoggedIn}
-          currentUser={currentUser}
+          isLoggedIn={isAuthenticated}
+          currentUser={user}
           onShowSettings={handleShowSettings}
           onLogout={handleLogout}
         />
-      </div>
-    </LanguageProvider>
+
+        {/* Health Check Component */}
+        <HealthCheck />
+    </div>
+  );
+}
+
+// 主App组件，提供AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </AuthProvider>
   );
 }
 

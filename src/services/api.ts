@@ -1,5 +1,18 @@
 // API服务配置
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+
+// 开发模式开关 - 设置为true使用模拟数据
+const USE_MOCK_API = false;
+
+// 导入模拟API
+import {
+  mockLoginApi,
+  mockRegisterApi,
+  mockGetProfileApi,
+  mockUpdateProfileApi,
+  mockHealthCheckApi,
+  mockGetMembershipApi
+} from './mockApi';
 
 // API响应类型定义
 export interface ApiResponse<T = any> {
@@ -40,6 +53,9 @@ export interface RegisterData {
   birthMonth?: number;
   birthDay?: number;
   birthHour?: number;
+  birthMinute?: number;
+  birthPlace?: string;
+  timezone?: string;
 }
 
 export interface LoginData {
@@ -54,11 +70,13 @@ export interface ResetPasswordData {
 }
 
 // HTTP请求工具函数
-async function apiRequest<T>(
+export async function apiRequest<T>(
   endpoint: string, 
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // 确保不会重复/api路径
+  const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
+  const url = `${baseUrl}${endpoint}`;
   
   // 默认请求头
   const defaultHeaders: HeadersInit = {
@@ -84,18 +102,30 @@ async function apiRequest<T>(
   };
   
   try {
+    console.log(`🔗 API Request: ${url}`, config);
     const response = await fetch(url, config);
+
+    console.log(`📡 Response status: ${response.status}`, response.statusText);
+
     const data = await response.json();
-    
+
     if (!response.ok) {
       // 优先使用后端返回的message，然后是error，最后是状态码
       const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+      console.error('❌ API Error:', errorMessage, data);
       throw new Error(errorMessage);
     }
-    
+
+    console.log('✅ API Success:', data);
     return data;
   } catch (error) {
-    console.error('API request failed:', error);
+    console.error('❌ API request failed:', error);
+
+    // 提供更详细的错误信息
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('无法连接到服务器，请检查网络连接或服务器状态');
+    }
+
     throw error;
   }
 }
@@ -103,10 +133,10 @@ async function apiRequest<T>(
 // 邮箱验证API
 export const emailAPI = {
   // 发送验证码
-  async sendVerificationCode(email: string): Promise<ApiResponse> {
+  async sendVerificationCode(email: string, language: string = 'en'): Promise<ApiResponse> {
     return await apiRequest('/email/send-verification-code', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, language }),
     });
   },
 
@@ -135,34 +165,46 @@ export const emailAPI = {
 export const authAPI = {
   // 用户注册
   async register(userData: RegisterData): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>('/auth/register', {
+    const response = await apiRequest<{ success: boolean; message: string; data: { user: any; token: string } }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
 
     // 保存token到localStorage
-    if (response.token) {
-      localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+    if (response.success && response.data.token) {
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
     }
 
-    return response;
+    // 返回符合AuthResponse格式的数据
+    return {
+      success: response.success,
+      message: response.message,
+      token: response.data.token,
+      user: response.data.user
+    };
   },
 
   // 用户登录
   async login(loginData: LoginData): Promise<AuthResponse> {
-    const response = await apiRequest<AuthResponse>('/auth/login', {
+    const response = await apiRequest<{ success: boolean; message: string; data: { user: any; token: string } }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(loginData),
     });
 
     // 保存token到localStorage
-    if (response.token) {
-      localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+    if (response.success && response.data.token) {
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
     }
 
-    return response;
+    // 返回符合AuthResponse格式的数据
+    return {
+      success: response.success,
+      message: response.message,
+      token: response.data.token,
+      user: response.data.user
+    };
   },
 
   // 获取用户信息
@@ -216,6 +258,21 @@ export const authAPI = {
   // 获取token
   getToken(): string | null {
     return localStorage.getItem('authToken');
+  },
+
+  // 发送删除账号验证码
+  async sendDeleteAccountVerificationCode(): Promise<ApiResponse> {
+    return await apiRequest('/auth/send-delete-verification', {
+      method: 'POST'
+    });
+  },
+
+  // 删除账号
+  async deleteAccount(data: { verificationCode: string }): Promise<ApiResponse> {
+    return await apiRequest('/auth/delete-account', {
+      method: 'DELETE',
+      body: JSON.stringify(data)
+    });
   }
 };
 
@@ -275,6 +332,34 @@ export const membershipAPI = {
   }
 };
 
+// Stripe支付相关API
+export const stripeAPI = {
+  // 创建支付意图或订阅
+  async createPayment(paymentData: {
+    planId: string;
+    paymentMethodId: string;
+    customerEmail: string;
+    customerName: string;
+  }): Promise<ApiResponse> {
+    return await apiRequest('/stripe/create-payment', {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+  },
+
+  // 获取订阅状态
+  async getSubscriptionStatus(): Promise<ApiResponse> {
+    return await apiRequest('/stripe/subscription-status');
+  },
+
+  // 取消订阅
+  async cancelSubscription(): Promise<ApiResponse> {
+    return await apiRequest('/stripe/cancel-subscription', {
+      method: 'POST',
+    });
+  }
+};
+
 // 用户相关API
 export const userAPI = {
   // 获取用户详细信息
@@ -303,12 +388,7 @@ export const userAPI = {
     });
   },
 
-  // 删除账户
-  async deleteAccount(): Promise<ApiResponse> {
-    return await apiRequest('/user/account', {
-      method: 'DELETE',
-    });
-  }
+
 };
 
 // 健康检查API

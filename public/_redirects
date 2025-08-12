@@ -1,0 +1,7 @@
+# Cloudflare Pages SPA重定向配置
+# 所有非API和静态资源请求都重定向到index.html
+/api/* 200
+/assets/* 200
+/favicon.ico 200
+/indicate-top-logo.png 200
+/* /index.html 200

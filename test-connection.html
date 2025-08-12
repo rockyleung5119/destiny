@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>连接测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>前后端连接测试</h1>
+    
+    <div>
+        <h2>1. 测试后端健康检查</h2>
+        <button onclick="testBackendHealth()">测试后端健康</button>
+        <div id="healthResult" class="result"></div>
+    </div>
+    
+    <div>
+        <h2>2. 测试用户登录</h2>
+        <button onclick="testLogin()">测试登录</button>
+        <div id="loginResult" class="result"></div>
+    </div>
+    
+    <div>
+        <h2>3. 测试用户资料API</h2>
+        <button onclick="testProfile()">测试用户资料</button>
+        <div id="profileResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        
+        async function testBackendHealth() {
+            const result = document.getElementById('healthResult');
+            result.innerHTML = '<div class="info">正在测试后端健康检查...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">✅ 后端健康检查成功！</div>
+                        <div>状态: ${data.status}</div>
+                        <div>消息: ${data.message}</div>
+                        <div>时间: ${data.timestamp}</div>
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">❌ 后端健康检查失败: ${response.status}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 连接错误: ${error.message}</div>`;
+            }
+        }
+        
+        async function testLogin() {
+            const result = document.getElementById('loginResult');
+            result.innerHTML = '<div class="info">正在测试登录...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('authToken', data.token);
+                    result.innerHTML = `
+                        <div class="success">✅ 登录成功！</div>
+                        <div>用户: ${data.user.name} (${data.user.email})</div>
+                        <div>Token已保存到localStorage</div>
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">❌ 登录失败: ${data.message}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 登录错误: ${error.message}</div>`;
+            }
+        }
+        
+        async function testProfile() {
+            const result = document.getElementById('profileResult');
+            result.innerHTML = '<div class="info">正在测试用户资料API...</div>';
+            
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                result.innerHTML = '<div class="error">❌ 请先登录获取token</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/user/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                        'X-Language': 'zh-CN'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.innerHTML = `
+                        <div class="success">✅ 用户资料API成功！</div>
+                        <div>用户: ${data.user.name} (${data.user.email})</div>
+                        <div>出生: ${data.user.birthYear}-${data.user.birthMonth}-${data.user.birthDay}</div>
+                        ${data.user.membership ? `<div>会员: ${data.user.membership.plan_id} (激活: ${data.user.membership.is_active})</div>` : '<div>会员: 无</div>'}
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">❌ 用户资料API失败: ${data.message}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 用户资料API错误: ${error.message}</div>`;
+            }
+        }
+        
+        // 页面加载时自动测试后端健康
+        window.onload = function() {
+            testBackendHealth();
+        };
+    </script>
+</body>
+</html>

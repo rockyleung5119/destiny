@@ -23,6 +23,7 @@ import {
   CalendarOutlined,
   BulbOutlined
 } from '@ant-design/icons';
+import { useLanguage } from '../hooks/useLanguage';
 import {
   RadarChart,
   PolarGrid,
@@ -49,12 +50,14 @@ interface AnalysisResultsProps {
 }
 
 export const AnalysisResults: React.FC<AnalysisResultsProps> = ({ result }) => {
+  const { currentLanguage, t } = useLanguage();
+
   // Prepare radar chart data
   const radarData = [
-    { subject: 'Career', score: result.fortune.career.score, fullMark: 100 },
-    { subject: 'Wealth', score: result.fortune.wealth.score, fullMark: 100 },
-    { subject: 'Love', score: result.fortune.love.score, fullMark: 100 },
-    { subject: 'Health', score: result.fortune.health.score, fullMark: 100 },
+    { subject: t('careerFortune'), score: result.fortune.career.score, fullMark: 100 },
+    { subject: t('wealthFortune'), score: result.fortune.wealth.score, fullMark: 100 },
+    { subject: t('loveFortune'), score: result.fortune.love.score, fullMark: 100 },
+    { subject: t('healthFortune'), score: result.fortune.health.score, fullMark: 100 },
   ];
 
   // Prepare elements chart data
@@ -114,7 +117,7 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({ result }) => {
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Career Fortune"
+              title={t('careerFortune')}
               value={result.fortune.career.score}
               valueStyle={{ color: '#1890ff' }}
               prefix={<TrophyOutlined />}
@@ -124,11 +127,11 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({ result }) => {
             </Paragraph>
           </Card>
         </Col>
-        
+
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Wealth Fortune"
+              title={t('wealthFortune')}
               value={result.fortune.wealth.score}
               valueStyle={{ color: '#52c41a' }}
               prefix={<DollarOutlined />}
@@ -138,11 +141,11 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({ result }) => {
             </Paragraph>
           </Card>
         </Col>
-        
+
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Love Fortune"
+              title={t('loveFortune')}
               value={result.fortune.love.score}
               valueStyle={{ color: '#eb2f96' }}
               prefix={<HeartOutlined />}
@@ -152,11 +155,11 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({ result }) => {
             </Paragraph>
           </Card>
         </Col>
-        
+
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Health Fortune"
+              title={t('healthFortune')}
               value={result.fortune.health.score}
               valueStyle={{ color: '#fa8c16' }}
               prefix={<StarOutlined />}

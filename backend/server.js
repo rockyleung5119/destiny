@@ -14,6 +14,7 @@ const userRoutes = require('./routes/user');
 const membershipRoutes = require('./routes/membership');
 const emailRoutes = require('./routes/email');
 const fortuneRoutes = require('./routes/fortune');
+const stripeRoutes = require('./routes/stripe');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,6 +54,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/membership', membershipRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/fortune', fortuneRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // 会员状态检查路由
 const { getMembershipStatus } = require('./middleware/membership');
@@ -83,12 +85,37 @@ const startServer = async () => {
 
     // 启动服务器
     console.log('🔄 Starting HTTP server...');
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Destiny API Server is running on port ${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
     });
+
+    // 设置服务器超时时间为5分钟，确保AI分析有足够时间
+    server.timeout = 300000; // 300秒 = 5分钟
+    server.keepAliveTimeout = 305000; // 稍微长一点，确保连接保持
+    server.headersTimeout = 310000; // 头部超时稍微长一点
+    console.log('⏱️ Server timeout set to 300 seconds for AI analysis');
+
+    // 添加服务器错误处理
+    server.on('error', (error) => {
+      console.error('❌ Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+      }
+    });
+
+    // 添加进程错误处理
+    process.on('uncaughtException', (error) => {
+      console.error('❌ Uncaught Exception:', error);
+      console.error('Stack:', error.stack);
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    });
+
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     console.error('Error details:', error.stack);

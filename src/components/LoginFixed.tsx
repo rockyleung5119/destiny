@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { User, Lock, Mail, Eye, EyeOff, Star, Moon, Sun, Settings } from 'lucide-react';
 import { authAPI, RegisterData, LoginData } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LoginFixedProps {
   onShowSettings?: () => void;
@@ -9,11 +10,11 @@ interface LoginFixedProps {
 
 const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
   const { t } = useLanguage();
+  const { login, register, logout, isAuthenticated } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -26,13 +27,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
     birthHour: '',
   });
 
-  // 检查用户是否已登录
-  useEffect(() => {
-    const checkLoginStatus = () => {
-      setIsLoggedIn(authAPI.isLoggedIn());
-    };
-    checkLoginStatus();
-  }, []);
+  // 不需要手动检查登录状态，AuthContext会自动管理
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,33 +37,34 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
     try {
       if (isLogin) {
         // 登录逻辑
-        const loginData: LoginData = {
-          email: formData.email,
-          password: formData.password,
-        };
-        
-        const response = await authAPI.login(loginData);
-        setMessage(`✅ ${response.message}`);
-        setIsLoggedIn(true);
-        
-        // 清空表单
-        setFormData({
-          email: '',
-          password: '',
-          confirmPassword: '',
-          name: '',
-          gender: '',
-          birthYear: '',
-          birthMonth: '',
-          birthDay: '',
-          birthHour: '',
-        });
+        const response = await login(formData.email, formData.password);
+
+        if (response.success) {
+          setMessage(`✅ ${response.message}`);
+
+          // 清空表单
+          setFormData({
+            email: '',
+            password: '',
+            confirmPassword: '',
+            name: '',
+            gender: '',
+            birthYear: '',
+            birthMonth: '',
+            birthDay: '',
+            birthHour: '',
+          });
+
+          // 登录成功，不需要刷新页面，AuthContext会自动更新状态
+        } else {
+          setMessage(`❌ ${response.message}`);
+        }
       } else {
         // 注册逻辑
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Passwords do not match');
         }
-        
+
         const registerData: RegisterData = {
           name: formData.name,
           email: formData.email,
@@ -80,10 +76,15 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
           birthDay: formData.birthDay,
           birthHour: formData.birthHour,
         };
-        
-        const response = await authAPI.register(registerData);
-        setMessage(`✅ ${response.message}`);
-        setIsLoggedIn(true);
+
+        const response = await register(registerData);
+
+        if (response.success) {
+          setMessage(`✅ ${response.message}`);
+          // 注册成功，不需要刷新页面，AuthContext会自动更新状态
+        } else {
+          setMessage(`❌ ${response.message}`);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
@@ -94,8 +95,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
   };
 
   const handleLogout = () => {
-    authAPI.logout();
-    setIsLoggedIn(false);
+    logout();
     setMessage('');
     setFormData({
       email: '',
@@ -133,20 +133,20 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
               </div>
             </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-              Celestial Wisdom
+              {t('celestialWisdom')}
             </h1>
-            <p className="text-gray-600 text-sm">Ancient Divination Arts</p>
+            <p className="text-gray-600 text-sm">{t('ancientDivination')}</p>
           </div>
 
-          {isLoggedIn ? (
+          {isAuthenticated ? (
             // 登录成功显示
             <div className="text-center space-y-6">
               <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg">
                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <User className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Welcome Back!</h3>
-                <p className="text-gray-600 mb-4">You are now logged in and can access all our services.</p>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{t('welcomeBack')}</h3>
+                <p className="text-gray-600 mb-4">{t('welcomeBackDesc')}</p>
                 <div className="space-y-3">
                   <button
                     onClick={() => {
@@ -157,20 +157,20 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                     }}
                     className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-400 hover:to-indigo-500 transition-all duration-300"
                   >
-                    Explore Our Services
+                    {t('exploreServices')}
                   </button>
                   <button
                     onClick={onShowSettings}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-400 hover:to-purple-500 transition-all duration-300 flex items-center justify-center gap-2"
                   >
                     <Settings size={20} />
-                    Account Settings
+                    {t('accountSettings')}
                   </button>
                   <button
                     onClick={handleLogout}
                     className="w-full bg-gray-100 border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-all duration-300"
                   >
-                    Logout
+                    {t('logout')}
                   </button>
                 </div>
               </div>
@@ -195,7 +195,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                     isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-purple-600'
                   }`}
                 >
-                  Login
+                  {t('login')}
                 </button>
                 <button
                   onClick={() => setIsLogin(false)}
@@ -203,7 +203,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                     !isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-purple-600'
                   }`}
                 >
-                  Register
+                  {t('register')}
                 </button>
               </div>
 
@@ -212,7 +212,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                 {!isLogin && (
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      Name
+                      {t('nameLabel')}
                     </label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -224,7 +224,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                         onChange={handleChange}
                         required={!isLogin}
                         className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                        placeholder="Enter your name"
+                        placeholder={t('namePlaceholder')}
                       />
                     </div>
                   </div>
@@ -233,7 +233,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                 {/* Email */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
+                    {t('emailLabel')}
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -245,7 +245,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                       onChange={handleChange}
                       required
                       className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                      placeholder="test@example.com"
+                      placeholder={t('emailPlaceholder')}
                     />
                   </div>
                 </div>
@@ -253,7 +253,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                 {/* Password */}
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
+                    {t('passwordLabel')}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -265,7 +265,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                       onChange={handleChange}
                       required
                       className="w-full pl-12 pr-12 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                      placeholder="123456"
+                      placeholder={t('passwordPlaceholder')}
                     />
                     <button
                       type="button"
@@ -280,11 +280,11 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                 {/* Confirm Password for registration */}
                 {!isLogin && (
                   <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-white/90 mb-2">
-                      Confirm Password
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('confirmPasswordLabel')}
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         id="confirmPassword"
@@ -292,8 +292,8 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                         value={formData.confirmPassword}
                         onChange={handleChange}
                         required={!isLogin}
-                        className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
-                        placeholder="Confirm your password"
+                        className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                        placeholder={t('confirmPasswordPlaceholder')}
                       />
                     </div>
                   </div>
@@ -323,10 +323,10 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      {isLogin ? 'Logging in...' : 'Registering...'}
+                      {isLogin ? t('loggingIn') : t('registering')}
                     </>
                   ) : (
-                    isLogin ? 'Login' : 'Register'
+                    isLogin ? t('loginButton') : t('registerButton')
                   )}
                 </button>
               </form>

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 import { useMembership } from '../hooks/useMembership';
+import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
+import { fortuneAPI } from '../services/fortuneApi';
 import { services } from '../data/services';
-import { Calendar, Home, Sparkles, Calculator, Clock, Zap, ArrowRight, Lock, Crown } from 'lucide-react';
+import { Calendar, Home, Sparkles, Calculator, Clock, Zap, ArrowRight, Lock, Crown, X } from 'lucide-react';
 import ServicePermissionModal from './ServicePermissionModal';
-import AnalysisModal from './AnalysisModal';
+import FortuneResultModal from './FortuneResultModal';
 
 const iconMap = {
   Calendar,
@@ -20,9 +22,13 @@ interface ServicesProps {
 
 const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
   const { membership, canUseService, consumeCredit } = useMembership();
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [fortuneResult, setFortuneResult] = useState<any>(null);
+  const [error, setError] = useState<string>('');
+  const [showResultModal, setShowResultModal] = useState(false);
   const [permissionModal, setPermissionModal] = useState<{
     isOpen: boolean;
     serviceTitle: string;
@@ -33,20 +39,11 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
     reason: '',
   });
 
-  const [analysisModal, setAnalysisModal] = useState<{
-    isOpen: boolean;
-    serviceId: string;
-    serviceName: string;
-  }>({
-    isOpen: false,
-    serviceId: '',
-    serviceName: '',
-  });
+
 
   const handleAnalyze = async (serviceId: string, serviceTitle: string) => {
     // 检查登录状态
-    const isLoggedIn = authAPI.isLoggedIn();
-    if (!isLoggedIn) {
+    if (!isAuthenticated) {
       setPermissionModal({
         isOpen: true,
         serviceTitle,
@@ -57,6 +54,7 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
 
     // 检查服务权限
     const permission = canUseService(serviceId);
+
     if (!permission.allowed) {
       setPermissionModal({
         isOpen: true,
@@ -66,12 +64,70 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
       return;
     }
 
-    // 打开分析模态框
-    setAnalysisModal({
-      isOpen: true,
-      serviceId,
-      serviceName: serviceTitle,
-    });
+    // 对于所有服务，检查用户是否有完整的出生信息
+    try {
+      // 从服务器获取最新的用户信息，而不是使用缓存的数据
+      const currentUser = await authAPI.getProfile();
+
+      if (!currentUser || !currentUser.birthYear || !currentUser.birthMonth || !currentUser.birthDay) {
+        setPermissionModal({
+          isOpen: true,
+          serviceTitle,
+          reason: 'incomplete_profile',
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setPermissionModal({
+        isOpen: true,
+        serviceTitle,
+        reason: 'incomplete_profile',
+      });
+      return;
+    }
+
+    // 直接调用算命API
+    setSelectedService(serviceId);
+    setIsAnalyzing(true);
+    setError('');
+    setFortuneResult(null);
+
+    try {
+      let response;
+      const language = 'zh'; // 可以从语言上下文获取
+
+      switch (serviceId) {
+        case 'bazi':
+          response = await fortuneAPI.getBaziAnalysis(language);
+          break;
+        case 'dailyfortune':
+          response = await fortuneAPI.getDailyFortune(language);
+          break;
+        case 'tarot':
+          response = await fortuneAPI.getTarotReading('', language);
+          break;
+        case 'luckyitems':
+          response = await fortuneAPI.getLuckyItems(language);
+          break;
+        default:
+          throw new Error('Unknown service type');
+      }
+
+      if (response.success) {
+        setFortuneResult(response);
+        setShowResultModal(true);
+        // 消费积分
+        await consumeCredit();
+      } else {
+        setError(response.message || 'Analysis failed');
+      }
+    } catch (error: any) {
+      console.error('Fortune analysis error:', error);
+      setError(error.message || 'Failed to connect to server');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleLogin = () => {
@@ -96,9 +152,7 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
     setPermissionModal({ isOpen: false, serviceTitle: '', reason: '' });
   };
 
-  const closeAnalysisModal = () => {
-    setAnalysisModal({ isOpen: false, serviceId: '', serviceName: '' });
-  };
+
 
   return (
     <section id="services" className="py-20">
@@ -123,13 +177,12 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
             const IconComponent = iconMap[service.icon as keyof typeof iconMap];
             const isSelected = selectedService === service.id;
             const isCurrentlyAnalyzing = isAnalyzing && isSelected;
-            const isLoggedIn = authAPI.isLoggedIn();
             const permission = canUseService(service.id);
             const serviceTitle = t(service.titleKey);
 
             // 确定服务状态
             const getServiceStatus = () => {
-              if (!isLoggedIn) return 'login_required';
+              if (!isAuthenticated) return 'login_required';
               if (!permission.allowed) {
                 switch (permission.reason) {
                   case 'insufficient_permissions': return 'upgrade_required';
@@ -191,7 +244,7 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
                 </p>
 
                 {/* Credits Info for Free Users */}
-                {isLoggedIn && membership?.plan.level === 'free' && serviceStatus === 'available' && (
+                {isAuthenticated && membership?.plan.level === 'free' && serviceStatus === 'available' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-blue-800">
                       剩余积分: {membership.remainingCredits || 0}
@@ -245,6 +298,26 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
           })}
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center mr-3">
+                <span className="text-white text-xs">!</span>
+              </div>
+              <p className="text-red-700">{error}</p>
+              <button
+                onClick={() => setError('')}
+                className="ml-auto text-red-500 hover:text-red-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+
+
         {/* AI Features */}
         <div className="mt-16 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-8">
           <div className="text-center mb-8">
@@ -277,6 +350,8 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
               <p className="text-sm text-gray-600">{t('personalizedInsightsDesc')}</p>
             </div>
           </div>
+
+
         </div>
       </div>
 
@@ -288,15 +363,21 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
         reason={permissionModal.reason}
         onLogin={handleLogin}
         onUpgrade={handleUpgrade}
+        onShowSettings={onShowSettings}
       />
 
-      {/* Analysis Modal */}
-      <AnalysisModal
-        isOpen={analysisModal.isOpen}
-        onClose={closeAnalysisModal}
-        serviceId={analysisModal.serviceId}
-        serviceName={analysisModal.serviceName}
-        onShowSettings={onShowSettings}
+
+
+      {/* Fortune Result Modal */}
+      <FortuneResultModal
+        isOpen={showResultModal}
+        onClose={() => {
+          setShowResultModal(false);
+          setFortuneResult(null);
+          setSelectedService(null);
+        }}
+        result={fortuneResult}
+        serviceType={selectedService || ''}
       />
     </section>
   );

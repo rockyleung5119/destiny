@@ -54,7 +54,7 @@ class ApiClient {
         'bazi': '/api/fortune/bazi',
         'daily': '/api/fortune/daily',
         'tarot': '/api/fortune/tarot',
-        'lucky': '/api/fortune/lucky-items'
+        'lucky': '/api/fortune/lucky'
       };
 
       const endpoint = endpointMap[request.analysisType || 'bazi'] || '/api/fortune/bazi';

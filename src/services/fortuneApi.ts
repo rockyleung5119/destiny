@@ -1,6 +1,78 @@
 // 算命功能API服务
 import { apiRequest } from './api';
 
+// 带超时的API请求函数（专门用于AI功能）
+async function apiRequestWithTimeout<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  timeoutMs: number = 180000 // 默认3分钟
+): Promise<T> {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+  const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
+  const url = `${baseUrl}${endpoint}`;
+
+  // 默认请求头
+  const defaultHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  // 添加认证token（如果存在）
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    defaultHeaders.Authorization = `Bearer ${token}`;
+  }
+
+  // 添加语言偏好
+  const currentLanguage = localStorage.getItem('language') || 'en';
+  defaultHeaders['X-Language'] = currentLanguage;
+
+  const config: RequestInit = {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+  };
+
+  // 创建AbortController用于超时控制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  config.signal = controller.signal;
+
+  try {
+    console.log(`🔗 AI API Request: ${url} (timeout: ${timeoutMs}ms)`, config);
+    const response = await fetch(url, config);
+
+    clearTimeout(timeoutId);
+    console.log(`📡 AI Response status: ${response.status}`, response.statusText);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+      console.error('❌ AI API Error:', errorMessage, data);
+      throw new Error(errorMessage);
+    }
+
+    console.log('✅ AI API Success:', data);
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    console.error('❌ AI API request failed:', error);
+
+    if (error.name === 'AbortError') {
+      throw new Error(`AI分析超时（${timeoutMs/1000}秒），请稍后重试`);
+    }
+
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('无法连接到服务器，请检查网络连接或服务器状态');
+    }
+
+    throw error;
+  }
+}
+
 export interface FortuneResponse {
   success: boolean;
   message: string;
@@ -47,43 +119,43 @@ export const fortuneAPI = {
 
   // 八字精算
   async getBaziAnalysis(language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequest<FortuneResponse>('/fortune/bazi', {
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/bazi', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
-    });
+    }, 300000); // 5分钟超时
   },
 
   // 每日运势
   async getDailyFortune(language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequest<FortuneResponse>('/fortune/daily', {
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/daily', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
-    });
+    }, 300000); // 5分钟超时
   },
 
   // 天体塔罗占卜
   async getTarotReading(question: string = '', language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequest<FortuneResponse>('/fortune/tarot', {
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/tarot', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
       body: JSON.stringify({ question }),
-    });
+    }, 300000); // 5分钟超时
   },
 
   // 幸运物品和颜色
   async getLuckyItems(language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequest<FortuneResponse>('/fortune/lucky-items', {
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/lucky', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
-    });
+    }, 300000); // 5分钟超时
   },
 
   // 获取算命历史记录
@@ -131,10 +203,65 @@ export const checkFeatureAccess = (membershipStatus: MembershipStatus, feature: 
   return membershipStatus.features[feature];
 };
 
-// 格式化算命结果
+// 格式化算命结果 - 与FortuneResultModal保持一致的格式化逻辑
 export const formatFortuneResult = (result: string): string[] => {
+  if (!result) return [];
+
+  // 使用与FortuneResultModal相同的超强格式化逻辑
+  let formatted = result
+    // 移除所有HTML标签
+    .replace(/<[^>]*>/g, '')
+    // 移除所有Markdown符号
+    .replace(/^#{1,6}\s*/gm, '')           // 移除标题符号
+    .replace(/\*\*(.*?)\*\*/g, '$1')      // 移除粗体符号
+    .replace(/\*(.*?)\*/g, '$1')          // 移除斜体符号
+    .replace(/`([^`]+)`/g, '$1')          // 移除行内代码符号
+    .replace(/```[\s\S]*?```/g, (match) => {  // 移除代码块符号
+      return match.replace(/```\w*\n?/g, '').replace(/```/g, '');
+    })
+    // 移除所有列表符号，保留内容 - 超强清理
+    .replace(/^[\s]*[-*+•·▪▫◦‣⁃⚫⚪🔸🔹▸▹►▻]\s*/gm, '')  // 移除各种列表符号
+    .replace(/^\d+[\.、]\s*/gm, '')        // 移除数字列表（包括中文顿号）
+    .replace(/^[一二三四五六七八九十]+[、\.]\s*/gm, '') // 移除中文数字列表
+    .replace(/^[①②③④⑤⑥⑦⑧⑨⑩]\s*/gm, '')  // 移除圆圈数字
+    .replace(/^[⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽]\s*/gm, '') // 移除括号数字
+    .replace(/^[ABCDEFGHIJKLMNOPQRSTUVWXYZ][\.、]\s*/gm, '') // 移除字母列表
+    .replace(/^[abcdefghijklmnopqrstuvwxyz][\.、]\s*/gm, '') // 移除小写字母列表
+    // 移除引用符号和特殊格式 - 超强清理
+    .replace(/^>\s*/gm, '')               // 移除引用符号
+    .replace(/^\|\s*/gm, '')              // 移除表格符号
+    .replace(/^\s*\|\s*.*\s*\|\s*$/gm, '') // 移除完整表格行
+    .replace(/^\s*\|[-\s:]+\|\s*$/gm, '') // 移除表格分隔行
+    .replace(/\|\s*[^|\n]*\s*\|/g, '')    // 移除行内表格内容
+    .replace(/\|/g, '')                   // 移除所有剩余的表格分隔符
+    // 移除分隔线和装饰符号 - 超强清理
+    .replace(/^[-=_~]{2,}$/gm, '')        // 移除分隔线（降低阈值）
+    .replace(/^[═─━]{2,}$/gm, '')         // 移除中文分隔线
+    .replace(/^[＊★☆]{2,}$/gm, '')        // 移除星号分隔线
+    .replace(/^[\.]{3,}$/gm, '')          // 移除省略号分隔线
+    // 移除特殊字符和符号 - 超强清理
+    .replace(/【.*?】/g, '')              // 移除中文方括号内容
+    .replace(/\[.*?\]/g, '')              // 移除英文方括号内容
+    .replace(/（[^）]*）/g, '')           // 移除中文圆括号内容
+    .replace(/\([^)]*\)/g, '')            // 移除英文圆括号内容
+    .replace(/「[^」]*」/g, '')           // 移除中文引号内容
+    .replace(/『[^』]*』/g, '')           // 移除中文书名号内容
+    // 移除特殊标记符号 - 超强清理
+    .replace(/^[▲△▼▽◆◇■□●○★☆♦♠♣♥]/gm, '') // 移除特殊标记符号
+    .replace(/[▲△▼▽◆◇■□●○★☆♦♠♣♥]/g, '')    // 移除行内特殊符号
+    .replace(/[🔸🔹🔺🔻⭐✨💫⚡]/g, '')      // 移除emoji符号
+    // 移除表格相关内容
+    .replace(/Element\s*\|\s*Count\s*\|\s*Strength/gi, '') // 移除表格标题
+    .replace(/^\s*\|\s*[-\s]*\|\s*[-\s]*\|\s*[-\s]*\|\s*$/gm, '') // 移除表格分隔
+    // 清理多余空行和空白 - 超强清理
+    .replace(/\n{3,}/g, '\n\n')           // 最多保留两个换行
+    .replace(/^\s+/gm, '')                // 移除行首空白
+    .replace(/\s+$/gm, '')                // 移除行尾空白
+    .replace(/\n\s*\n\s*\n/g, '\n\n')     // 清理连续空行
+    .trim();
+
   // 将结果按段落分割，便于前端显示
-  return result.split('\n\n').filter(paragraph => paragraph.trim().length > 0);
+  return formatted.split('\n\n').filter(paragraph => paragraph.trim().length > 0);
 };
 
 // 获取功能名称的多语言映射

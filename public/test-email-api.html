@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Email API - Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #5855eb;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+        .info {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            color: #1e40af;
+        }
+        .log {
+            background: #f3f4f6;
+            border: 1px solid #9ca3af;
+            color: #374151;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Frontend Email API Test</h1>
+        <p>测试前端邮件验证码发送功能（使用相同的代码逻辑）</p>
+        
+        <div class="form-group">
+            <label for="email">Email Address:</label>
+            <input type="email" id="email" value="494159635@qq.com" placeholder="Enter email address">
+        </div>
+        
+        <div class="form-group">
+            <label for="language">Language:</label>
+            <select id="language">
+                <option value="en">English</option>
+                <option value="zh">中文</option>
+            </select>
+        </div>
+        
+        <button onclick="testSendCode()" id="sendBtn">Send Verification Code</button>
+        <button onclick="clearResult()">Clear Result</button>
+        <button onclick="clearLog()">Clear Log</button>
+        
+        <div id="result"></div>
+        <div id="log" class="result log"></div>
+    </div>
+
+    <script>
+        // 复制前端的 API 配置
+        const API_BASE_URL = 'http://localhost:3001/api';
+        
+        // 日志函数
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('log');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : '📝';
+            logDiv.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`${prefix} ${message}`);
+        }
+        
+        // 复制前端的 apiRequest 函数
+        async function apiRequest(endpoint, options = {}) {
+            const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
+            const url = `${baseUrl}${endpoint}`;
+            
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+            };
+            
+            const config = {
+                ...options,
+                headers: {
+                    ...defaultHeaders,
+                    ...options.headers,
+                },
+            };
+            
+            try {
+                log(`API Request: ${url}`, 'info');
+                log(`Config: ${JSON.stringify(config, null, 2)}`, 'info');
+                
+                const response = await fetch(url, config);
+                
+                log(`Response status: ${response.status} ${response.statusText}`, 'info');
+                
+                const data = await response.json();
+                log(`Response data: ${JSON.stringify(data, null, 2)}`, 'info');
+                
+                if (!response.ok) {
+                    const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+                    log(`API Error: ${errorMessage}`, 'error');
+                    throw new Error(errorMessage);
+                }
+                
+                log('API Success', 'success');
+                return data;
+            } catch (error) {
+                log(`API request failed: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        // 复制前端的 emailAPI
+        const emailAPI = {
+            async sendVerificationCode(email, language = 'en') {
+                return await apiRequest('/email/send-verification-code', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, language }),
+                });
+            }
+        };
+        
+        // 复制前端的 sendVerificationCode 函数
+        async function sendVerificationCode(email, language = 'en') {
+            try {
+                log(`sendVerificationCode called with: ${JSON.stringify({ email, language })}`, 'info');
+                
+                // 验证邮箱格式
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    log(`Invalid email format: ${email}`, 'error');
+                    return { success: false, message: 'Invalid email format' };
+                }
+
+                log('Calling emailAPI.sendVerificationCode...', 'info');
+                // 调用后端API发送验证码
+                const response = await emailAPI.sendVerificationCode(email, language);
+                log(`emailAPI response: ${JSON.stringify(response)}`, 'info');
+
+                if (response && response.success) {
+                    log('Email API returned success', 'success');
+                    return {
+                        success: true,
+                        message: response.message || 'Verification code has been sent to your email. Please check your inbox (valid for 5 minutes)'
+                    };
+                } else {
+                    log(`Email API returned failure: ${JSON.stringify(response)}`, 'error');
+                    return {
+                        success: false,
+                        message: response?.message || 'Failed to send verification code, please try again later'
+                    };
+                }
+            } catch (error) {
+                log(`sendVerificationCode error: ${error.message}`, 'error');
+                log(`Error details: ${JSON.stringify({
+                    message: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    type: typeof error,
+                    error: error
+                }, null, 2)}`, 'error');
+
+                return { 
+                    success: false, 
+                    message: error instanceof Error ? error.message : 'Failed to send verification code, please try again later' 
+                };
+            }
+        }
+        
+        async function testSendCode() {
+            const email = document.getElementById('email').value;
+            const language = document.getElementById('language').value;
+            const resultDiv = document.getElementById('result');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            if (!email) {
+                showResult('Please enter an email address', 'error');
+                return;
+            }
+            
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+            
+            try {
+                showResult('Sending verification code...', 'info');
+                log('=== Starting email verification test ===', 'info');
+                
+                const result = await sendVerificationCode(email, language);
+                log(`Final result: ${JSON.stringify(result)}`, result.success ? 'success' : 'error');
+                
+                if (result.success) {
+                    showResult(`✅ Success!\n\nMessage: ${result.message}`, 'success');
+                } else {
+                    showResult(`❌ Failed!\n\nMessage: ${result.message}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`Test failed: ${error.message}`, 'error');
+                showResult(`❌ Test Error!\n\nMessage: ${error.message}\n\nStack: ${error.stack}`, 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send Verification Code';
+                log('=== Email verification test completed ===', 'info');
+            }
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+        }
+        
+        function clearResult() {
+            document.getElementById('result').textContent = '';
+            document.getElementById('result').className = 'result';
+        }
+        
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+        
+        // 页面加载时显示当前配置
+        window.onload = function() {
+            log(`API Base URL: ${API_BASE_URL}`, 'info');
+            showResult('Ready to test. Click "Send Verification Code" to start.', 'info');
+        };
+    </script>
+</body>
+</html>

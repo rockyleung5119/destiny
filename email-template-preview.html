@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Template Preview - Indicate.Top</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .preview-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .preview-header {
+            background: #1f2937;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .language-tabs {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: white;
+            color: #6366f1;
+            border-bottom: 2px solid #6366f1;
+        }
+        .tab:hover {
+            background: #f1f5f9;
+        }
+        .email-preview {
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .email-frame {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        <div class="preview-header">
+            <h1>📧 Email Template Preview</h1>
+            <p>New Design Based on Provided Mockup</p>
+        </div>
+        
+        <div class="language-tabs">
+            <button class="tab active">English Email Template</button>
+        </div>
+        
+        <div class="email-preview">
+            <div class="email-frame" id="emailFrame">
+                <!-- Email content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // English email template with colorful background inside the email container
+        const template = `
+                <div style="background: #f5f5f5; padding: 20px;">
+                    <div style="max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #ffffff 0%, #fff5f5 8%, #fef3c7 16%, #ecfdf5 24%, #eff6ff 32%, #f3e8ff 40%, #fdf4ff 48%, #fff1f2 56%, #fffbeb 64%, #f0fdf4 72%, #f0f9ff 80%, #faf5ff 88%, #ffffff 100%); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
+                        <!-- Header -->
+                        <div style="text-align: center; padding: 60px 40px 40px 40px; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px);">
+                            <!-- Complete LOGO design (consistent with website Header component) -->
+                            <div style="display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                                <div style="position: relative; width: 64px; height: 64px; background: linear-gradient(135deg, #facc15 0%, #f97316 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                                    <!-- White star SVG (consistent with website Star component) -->
+                                    <svg style="width: 32px; height: 32px; color: white; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    </svg>
+
+                                    <!-- Top-right moon decoration (hollow style) -->
+                                    <div style="position: absolute; top: -4px; right: -4px; width: 20px; height: 20px; color: #fcd34d;">
+                                        <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                                        </svg>
+                                    </div>
+
+                                    <!-- Bottom-left sun decoration (hollow style) -->
+                                    <div style="position: absolute; bottom: -4px; left: -4px; width: 20px; height: 20px; color: #fb923c;">
+                                        <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <circle cx="12" cy="12" r="5"/>
+                                            <path d="m12 1 2 3-2-3zM12 23l-2-3 2 3zM4.22 4.22l1.42 1.42-1.42-1.42zM18.36 18.36l1.42 1.42-1.42-1.42zM1 12l3 1-3-1zM23 12l-3-1 3 1zM4.22 19.78l1.42-1.42-1.42 1.42zM18.36 5.64l1.42-1.42-1.42 1.42z"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Brand name -->
+                            <h1 style="color: #1f2937; margin: 0; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #1f2937 0%, #4f46e5 50%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Indicate.Top</h1>
+                            <p style="color: #6b7280; margin: 8px 0 4px 0; font-size: 18px; font-weight: 600;">Ancient Divination Arts</p>
+                            <p style="color: #9ca3af; margin: 0; font-size: 14px; font-style: italic; opacity: 0.8;">Illuminating paths through celestial wisdom</p>
+                        </div>
+
+                        <!-- Main Content -->
+                        <div style="background: rgba(255, 255, 255, 0.6); padding: 50px 30px; text-align: center; color: #1f2937; position: relative; overflow: hidden;">
+                            <!-- Decorative background elements -->
+                            <div style="position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: rgba(139, 92, 246, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 20px; opacity: 0.6;">✨</span>
+                            </div>
+                            <div style="position: absolute; top: 60px; right: 30px; width: 24px; height: 24px; background: rgba(251, 191, 36, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 12px; opacity: 0.5;">🌙</span>
+                            </div>
+                            <div style="position: absolute; bottom: 30px; left: 50px; width: 32px; height: 32px; background: rgba(245, 158, 11, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 16px; opacity: 0.4;">⭐</span>
+                            </div>
+
+                            <h2 style="color: #1f2937; margin: 0 0 24px 0; font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Email Verification Code</h2>
+                            <p style="color: #4b5563; margin: 0 0 40px 0; font-size: 18px; line-height: 1.6;">Please use the following verification code to complete email verification:</p>
+
+                            <!-- Verification Code -->
+                            <div style="background: rgba(255,255,255,0.8); padding: 40px; border-radius: 20px; margin: 40px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; backdrop-filter: blur(10px);">
+                                <div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); color: #1f2937; display: inline-block; padding: 24px 40px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 2px solid rgba(139, 92, 246, 0.2);">
+                                    <span style="font-size: 42px; font-weight: 800; letter-spacing: 12px; font-family: 'Courier New', monospace; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">544311</span>
+                                </div>
+                                <p style="color: #6b7280; margin: 0; font-size: 16px; font-weight: 500;">Verification code expires in 5 minutes</p>
+                            </div>
+                        </div>
+
+                        <!-- Security Tips -->
+                        <div style="padding: 40px 30px; background: rgba(255, 255, 255, 0.7);">
+                            <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-align: center;">Security Tips:</h3>
+                            <div style="background: rgba(255,255,255,0.8); padding: 24px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                                <ul style="color: #4b5563; margin: 0; padding-left: 0; list-style: none; line-height: 1.8;">
+                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                                        <span style="flex-shrink: 0; width: 24px; height: 24px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">1</span>
+                                        <span style="flex: 1; font-size: 15px;">Do not share this verification code with others</span>
+                                    </li>
+                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                                        <span style="flex-shrink: 0; width: 24px; height: 24px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">2</span>
+                                        <span style="flex: 1; font-size: 15px;">If this was not requested by you, please ignore this email</span>
+                                    </li>
+                                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px;">
+                                        <span style="flex-shrink: 0; width: 24px; height: 24px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">3</span>
+                                        <span style="flex: 1; font-size: 15px;">This code is only for email verification purposes</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="text-align: center; padding: 30px; background: rgba(255, 255, 255, 0.8); border-top: 1px solid rgba(229, 231, 235, 0.3);">
+                            <div style="background: rgba(255,255,255,0.7); padding: 20px; border-radius: 12px; backdrop-filter: blur(10px);">
+                                <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.6;">This email was sent automatically, please do not reply<br>© 2025 Indicate.Top. All rights reserved.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+        // Initialize template on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('emailFrame').innerHTML = template;
+        });
+    </script>
+</body>
+</html>

@@ -17,6 +17,19 @@ export interface MockUser {
 export const MOCK_USERS: MockUser[] = [
   {
     id: '1',
+    username: 'test_user',
+    email: 'test@example.com',
+    password: 'password123',
+    profile: {
+      name: '张三',
+      birthDate: '1990-05-15',
+      birthTime: '14:00',
+      birthPlace: '北京市',
+      gender: 'male',
+    }
+  },
+  {
+    id: '2',
     username: 'free_user',
     email: 'free@test.com',
     password: '123456',
@@ -29,7 +42,7 @@ export const MOCK_USERS: MockUser[] = [
     }
   },
   {
-    id: '2',
+    id: '3',
     username: 'single_user',
     email: 'single@test.com',
     password: '123456',
@@ -42,7 +55,7 @@ export const MOCK_USERS: MockUser[] = [
     }
   },
   {
-    id: '3',
+    id: '4',
     username: 'monthly_user',
     email: 'monthly@test.com',
     password: '123456',
@@ -55,7 +68,7 @@ export const MOCK_USERS: MockUser[] = [
     }
   },
   {
-    id: '4',
+    id: '5',
     username: 'yearly_user',
     email: 'yearly@test.com',
     password: '123456',
@@ -71,18 +84,24 @@ export const MOCK_USERS: MockUser[] = [
 
 // 预设的会员数据
 export const MOCK_MEMBERSHIPS: Record<string, any> = {
-  '1': null, // 免费用户，无会员数据
-  '2': {
+  '1': {
+    planId: 'paid',
+    isActive: true,
+    remainingCredits: 100,
+    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 365天后过期
+  },
+  '2': null, // 免费用户，无会员数据
+  '3': {
     planId: 'single',
     isActive: true,
     remainingCredits: 1,
   },
-  '3': {
+  '4': {
     planId: 'monthly',
     isActive: true,
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30天后过期
   },
-  '4': {
+  '5': {
     planId: 'yearly',
     isActive: true,
     expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 365天后过期

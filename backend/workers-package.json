@@ -1,0 +1,21 @@
+{
+  "name": "destiny-backend-workers",
+  "version": "1.0.0",
+  "description": "Destiny Fortune Telling Backend for Cloudflare Workers",
+  "main": "worker.js",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "build": "node build-worker.js"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "joi": "^17.11.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

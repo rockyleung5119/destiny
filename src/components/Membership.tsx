@@ -1,10 +1,63 @@
 import React, { useState } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
+import { useAuth } from '../hooks/useAuth';
 import { Check, Star, Crown, Zap, Gift, Calendar } from 'lucide-react';
+
+// 动态导入Stripe组件以防止加载错误
+const StripePaymentModal = React.lazy(() =>
+  import('./StripePaymentModal').catch(() => ({
+    default: () => (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '0.75rem',
+          padding: '2rem',
+          maxWidth: '400px',
+          width: '90%',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem', fontWeight: '600', color: '#dc2626' }}>
+            支付功能暂时不可用
+          </h2>
+          <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280' }}>
+            请稍后再试或联系客服
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    )
+  }))
+);
 
 const Membership: React.FC = () => {
   const { t } = useLanguage();
+  const { user, isLoggedIn } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const plans = [
     {
@@ -18,7 +71,6 @@ const Membership: React.FC = () => {
         'oneTimeAccess',
         'basicAnalysis',
         'instantResults',
-        'emailSupport',
         'limitedUse', // 有使用次数限制
       ],
       popular: false,
@@ -26,7 +78,7 @@ const Membership: React.FC = () => {
     {
       id: 'monthly',
       name: t('monthlyPlan'),
-      price: '$9.99',
+      price: '$19.9',
       period: t('perMonth'),
       icon: Zap,
       color: 'from-indigo-500 to-purple-600',
@@ -36,14 +88,13 @@ const Membership: React.FC = () => {
         'dailyInsights',
         'prioritySupport',
         'personalizedReports',
-        'historyTracking',
       ],
       popular: true,
     },
     {
       id: 'yearly',
       name: t('yearlyPlan'),
-      price: '$99.99',
+      price: '$188',
       period: t('perYear'),
       icon: Crown,
       color: 'from-yellow-500 to-orange-600',
@@ -52,7 +103,6 @@ const Membership: React.FC = () => {
         'premiumAnalysis',
         'dailyInsights',
         'personalizedReports',
-        'historyTracking',
         'earlyAccess',
       ],
       popular: false,
@@ -61,9 +111,26 @@ const Membership: React.FC = () => {
   ];
 
   const handleSelectPlan = (planId: string) => {
+    if (!isLoggedIn) {
+      alert(t('pleaseLoginFirst') || '请先登录后再购买会员');
+      return;
+    }
+
     setSelectedPlan(planId);
-    // Here you would integrate with payment processing
-    console.log('Selected plan:', planId);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = (planId: string) => {
+    setShowPaymentModal(false);
+    setSelectedPlan(null);
+
+    // 显示成功消息，不需要刷新页面
+    alert(t('paymentSuccess') || '支付成功！会员权限已激活。');
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+    setSelectedPlan(null);
   };
 
   return (
@@ -93,10 +160,10 @@ const Membership: React.FC = () => {
               return (
                 <div
                   key={plan.id}
-                  className={`relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-2 ${
-                    plan.popular 
-                      ? 'border-indigo-500 ring-4 ring-indigo-100' 
-                      : isSelected 
+                  className={`relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-2 flex flex-col h-full ${
+                    plan.popular
+                      ? 'border-indigo-500 ring-4 ring-indigo-100'
+                      : isSelected
                         ? 'border-purple-500 ring-4 ring-purple-100'
                         : 'border-gray-200'
                   }`}
@@ -140,7 +207,7 @@ const Membership: React.FC = () => {
                   </div>
 
                   {/* Features */}
-                  <ul className="space-y-4 mb-8">
+                  <ul className="space-y-4 mb-8 flex-grow">
                     {plan.features.map((feature, index) => (
                       <li key={index} className="flex items-center gap-3">
                         <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -188,8 +255,6 @@ const Membership: React.FC = () => {
                     { feature: 'basicAnalysis', single: true, monthly: true, yearly: true },
                     { feature: 'advancedAnalysis', single: false, monthly: true, yearly: true },
                     { feature: 'dailyInsights', single: false, monthly: true, yearly: true },
-                    { feature: 'personalizedReports', single: false, monthly: true, yearly: true },
-                    { feature: 'historyTracking', single: false, monthly: true, yearly: true },
                     { feature: 'earlyAccess', single: false, monthly: false, yearly: true },
                   ].map((row, index) => (
                     <tr key={index} className="border-b border-gray-100">
@@ -223,6 +288,44 @@ const Membership: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Stripe支付模态框 */}
+      {showPaymentModal && selectedPlan && (
+        <React.Suspense fallback={
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: '1rem',
+              padding: '2rem',
+              textAlign: 'center',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              color: '#1f2937'
+            }}>
+              <div>加载支付组件...</div>
+            </div>
+          </div>
+        }>
+          <StripePaymentModal
+            planId={selectedPlan}
+            onSuccess={handlePaymentSuccess}
+            onCancel={handlePaymentCancel}
+          />
+        </React.Suspense>
+      )}
     </section>
   );
 };

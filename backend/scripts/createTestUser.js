@@ -74,18 +74,18 @@ async function createTestUser() {
 
     console.log('✅ Test user created successfully with ID:', result.id);
 
-    // 创建会员记录
+    // 创建会员记录 - 月度会员
     await dbRun(`
       INSERT INTO memberships (
-        user_id, plan_id, is_active, expires_at, 
+        user_id, plan_id, is_active, expires_at,
         remaining_credits, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `, [
       result.id,
-      'paid',
+      'monthly',
       true,
-      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1年后过期
-      100
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30天后过期
+      1000 // 增加到1000积分，方便测试
     ]);
 
     console.log('✅ Test user membership created successfully');

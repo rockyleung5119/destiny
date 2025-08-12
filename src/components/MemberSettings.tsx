@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, Calendar, MapPin, Mail, AlertTriangle, CheckCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { User, Lock, Calendar, MapPin, Mail, AlertTriangle, CheckCircle, Eye, EyeOff, ArrowLeft, Trash2 } from 'lucide-react';
 import { authAPI, userAPI } from '../services/api';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfile {
   id: number;
@@ -12,6 +13,7 @@ interface UserProfile {
   birthMonth?: number;
   birthDay?: number;
   birthHour?: number;
+  birthMinute?: number;
   birthPlace?: string;
   timezone?: string;
   isEmailVerified: boolean;
@@ -38,8 +40,9 @@ interface MemberSettingsProps {
 }
 
 const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
-  const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
+  const { t, currentLanguage } = useLanguage();
+  const { refreshUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'delete'>('profile');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,6 +57,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
     birthMonth: '',
     birthDay: '',
     birthHour: '',
+    birthMinute: '',
     birthPlace: '',
     timezone: ''
   });
@@ -71,6 +75,13 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
     confirm: false
   });
 
+  // 删除账号相关状态
+  const [deleteStep, setDeleteStep] = useState(0); // 0: 初始, 1: 发送验证码, 2: 输入验证码
+  const [deleteVerificationCode, setDeleteVerificationCode] = useState('');
+  const [isDeleteCodeSending, setIsDeleteCodeSending] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteCodeSent, setDeleteCodeSent] = useState(false);
+
   // Load user profile
   useEffect(() => {
     loadUserProfile();
@@ -84,7 +95,19 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
       const response = await userAPI.getProfile();
       if (response.success && response.user) {
         const user = response.user;
-        setUserProfile(user);
+
+        // 转换会员数据字段名
+        const processedUser = {
+          ...user,
+          membership: user.membership ? {
+            planId: user.membership.plan_id,
+            isActive: user.membership.is_active,
+            expiresAt: user.membership.expires_at,
+            remainingCredits: user.membership.remaining_credits
+          } : null
+        };
+
+        setUserProfile(processedUser);
         setProfileForm({
           name: user.name || '',
           gender: user.gender || '',
@@ -92,16 +115,17 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           birthMonth: user.birthMonth?.toString() || '',
           birthDay: user.birthDay?.toString() || '',
           birthHour: user.birthHour?.toString() || '',
+          birthMinute: user.birthMinute?.toString() || '',
           birthPlace: user.birthPlace || '',
           timezone: user.timezone || 'Asia/Shanghai'
         });
       } else {
-        setMessage(response.message || 'Failed to load profile data');
+        setMessage(response.message || t('failedToLoadProfile'));
         setMessageType('error');
       }
     } catch (error) {
       console.error('Profile loading error:', error);
-      setMessage('Unable to connect to server. Please check your connection and try again.');
+      setMessage(t('unableToConnect'));
       setMessageType('error');
     } finally {
       setIsLoading(false);
@@ -115,7 +139,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
 
     // Check if profile has been updated before
     if (userProfile.profileUpdatedCount >= 1) {
-      setMessage('Profile can only be updated once for fortune telling accuracy');
+      setMessage(t('profileCanOnlyBeUpdated'));
       setMessageType('warning');
       return;
     }
@@ -131,22 +155,24 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
         birthMonth: profileForm.birthMonth ? parseInt(profileForm.birthMonth) : undefined,
         birthDay: profileForm.birthDay ? parseInt(profileForm.birthDay) : undefined,
         birthHour: profileForm.birthHour ? parseInt(profileForm.birthHour) : undefined,
+        birthMinute: profileForm.birthMinute ? parseInt(profileForm.birthMinute) : undefined,
         birthPlace: profileForm.birthPlace,
         timezone: profileForm.timezone
       };
 
       const response = await userAPI.updateProfile(updateData);
-      
+
       if (response.success) {
-        setMessage('Profile updated successfully! This was your one-time update.');
+        setMessage(t('profileUpdatedSuccess'));
         setMessageType('success');
         await loadUserProfile(); // Reload to get updated data
+        await refreshUser(); // Update AuthContext with latest user data
       } else {
-        setMessage(response.message || 'Failed to update profile');
+        setMessage(response.message || t('failedToUpdateProfile'));
         setMessageType('error');
       }
     } catch (error) {
-      setMessage('Failed to update profile');
+      setMessage(t('failedToUpdateProfile'));
       setMessageType('error');
     } finally {
       setIsSaving(false);
@@ -157,13 +183,13 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
     e.preventDefault();
     
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setMessage('New passwords do not match');
+      setMessage(t('newPasswordsDoNotMatch'));
       setMessageType('error');
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      setMessage('New password must be at least 6 characters');
+      setMessage(t('newPasswordMinLength'));
       setMessageType('error');
       return;
     }
@@ -178,7 +204,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
       });
 
       if (response.success) {
-        setMessage('Password changed successfully');
+        setMessage(t('passwordChangedSuccessfully'));
         setMessageType('success');
         setPasswordForm({
           currentPassword: '',
@@ -186,21 +212,84 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           confirmPassword: ''
         });
       } else {
-        setMessage(response.message || 'Failed to change password');
+        setMessage(response.message || t('failedToChangePassword'));
         setMessageType('error');
       }
     } catch (error) {
-      setMessage('Failed to change password');
+      setMessage(t('failedToChangePassword'));
       setMessageType('error');
     } finally {
       setIsSaving(false);
     }
   };
 
+  // 删除账号相关函数
+  const handleSendDeleteVerificationCode = async () => {
+    try {
+      setIsDeleteCodeSending(true);
+      setMessage('');
+
+      const response = await authAPI.sendDeleteAccountVerificationCode();
+
+      if (response.success) {
+        setDeleteCodeSent(true);
+        setDeleteStep(2);
+        setMessage(t('deleteVerificationCodeSent'));
+        setMessageType('success');
+      } else {
+        setMessage(response.message || t('failedToSendDeleteCode'));
+        setMessageType('error');
+      }
+    } catch (error) {
+      console.error('Send delete verification code error:', error);
+      setMessage(t('failedToSendDeleteCode'));
+      setMessageType('error');
+    } finally {
+      setIsDeleteCodeSending(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteVerificationCode.trim()) {
+      setMessage(t('pleaseEnterDeleteCode'));
+      setMessageType('error');
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setMessage('');
+
+      const response = await authAPI.deleteAccount({
+        verificationCode: deleteVerificationCode
+      });
+
+      if (response.success) {
+        setMessage(t('accountDeletedSuccessfully'));
+        setMessageType('success');
+        // 清除本地存储并跳转到首页
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        setMessage(response.message || t('failedToDeleteAccount'));
+        setMessageType('error');
+      }
+    } catch (error) {
+      console.error('Delete account error:', error);
+      setMessage(t('failedToDeleteAccount'));
+      setMessageType('error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen shimmer-background flex items-center justify-center">
-        <div className="text-gray-800 text-xl font-semibold bg-white/80 backdrop-blur-sm px-6 py-3 rounded-lg shadow-lg">Loading...</div>
+        <div className="text-gray-800 text-xl font-semibold bg-white/80 backdrop-blur-sm px-6 py-3 rounded-lg shadow-lg">{t('loading')}</div>
       </div>
     );
   }
@@ -226,8 +315,8 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2 drop-shadow-sm">Member Settings</h1>
-          <p className="text-gray-700 font-medium">Manage your profile and account settings</p>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2 drop-shadow-sm">{t('memberSettings')}</h1>
+          <p className="text-gray-700 font-medium">{t('memberSettingsDesc')}</p>
         </div>
 
         {/* Tab Navigation */}
@@ -242,7 +331,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
               }`}
             >
               <User size={20} />
-              Profile Settings
+              {t('profileSettings')}
             </button>
             <button
               onClick={() => setActiveTab('password')}
@@ -253,7 +342,18 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
               }`}
             >
               <Lock size={20} />
-              Change Password
+              {t('changePassword')}
+            </button>
+            <button
+              onClick={() => setActiveTab('delete')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-medium transition-all ${
+                activeTab === 'delete'
+                  ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-red-600'
+              }`}
+            >
+              <Trash2 size={20} />
+              {t('deleteAccount')}
             </button>
           </div>
         </div>
@@ -275,18 +375,17 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           {activeTab === 'profile' && (
             <div>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">Profile Information</h2>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">{t('profileInformation')}</h2>
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 shadow-sm">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="text-yellow-600 mt-1" size={20} />
                     <div className="text-yellow-800">
-                      <p className="font-medium mb-1">Important Notice for Fortune Telling Accuracy</p>
+                      <p className="font-medium mb-1">{t('importantNotice')}</p>
                       <p className="text-sm">
-                        Your birth information is crucial for accurate fortune telling.
-                        <strong> You can only update your profile once</strong> to maintain the integrity of your readings.
+                        {t('importantNoticeDesc')}
                         {userProfile?.profileUpdatedCount >= 1 && (
                           <span className="block mt-2 text-yellow-700 font-medium">
-                            ⚠️ You have already used your one-time profile update.
+                            ⚠️ {t('alreadyUsedUpdate')}
                           </span>
                         )}
                       </p>
@@ -300,43 +399,51 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                     <CheckCircle className="mr-2 text-green-400" size={20} />
-                    Membership Status
+                    {t('membershipStatus')}
                   </h3>
                   <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-400/30 rounded-lg p-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <p className="text-green-100 text-sm">Plan</p>
+                        <p className="text-green-100 text-sm">{t('plan')}</p>
                         <p className="text-white font-medium">
-                          {userProfile.membership.planId === 'basic' ? 'Basic Fortune Reading' :
-                           userProfile.membership.planId === 'premium' ? 'Premium Destiny Analysis' :
-                           userProfile.membership.planId === 'master' ? 'Master Fortune Package' :
-                           'Custom Plan'}
+                          {userProfile.membership.planId === 'basic' ? t('basicFortune') :
+                           userProfile.membership.planId === 'premium' ? t('premiumDestiny') :
+                           userProfile.membership.planId === 'master' ? t('masterFortune') :
+                           userProfile.membership.planId === 'paid' ? t('paidMembership') :
+                           userProfile.membership.planId === 'single' ? t('singleReading') :
+                           userProfile.membership.planId === 'monthly' ? t('monthlyPlan') :
+                           userProfile.membership.planId === 'yearly' ? t('yearlyPlan') :
+                           t('customPlan')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-green-100 text-sm">Status</p>
+                        <p className="text-green-100 text-sm">{t('status')}</p>
                         <p className={`font-medium ${userProfile.membership.isActive ? 'text-green-300' : 'text-red-300'}`}>
-                          {userProfile.membership.isActive ? '✅ Active' : '❌ Expired'}
+                          {userProfile.membership.isActive ? t('activeStatus') : t('expiredStatus')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-green-100 text-sm">Renewal Date</p>
+                        <p className="text-green-100 text-sm">{t('renewalDate')}</p>
                         <p className="text-white font-medium">
                           {userProfile.membership.expiresAt ?
-                            new Date(userProfile.membership.expiresAt).toLocaleDateString('en-US', {
+                            new Date(userProfile.membership.expiresAt).toLocaleDateString(
+                              currentLanguage === 'zh' ? 'zh-CN' :
+                              currentLanguage === 'ja' ? 'ja-JP' : 'en-US', {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric'
-                            }) : 'No expiration'
+                            }) : t('noExpiration')
                           }
                         </p>
                       </div>
                       <div>
-                        <p className="text-green-100 text-sm">Usage Limit</p>
+                        <p className="text-green-100 text-sm">{t('usageLimit')}</p>
                         <p className="text-white font-medium">
                           {userProfile.membership.planId === 'single' ?
-                            `${userProfile.membership.remainingCredits || 0} credits remaining` :
-                            '🚀 Unlimited Usage'
+                            `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}` :
+                            userProfile.membership.planId === 'paid' ?
+                            `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}` :
+                            t('unlimitedUsage')
                           }
                         </p>
                       </div>
@@ -351,7 +458,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   <div>
                     <label className="block text-gray-700 font-medium mb-2">
                       <User size={16} className="inline mr-2" />
-                      Full Name
+                      {t('fullName')}
                     </label>
                     <input
                       type="text"
@@ -359,7 +466,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                       onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
                       disabled={userProfile?.profileUpdatedCount >= 1}
                       className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                      placeholder="Enter your full name"
+                      placeholder={t('enterFullName')}
                       required
                     />
                   </div>
@@ -367,7 +474,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   <div>
                     <label className="block text-gray-700 font-medium mb-2">
                       <Mail size={16} className="inline mr-2" />
-                      Email Address
+                      {t('emailAddress')}
                     </label>
                     <input
                       type="email"
@@ -381,16 +488,16 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
 
                 {/* Gender */}
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">Gender</label>
+                  <label className="block text-gray-700 font-medium mb-2">{t('gender')}</label>
                   <select
                     value={profileForm.gender}
                     onChange={(e) => setProfileForm({...profileForm, gender: e.target.value})}
                     disabled={userProfile?.profileUpdatedCount >= 1}
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
+                    <option value="">{t('selectGender')}</option>
+                    <option value="male">{t('male')}</option>
+                    <option value="female">{t('female')}</option>
                   </select>
                 </div>
 
@@ -398,12 +505,12 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">
                     <Calendar size={16} className="inline mr-2" />
-                    Birth Date & Time (Essential for Fortune Telling)
+                    {t('birthDateTime')}
                   </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <input
                       type="number"
-                      placeholder="Year"
+                      placeholder={t('year')}
                       value={profileForm.birthYear}
                       onChange={(e) => setProfileForm({...profileForm, birthYear: e.target.value})}
                       disabled={userProfile?.profileUpdatedCount >= 1}
@@ -413,7 +520,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     />
                     <input
                       type="number"
-                      placeholder="Month"
+                      placeholder={t('month')}
                       value={profileForm.birthMonth}
                       onChange={(e) => setProfileForm({...profileForm, birthMonth: e.target.value})}
                       disabled={userProfile?.profileUpdatedCount >= 1}
@@ -423,7 +530,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     />
                     <input
                       type="number"
-                      placeholder="Day"
+                      placeholder={t('day')}
                       value={profileForm.birthDay}
                       onChange={(e) => setProfileForm({...profileForm, birthDay: e.target.value})}
                       disabled={userProfile?.profileUpdatedCount >= 1}
@@ -433,12 +540,22 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     />
                     <input
                       type="number"
-                      placeholder="Hour (0-23)"
+                      placeholder={t('hourFormat')}
                       value={profileForm.birthHour}
                       onChange={(e) => setProfileForm({...profileForm, birthHour: e.target.value})}
                       disabled={userProfile?.profileUpdatedCount >= 1}
                       min="0"
                       max="23"
+                      className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    />
+                    <input
+                      type="number"
+                      placeholder={t('minute')}
+                      value={profileForm.birthMinute}
+                      onChange={(e) => setProfileForm({...profileForm, birthMinute: e.target.value})}
+                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      min="0"
+                      max="59"
                       className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     />
                   </div>
@@ -448,7 +565,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">
                     <MapPin size={16} className="inline mr-2" />
-                    Birth Place
+                    {t('birthPlace')}
                   </label>
                   <input
                     type="text"
@@ -456,7 +573,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     onChange={(e) => setProfileForm({...profileForm, birthPlace: e.target.value})}
                     disabled={userProfile?.profileUpdatedCount >= 1}
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                    placeholder="City, Country"
+                    placeholder={t('cityCountry')}
                   />
                 </div>
 
@@ -464,7 +581,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">
                     <Calendar size={16} className="inline mr-2" />
-                    Timezone (Essential for Accurate Fortune Telling)
+                    {t('timezoneEssential')}
                   </label>
                   <select
                     value={profileForm.timezone}
@@ -472,7 +589,16 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     disabled={userProfile?.profileUpdatedCount >= 1}
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
-                    <option value="">Select Timezone</option>
+                    <option value="">{t('selectTimezone')}</option>
+                    {/* 兼容旧格式的时区选项 */}
+                    <option value="UTC+8">UTC+8 (Beijing, Shanghai) - 中国标准时间</option>
+                    <option value="UTC+9">UTC+9 (Tokyo, Seoul) - 日本韩国时间</option>
+                    <option value="UTC+7">UTC+7 (Bangkok, Jakarta) - 东南亚时间</option>
+                    <option value="UTC+5:30">UTC+5:30 (Mumbai, Delhi) - 印度时间</option>
+                    <option value="UTC+0">UTC+0 (London, Dublin) - 格林威治时间</option>
+                    <option value="UTC-5">UTC-5 (New York, Toronto) - 美国东部时间</option>
+                    <option value="UTC-8">UTC-8 (Los Angeles, Vancouver) - 美国西部时间</option>
+                    {/* 标准时区名称选项 */}
                     <option value="Asia/Shanghai">Asia/Shanghai (UTC+8) - 中国标准时间</option>
                     <option value="Asia/Hong_Kong">Asia/Hong_Kong (UTC+8) - 香港时间</option>
                     <option value="Asia/Taipei">Asia/Taipei (UTC+8) - 台北时间</option>
@@ -493,9 +619,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   disabled={isSaving || userProfile?.profileUpdatedCount >= 1}
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 px-6 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                 >
-                  {isSaving ? 'Updating...' :
-                   userProfile?.profileUpdatedCount >= 1 ? 'Profile Already Updated' :
-                   'Update Profile (One Time Only)'}
+                  {isSaving ? t('updating') :
+                   userProfile?.profileUpdatedCount >= 1 ? t('profileAlreadyUpdated') :
+                   t('updateProfileOneTime')}
                 </button>
               </form>
             </div>
@@ -504,20 +630,20 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           {activeTab === 'password' && (
             <div>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">Change Password</h2>
-                <p className="text-gray-600">Update your account password for security</p>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">{t('changePassword')}</h2>
+                <p className="text-gray-600">{t('changePasswordDesc')}</p>
               </div>
 
               <form onSubmit={handlePasswordSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">Current Password</label>
+                  <label className="block text-gray-700 font-medium mb-2">{t('currentPassword')}</label>
                   <div className="relative">
                     <input
                       type={showPasswords.current ? 'text' : 'password'}
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
                       className="w-full px-4 py-3 pr-12 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
-                      placeholder="Enter current password"
+                      placeholder={t('enterCurrentPassword')}
                       required
                     />
                     <button
@@ -531,14 +657,14 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">New Password</label>
+                  <label className="block text-gray-700 font-medium mb-2">{t('newPassword')}</label>
                   <div className="relative">
                     <input
                       type={showPasswords.new ? 'text' : 'password'}
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
                       className="w-full px-4 py-3 pr-12 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
-                      placeholder="Enter new password (min 6 characters)"
+                      placeholder={t('enterNewPassword')}
                       required
                       minLength={6}
                     />
@@ -553,14 +679,14 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">Confirm New Password</label>
+                  <label className="block text-gray-700 font-medium mb-2">{t('confirmNewPassword')}</label>
                   <div className="relative">
                     <input
                       type={showPasswords.confirm ? 'text' : 'password'}
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
                       className="w-full px-4 py-3 pr-12 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
-                      placeholder="Confirm new password"
+                      placeholder={t('confirmNewPasswordPlaceholder')}
                       required
                     />
                     <button
@@ -578,9 +704,125 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   disabled={isSaving}
                   className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-4 px-6 rounded-lg font-medium hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                 >
-                  {isSaving ? 'Changing Password...' : 'Change Password'}
+                  {isSaving ? t('changingPassword') : t('changePassword')}
                 </button>
               </form>
+            </div>
+          )}
+
+          {activeTab === 'delete' && (
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-red-600 to-red-700 bg-clip-text text-transparent mb-2">{t('deleteAccount')}</h2>
+                <p className="text-gray-600">{t('deleteAccountDesc')}</p>
+              </div>
+
+              {/* 警告提示 */}
+              <div className="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-lg">
+                <div className="flex items-start">
+                  <AlertTriangle className="text-red-500 mr-3 mt-1" size={24} />
+                  <div>
+                    <h3 className="text-red-800 font-bold text-lg mb-2">{t('dangerZone')}</h3>
+                    <div className="text-red-700 space-y-2">
+                      <p>• {t('deleteWarning1')}</p>
+                      <p>• {t('deleteWarning2')}</p>
+                      <p>• {t('deleteWarning3')}</p>
+                      <p>• {t('deleteWarning4')}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {deleteStep === 0 && (
+                <div className="space-y-6">
+                  <div className="bg-gray-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3">{t('beforeYouProceed')}</h3>
+                    <div className="text-gray-700 space-y-2">
+                      <p>• {t('deleteStep1')}</p>
+                      <p>• {t('deleteStep2')}</p>
+                      <p>• {t('deleteStep3')}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setDeleteStep(1)}
+                    className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-4 px-6 rounded-lg font-medium hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg"
+                  >
+                    {t('proceedToDelete')}
+                  </button>
+                </div>
+              )}
+
+              {deleteStep === 1 && (
+                <div className="space-y-6">
+                  <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-yellow-800 mb-3">{t('deleteEmailVerificationRequired')}</h3>
+                    <p className="text-yellow-700 mb-4">{t('deleteEmailVerificationDesc')}</p>
+                    <p className="text-sm text-yellow-600">{t('currentEmail')}: <strong>{userProfile?.email}</strong></p>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setDeleteStep(0)}
+                      className="flex-1 bg-gray-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all"
+                    >
+                      {t('cancel')}
+                    </button>
+                    <button
+                      onClick={handleSendDeleteVerificationCode}
+                      disabled={isDeleteCodeSending}
+                      className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 text-white py-3 px-6 rounded-lg font-medium hover:from-orange-700 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      {isDeleteCodeSending ? t('sendingDeleteCode') : t('sendDeleteVerificationCode')}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {deleteStep === 2 && (
+                <div className="space-y-6">
+                  <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-blue-800 mb-3">{t('enterDeleteVerificationCode')}</h3>
+                    <p className="text-blue-700 mb-4">{t('deleteCodeSentDesc')}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-medium mb-2">{t('deleteVerificationCode')}</label>
+                    <input
+                      type="text"
+                      value={deleteVerificationCode}
+                      onChange={(e) => setDeleteVerificationCode(e.target.value)}
+                      placeholder={t('enterDeleteSixDigitCode')}
+                      className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+                      maxLength={6}
+                    />
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setDeleteStep(1)}
+                      className="flex-1 bg-gray-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all"
+                    >
+                      {t('backToDelete')}
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting || !deleteVerificationCode.trim()}
+                      className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-6 rounded-lg font-medium hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      {isDeleting ? t('deletingAccount') : t('confirmDeleteAccount')}
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handleSendDeleteVerificationCode}
+                    disabled={isDeleteCodeSending}
+                    className="w-full text-blue-600 hover:text-blue-800 font-medium py-2 transition-colors"
+                  >
+                    {isDeleteCodeSending ? t('sendingDeleteCode') : t('resendDeleteCode')}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1,13 +1,18 @@
 import React from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
-const Hero: React.FC = () => {
+interface HeroProps {}
+
+const Hero: React.FC<HeroProps> = () => {
   const { t } = useLanguage();
 
   const handleGetReading = () => {
-    // 暂时使用 alert，稍后会添加路由
-    alert('跳转到登录页面功能即将开放！');
+    // 滚动到登录部分
+    const loginSection = document.getElementById('login');
+    if (loginSection) {
+      loginSection.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const handleLearnMore = () => {
@@ -49,6 +54,8 @@ const Hero: React.FC = () => {
               {t('getReading')}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
+
+
 
             <button
               onClick={handleLearnMore}

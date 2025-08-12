@@ -1,14 +1,21 @@
 import React from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 import { Star, Moon, Sun, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
 
-const Footer: React.FC = () => {
+interface FooterProps {
+  onShowTerms?: () => void;
+  onShowPrivacy?: () => void;
+  onScrollToMembership?: () => void;
+  onShowContact?: () => void;
+}
+
+const Footer: React.FC<FooterProps> = ({ onShowTerms, onShowPrivacy, onScrollToMembership, onShowContact }) => {
   const { t } = useLanguage();
 
   return (
     <footer className="colorful-white sparkle-overlay floating-lights text-gray-700 py-16 border-t border-gray-200/50">
       <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-4 gap-8">
+        <div className="grid md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="col-span-1">
             <div className="flex items-center gap-3 mb-4">
@@ -20,7 +27,7 @@ const Footer: React.FC = () => {
                 <Sun className="absolute -bottom-1 -left-1 w-4 h-4 text-orange-300" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-800">Celestial Wisdom</h3>
+                <h3 className="text-lg font-bold text-gray-800">Indicate.Top</h3>
                 <p className="text-sm text-gray-500">Ancient Divination Arts</p>
               </div>
             </div>
@@ -28,56 +35,72 @@ const Footer: React.FC = () => {
               {t('footerTagline')}
             </p>
             <div className="flex gap-3">
-              <a href="#" className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600">
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
                 <Facebook className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600">
+              </div>
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
                 <Twitter className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600">
+              </div>
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
                 <Instagram className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600">
+              </div>
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600">
                 <Youtube className="w-4 h-4" />
-              </a>
+              </div>
             </div>
           </div>
-          
-          {/* Quick Links */}
-          <div className="col-span-1">
-            <h4 className="font-semibold mb-4 text-gray-800">{t('quickLinks')}</h4>
-            <ul className="space-y-2 text-sm">
-              <li><a href="#home" className="text-gray-600 hover:text-purple-600 transition-colors">{t('home')}</a></li>
-              <li><a href="#services" className="text-gray-600 hover:text-purple-600 transition-colors">{t('services')}</a></li>
-              <li><a href="#about" className="text-gray-600 hover:text-purple-600 transition-colors">{t('about')}</a></li>
-              <li><a href="#login" className="text-gray-600 hover:text-purple-600 transition-colors">{t('login')}</a></li>
-            </ul>
-          </div>
 
-          {/* Services */}
-          <div className="col-span-1">
-            <h4 className="font-semibold mb-4 text-gray-800">{t('services')}</h4>
-            <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">{t('baziTitle')}</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">{t('fengShuiTitle')}</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">{t('tarotTitle')}</a></li>
-              <li><a href="#" className="text-gray-600 hover:text-purple-600 transition-colors">{t('numerologyTitle')}</a></li>
-            </ul>
-          </div>
-
-          {/* Contact Info */}
+          {/* Pricing & Account */}
           <div className="col-span-1">
             <h4 className="font-semibold mb-4 text-gray-800">{t('accountInfo')}</h4>
             <ul className="space-y-2 text-sm text-gray-600">
               <li><a href="#login" className="hover:text-purple-600 transition-colors">{t('login')}</a></li>
               <li><a href="#login" className="hover:text-purple-600 transition-colors">{t('register')}</a></li>
-              <li><a href="#" className="hover:text-purple-600 transition-colors">{t('support')}</a></li>
+              <li>
+                <button
+                  onClick={onScrollToMembership}
+                  className="hover:text-purple-600 transition-colors text-left"
+                >
+                  {t('pricing')}
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={onShowContact}
+                  className="hover:text-purple-600 transition-colors text-left"
+                >
+                  {t('support')}
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div className="col-span-1">
+            <h4 className="font-semibold mb-4 text-gray-800">{t('legal')}</h4>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li>
+                <button
+                  onClick={onShowTerms}
+                  className="hover:text-purple-600 transition-colors text-left"
+                >
+                  {t('termsOfService')}
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={onShowPrivacy}
+                  className="hover:text-purple-600 transition-colors text-left"
+                >
+                  {t('privacyPolicy')}
+                </button>
+              </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gray-300 mt-12 pt-8 text-center text-sm text-gray-500">
-          <p>&copy; 2024 Celestial Wisdom. All rights reserved.</p>
+          <p>&copy; 2025 Indicate.Top. All rights reserved.</p>
         </div>
       </div>
     </footer>

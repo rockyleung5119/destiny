@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端流程测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>前端完整流程测试</h1>
+    
+    <div class="step">
+        <h2>步骤1: 清除现有数据</h2>
+        <button onclick="clearData()">清除localStorage</button>
+        <div id="clearResult" class="result"></div>
+    </div>
+    
+    <div class="step">
+        <h2>步骤2: 用户登录</h2>
+        <button onclick="testLogin()">模拟登录</button>
+        <div id="loginResult" class="result"></div>
+    </div>
+    
+    <div class="step">
+        <h2>步骤3: 获取用户资料</h2>
+        <button onclick="testProfile()">获取用户资料</button>
+        <div id="profileResult" class="result"></div>
+    </div>
+    
+    <div class="step">
+        <h2>步骤4: 检查localStorage状态</h2>
+        <button onclick="checkStorage()">检查存储状态</button>
+        <div id="storageResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        
+        function clearData() {
+            localStorage.clear();
+            document.getElementById('clearResult').innerHTML = '<div class="success">✅ localStorage已清除</div>';
+        }
+        
+        async function testLogin() {
+            const result = document.getElementById('loginResult');
+            result.innerHTML = '<div class="info">正在登录...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 模拟前端保存token的逻辑
+                    localStorage.setItem('authToken', data.data.token);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    
+                    result.innerHTML = `
+                        <div class="success">✅ 登录成功！</div>
+                        <div>用户: ${data.data.user.name} (${data.data.user.email})</div>
+                        <div>Token已保存到localStorage</div>
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">❌ 登录失败: ${data.message}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 登录错误: ${error.message}</div>`;
+            }
+        }
+        
+        async function testProfile() {
+            const result = document.getElementById('profileResult');
+            result.innerHTML = '<div class="info">正在获取用户资料...</div>';
+            
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                result.innerHTML = '<div class="error">❌ 请先登录获取token</div>';
+                return;
+            }
+            
+            try {
+                // 模拟前端API调用
+                const response = await fetch(`${API_BASE_URL}/user/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                        'X-Language': 'zh-CN'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.innerHTML = `
+                        <div class="success">✅ 用户资料获取成功！</div>
+                        <div>用户: ${data.user.name} (${data.user.email})</div>
+                        <div>出生: ${data.user.birthYear}-${data.user.birthMonth}-${data.user.birthDay}</div>
+                        ${data.user.membership ? `<div>会员: ${data.user.membership.plan_id} (激活: ${data.user.membership.is_active})</div>` : '<div>会员: 无</div>'}
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">❌ 用户资料获取失败: ${data.message}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 用户资料获取错误: ${error.message}</div>`;
+            }
+        }
+        
+        function checkStorage() {
+            const result = document.getElementById('storageResult');
+            const token = localStorage.getItem('authToken');
+            const user = localStorage.getItem('user');
+            
+            result.innerHTML = `
+                <div class="info">📋 localStorage状态:</div>
+                <div>authToken: ${token ? token.substring(0, 20) + '...' : '未设置'}</div>
+                <div>user: ${user ? '已设置' : '未设置'}</div>
+                ${user ? `<div>用户数据: ${user}</div>` : ''}
+            `;
+        }
+        
+        // 页面加载时检查存储状态
+        window.onload = function() {
+            checkStorage();
+        };
+    </script>
+</body>
+</html>

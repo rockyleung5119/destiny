@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Frontend API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #5855eb;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Frontend API Test</h1>
+        <p>测试前端邮件验证码发送功能</p>
+        
+        <div class="form-group">
+            <label for="email">Email Address:</label>
+            <input type="email" id="email" value="494159635@qq.com" placeholder="Enter email address">
+        </div>
+        
+        <div class="form-group">
+            <label for="language">Language:</label>
+            <select id="language">
+                <option value="en">English</option>
+                <option value="zh">中文</option>
+            </select>
+        </div>
+        
+        <button onclick="testSendCode()" id="sendBtn">Send Verification Code</button>
+        <button onclick="clearResult()">Clear Result</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001';
+        
+        async function apiRequest(endpoint, options = {}) {
+            const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
+            const url = `${baseUrl}${endpoint}`;
+            
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+            };
+            
+            const config = {
+                ...options,
+                headers: {
+                    ...defaultHeaders,
+                    ...options.headers,
+                },
+            };
+            
+            try {
+                console.log(`🔗 API Request: ${url}`, config);
+                const response = await fetch(url, config);
+                
+                console.log(`📡 Response status: ${response.status}`, response.statusText);
+                
+                const data = await response.json();
+                console.log('📦 Response data:', data);
+                
+                if (!response.ok) {
+                    const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+                    console.error('❌ API Error:', errorMessage, data);
+                    throw new Error(errorMessage);
+                }
+                
+                console.log('✅ API Success:', data);
+                return data;
+            } catch (error) {
+                console.error('❌ API request failed:', error);
+                throw error;
+            }
+        }
+        
+        async function testSendCode() {
+            const email = document.getElementById('email').value;
+            const language = document.getElementById('language').value;
+            const resultDiv = document.getElementById('result');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            if (!email) {
+                showResult('Please enter an email address', 'error');
+                return;
+            }
+            
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+            
+            try {
+                showResult('Sending verification code...', 'info');
+                
+                const result = await apiRequest('/email/send-verification-code', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, language }),
+                });
+                
+                showResult(`✅ Success!\n\nResponse: ${JSON.stringify(result, null, 2)}`, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error!\n\nMessage: ${error.message}\n\nStack: ${error.stack}`, 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send Verification Code';
+            }
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+        }
+        
+        function clearResult() {
+            document.getElementById('result').textContent = '';
+            document.getElementById('result').className = 'result';
+        }
+        
+        // 页面加载时显示当前配置
+        window.onload = function() {
+            console.log('🔧 API Base URL:', API_BASE_URL);
+            showResult('Ready to test. Click "Send Verification Code" to start.', 'info');
+        };
+    </script>
+</body>
+</html>

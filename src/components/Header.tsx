@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage } from '../hooks/useLanguage';
 import { Star, Moon, Sun } from 'lucide-react';
 import LanguageSelector from './LanguageSelector';
 
@@ -20,7 +20,7 @@ const Header: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                Celestial Wisdom
+                Indicate.Top
               </h1>
               <p className="text-xs text-gray-500">Ancient Divination Arts</p>
             </div>

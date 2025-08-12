@@ -1,0 +1,31 @@
+{
+  "templates": {
+    "chinese": {
+      "file": "verification-email-zh.html",
+      "subject": "Indicate.Top - 邮箱验证码",
+      "language": "zh"
+    },
+    "english": {
+      "file": "verification-email-en.html",
+      "subject": "Indicate.Top - Email Verification Code",
+      "language": "en"
+    }
+  },
+  "brandInfo": {
+    "name": "Indicate.Top",
+    "website": "https://indicate.top",
+    "support": "support@indicate.top",
+    "colors": {
+      "primary": "#8b5cf6",
+      "gradient": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+    }
+  },
+  "features": [
+    "响应式设计，支持移动设备",
+    "专业的品牌视觉设计",
+    "多语言支持（中文/英文）",
+    "安全提示和用户指导",
+    "清晰的验证码显示",
+    "品牌一致性"
+  ]
+}

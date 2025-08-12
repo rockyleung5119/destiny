@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authAPI } from '../services/api';
 
 interface User {
@@ -40,6 +40,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const isAuthenticated = !!user;
 
+  // Define logout function first to avoid dependency issues
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }, []);
+
   // Check for existing auth on mount
   useEffect(() => {
     const initAuth = async () => {
@@ -49,24 +56,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (token && savedUser) {
         try {
           const userData = JSON.parse(savedUser);
-          setUser(userData);
-          
-          // Optionally verify token with server
-          // const response = await authAPI.verifyToken();
-          // if (!response.success) {
-          //   logout();
-          // }
+
+          // Verify token with server
+          try {
+            const response = await authAPI.verifyToken();
+            if (response.valid && response.user) {
+              // Update user data from server
+              setUser(response.user);
+              localStorage.setItem('user', JSON.stringify(response.user));
+            } else {
+              // Token is invalid, clear auth
+              logout();
+            }
+          } catch (verifyError) {
+            console.error('Token verification failed:', verifyError);
+            // If verification fails, clear auth
+            logout();
+          }
         } catch (error) {
           console.error('Error parsing saved user data:', error);
           logout();
         }
       }
-      
+
       setIsLoading(false);
     };
 
     initAuth();
-  }, []);
+  }, [logout]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -108,12 +125,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-  };
-
   const updateUser = (userData: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
@@ -124,10 +135,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const response = await authAPI.getProfile();
-      if (response.success && response.user) {
-        setUser(response.user);
-        localStorage.setItem('user', JSON.stringify(response.user));
+      const user = await authAPI.getProfile();
+      if (user) {
+        setUser(user);
+        localStorage.setItem('user', JSON.stringify(user));
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);

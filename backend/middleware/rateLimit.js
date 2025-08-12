@@ -7,11 +7,11 @@ const generalLimiter = new RateLimiterMemory({
   duration: parseInt(process.env.RATE_LIMIT_WINDOW) / 1000 || 900, // 时间窗口（秒）
 });
 
-// 邮件发送速率限制器
+// 邮件发送速率限制器 (开发环境放宽限制)
 const emailLimiter = new RateLimiterMemory({
   keyGenerator: (req) => req.ip,
-  points: 5, // 5次请求
-  duration: 900, // 15分钟
+  points: process.env.NODE_ENV === 'development' ? 100 : 5, // 开发环境100次，生产环境5次
+  duration: process.env.NODE_ENV === 'development' ? 60 : 900, // 开发环境1分钟，生产环境15分钟
 });
 
 // 登录尝试速率限制器
