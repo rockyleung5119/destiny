@@ -266,9 +266,9 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
               </div>
             ) : (
               // 登录/注册表单
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
+              <div className="bg-white/95 backdrop-blur-md rounded-2xl p-8 border border-gray-200 shadow-xl">
                 {/* Toggle Buttons */}
-                <div className="flex bg-white/10 rounded-lg p-1 mb-6">
+                <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
                   <button
                     onClick={() => {
                       setIsLogin(true);
@@ -276,7 +276,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       setMessage('');
                     }}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      isLogin ? 'bg-white text-purple-900' : 'text-white hover:text-yellow-300'
+                      isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-purple-600'
                     }`}
                   >
                     Login
@@ -288,7 +288,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                       setMessage('');
                     }}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      !isLogin ? 'bg-white text-purple-900' : 'text-white hover:text-yellow-300'
+                      !isLogin ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-purple-600'
                     }`}
                   >
                     Register
@@ -299,24 +299,24 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                   {/* Email - 登录时使用普通输入，注册时使用验证组件 */}
                   {isLogin ? (
                     <div>
-                      <label className="block text-sm font-medium text-white/90 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Email Address
                       </label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" />
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="email"
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                          className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           placeholder="Enter your email"
                         />
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <EmailVerification
                         email={formData.email}
                         onVerificationSuccess={() => setIsEmailVerified(true)}
@@ -327,24 +327,24 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
                   {/* Password */}
                   <div>
-                    <label className="block text-sm font-medium text-white/90 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Password
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         name="password"
                         value={formData.password}
                         onChange={handleChange}
                         required
-                        className="w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                        className="w-full pl-12 pr-12 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         placeholder="Enter your password"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
@@ -354,7 +354,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                         <button
                           type="button"
                           onClick={() => setShowForgotPassword(true)}
-                          className="text-yellow-300 hover:text-yellow-200 text-sm underline bg-transparent border-none cursor-pointer"
+                          className="text-purple-600 hover:text-purple-700 text-sm underline bg-transparent border-none cursor-pointer"
                         >
                           Forgot Password? 忘记密码?
                         </button>
@@ -367,18 +367,18 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                     <>
                       {/* Confirm Password */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Confirm Password
                         </label>
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" />
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type={showPassword ? 'text' : 'password'}
                             name="confirmPassword"
                             value={formData.confirmPassword}
                             onChange={handleChange}
                             required
-                            className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                             placeholder="Confirm your password"
                           />
                         </div>
@@ -386,18 +386,18 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
                       {/* Full Name */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Full Name
                         </label>
                         <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" />
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
                             type="text"
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
                             required
-                            className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                             placeholder="Enter your full name"
                           />
                         </div>
@@ -405,7 +405,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
                       {/* Gender */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Gender
                         </label>
                         <select
@@ -413,17 +413,17 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           value={formData.gender}
                           onChange={handleChange}
                           required
-                          className="w-full py-3 px-4 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                          className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         >
-                          <option value="" className="text-gray-800">Select Gender</option>
-                          <option value="male" className="text-gray-800">Male</option>
-                          <option value="female" className="text-gray-800">Female</option>
+                          <option value="">Select Gender</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
                         </select>
                       </div>
 
                       {/* Birth Date */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           <Calendar className="inline w-4 h-4 mr-2" />
                           Birth Date
                         </label>
@@ -433,11 +433,11 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             value={formData.birthYear}
                             onChange={handleChange}
                             required
-                            className="py-2 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="" className="text-gray-800">Year</option>
+                            <option value="">Year</option>
                             {years.map(year => (
-                              <option key={year} value={year} className="text-gray-800">{year}</option>
+                              <option key={year} value={year}>{year}</option>
                             ))}
                           </select>
                           <select
@@ -445,11 +445,11 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             value={formData.birthMonth}
                             onChange={handleChange}
                             required
-                            className="py-2 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="" className="text-gray-800">Month</option>
+                            <option value="">Month</option>
                             {months.map(month => (
-                              <option key={month} value={month} className="text-gray-800">{month}</option>
+                              <option key={month} value={month}>{month}</option>
                             ))}
                           </select>
                           <select
@@ -457,11 +457,11 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             value={formData.birthDay}
                             onChange={handleChange}
                             required
-                            className="py-2 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="" className="text-gray-800">Day</option>
+                            <option value="">Day</option>
                             {days.map(day => (
-                              <option key={day} value={day} className="text-gray-800">{day}</option>
+                              <option key={day} value={day}>{day}</option>
                             ))}
                           </select>
                         </div>
@@ -469,7 +469,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
                       {/* Birth Time */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           <Sun className="inline w-4 h-4 mr-2" />
                           Birth Time (Optional for more accurate reading)
                         </label>
@@ -478,11 +478,11 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             name="birthHour"
                             value={formData.birthHour}
                             onChange={handleChange}
-                            className="py-2 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="" className="text-gray-800">Hour</option>
+                            <option value="">Hour</option>
                             {hours.map(hour => (
-                              <option key={hour} value={hour} className="text-gray-800">
+                              <option key={hour} value={hour}>
                                 {hour.toString().padStart(2, '0')}:00
                               </option>
                             ))}
@@ -491,11 +491,11 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                             name="birthMinute"
                             value={formData.birthMinute}
                             onChange={handleChange}
-                            className="py-2 px-3 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                            className="py-2 px-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           >
-                            <option value="" className="text-gray-800">Minute</option>
+                            <option value="">Minute</option>
                             {minutes.map(minute => (
-                              <option key={minute} value={minute} className="text-gray-800">
+                              <option key={minute} value={minute}>
                                 {minute.toString().padStart(2, '0')}
                               </option>
                             ))}
@@ -505,7 +505,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
                       {/* Birth Place */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           <MapPin className="inline w-4 h-4 mr-2" />
                           Birth Place
                         </label>
@@ -514,30 +514,30 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           name="birthPlace"
                           value={formData.birthPlace}
                           onChange={handleChange}
-                          className="w-full py-3 px-4 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                          className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                           placeholder="City, Country (e.g., Beijing, China)"
                         />
                       </div>
 
                       {/* Timezone */}
                       <div>
-                        <label className="block text-sm font-medium text-white/90 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Timezone (Optional)
                         </label>
                         <select
                           name="timezone"
                           value={formData.timezone}
                           onChange={handleChange}
-                          className="w-full py-3 px-4 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors"
+                          className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         >
-                          <option value="" className="text-gray-800">Select Timezone</option>
-                          <option value="UTC+8" className="text-gray-800">UTC+8 (Beijing, Shanghai)</option>
-                          <option value="UTC+9" className="text-gray-800">UTC+9 (Tokyo, Seoul)</option>
-                          <option value="UTC+7" className="text-gray-800">UTC+7 (Bangkok, Jakarta)</option>
-                          <option value="UTC+5:30" className="text-gray-800">UTC+5:30 (Mumbai, Delhi)</option>
-                          <option value="UTC+0" className="text-gray-800">UTC+0 (London, Dublin)</option>
-                          <option value="UTC-5" className="text-gray-800">UTC-5 (New York, Toronto)</option>
-                          <option value="UTC-8" className="text-gray-800">UTC-8 (Los Angeles, Vancouver)</option>
+                          <option value="">Select Timezone</option>
+                          <option value="UTC+8">UTC+8 (Beijing, Shanghai)</option>
+                          <option value="UTC+9">UTC+9 (Tokyo, Seoul)</option>
+                          <option value="UTC+7">UTC+7 (Bangkok, Jakarta)</option>
+                          <option value="UTC+5:30">UTC+5:30 (Mumbai, Delhi)</option>
+                          <option value="UTC+0">UTC+0 (London, Dublin)</option>
+                          <option value="UTC-5">UTC-5 (New York, Toronto)</option>
+                          <option value="UTC-8">UTC-8 (Los Angeles, Vancouver)</option>
                         </select>
                       </div>
                     </>
@@ -546,9 +546,9 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                   {/* Message Display */}
                   {message && (
                     <div className={`p-3 rounded-lg text-sm font-medium ${
-                      message.includes('✅') 
-                        ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                        : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                      message.includes('✅')
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-red-50 text-red-700 border border-red-200'
                     }`}>
                       {message}
                     </div>
@@ -576,7 +576,7 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
 
                   {/* 注册时的邮箱验证提示 */}
                   {!isLogin && !isEmailVerified && (
-                    <div className="mt-3 text-center text-sm text-yellow-300">
+                    <div className="mt-3 text-center text-sm text-orange-600">
                       <Mail className="inline w-4 h-4 mr-1" />
                       请先验证邮箱地址后才能创建账户
                     </div>

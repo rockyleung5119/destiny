@@ -174,6 +174,7 @@ export const translations: Translations = {
     pleaseEnterPassword: 'Please enter your password.',
     emailVerificationSuccess: 'Email verification successful.',
     verificationCodeSent: 'Verification code has been sent to your email. Please check your inbox (valid for 5 minutes).',
+    emailCannotBeChanged: 'Email cannot be changed',
 
     // Footer
     footerTagline: 'Illuminating paths through celestial wisdom',
@@ -363,6 +364,7 @@ export const translations: Translations = {
     pleaseEnterPassword: '请输入密码',
     emailVerificationSuccess: '邮箱验证成功',
     verificationCodeSent: '验证码已发送到您的邮箱，请查收（5分钟内有效）',
+    emailCannotBeChanged: '邮箱不能修改',
 
     // Footer
     footerTagline: '以天体智慧照亮人生道路',
@@ -531,6 +533,7 @@ export const translations: Translations = {
     pleaseEnterPassword: 'Por favor ingresa tu contraseña.',
     emailVerificationSuccess: 'Verificación de correo exitosa.',
     verificationCodeSent: 'El código de verificación ha sido enviado a tu correo. Por favor revisa tu bandeja de entrada (válido por 5 minutos).',
+    emailCannotBeChanged: 'El correo no se puede cambiar',
 
     // Footer
     footerTagline: 'Iluminando caminos a través de la sabiduría celestial',
@@ -699,6 +702,7 @@ export const translations: Translations = {
     pleaseEnterPassword: 'Veuillez entrer votre mot de passe.',
     emailVerificationSuccess: 'Vérification d\'email réussie.',
     verificationCodeSent: 'Le code de vérification a été envoyé à votre email. Veuillez vérifier votre boîte de réception (valide pendant 5 minutes).',
+    emailCannotBeChanged: 'L\'email ne peut pas être modifié',
 
     // Footer
     footerTagline: 'Illuminant les chemins à travers la sagesse céleste',
@@ -867,6 +871,7 @@ export const translations: Translations = {
     pleaseEnterPassword: 'パスワードを入力してください。',
     emailVerificationSuccess: 'メール確認が成功しました。',
     verificationCodeSent: '確認コードがメールに送信されました。受信トレイをご確認ください（5分間有効）。',
+    emailCannotBeChanged: 'メールアドレスは変更できません',
 
     // Footer
     footerTagline: '天体の知恵で道を照らす',

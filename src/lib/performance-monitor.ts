@@ -69,7 +69,9 @@ export class PerformanceMonitor {
       userId?: string
     ): Promise<any> => {
       const startTime = Date.now();
-      const startMemory = process.memoryUsage();
+      // 检查是否在Node.js环境中
+      const isNodeEnv = typeof process !== 'undefined' && process.memoryUsage;
+      const startMemory = isNodeEnv ? process.memoryUsage() : null;
       let success = true;
       let error: string | undefined;
 
@@ -82,7 +84,7 @@ export class PerformanceMonitor {
         throw err;
       } finally {
         const duration = Date.now() - startTime;
-        const endMemory = process.memoryUsage();
+        const endMemory = isNodeEnv ? process.memoryUsage() : null;
 
         const metrics: PerformanceMetrics = {
           endpoint,
@@ -91,13 +93,13 @@ export class PerformanceMonitor {
           success,
           userId,
           timestamp: new Date(),
-          memoryUsage: {
+          memoryUsage: startMemory && endMemory ? {
             rss: endMemory.rss - startMemory.rss,
             heapTotal: endMemory.heapTotal - startMemory.heapTotal,
             heapUsed: endMemory.heapUsed - startMemory.heapUsed,
             external: endMemory.external - startMemory.external,
             arrayBuffers: endMemory.arrayBuffers - startMemory.arrayBuffers
-          },
+          } : undefined,
           error
         };
 

@@ -75,7 +75,7 @@ function App() {
       <div className="min-h-screen shimmer-background">
         <Header />
         <Hero />
-        <Services />
+        <Services onShowSettings={handleShowSettings} />
         <About />
         <Membership />
         <LoginDetailed onLoginSuccess={handleLoginSuccess} onShowSettings={handleShowSettings} />

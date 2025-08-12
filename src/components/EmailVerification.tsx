@@ -112,7 +112,7 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
     <div className="space-y-4">
       {/* 邮箱输入 */}
       <div className="mb-4">
-        <label className="flex items-center gap-2 font-medium mb-2 text-white/90">
+        <label className="flex items-center gap-2 font-medium mb-2 text-gray-700">
           <Mail className="w-4 h-4" />
           邮箱地址
         </label>
@@ -122,7 +122,7 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
             value={email}
             onChange={(e) => onEmailChange?.(e.target.value)}
             placeholder="请输入邮箱地址"
-            className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-colors disabled:bg-white/5 disabled:text-white/50"
+            className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:bg-gray-50 disabled:text-gray-500"
             disabled={disabled || isVerified}
             required
           />
@@ -146,7 +146,7 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
       {/* 验证码输入 */}
       {isCodeSent && !isVerified && (
         <div className="mb-4">
-          <label className="flex items-center gap-2 font-medium mb-2 text-white/90">
+          <label className="flex items-center gap-2 font-medium mb-2 text-gray-700">
             <Clock className="w-4 h-4" />
             验证码
           </label>
@@ -156,7 +156,7 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
               value={verificationCode}
               onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="请输入6位验证码"
-              className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition-colors disabled:bg-white/5 disabled:text-white/50"
+              className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:bg-gray-50 disabled:text-gray-500"
               maxLength={6}
               disabled={isVerifying}
             />
@@ -175,13 +175,13 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
           </div>
 
           {/* 重新发送链接 */}
-          <div className="mt-2 text-sm text-white/70">
+          <div className="mt-2 text-sm text-gray-600">
             没有收到验证码？
             <button
               type="button"
               onClick={handleResendCode}
               disabled={countdown > 0}
-              className="bg-none border-none text-purple-300 cursor-pointer underline ml-1 hover:text-purple-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
+              className="bg-none border-none text-purple-600 cursor-pointer underline ml-1 hover:text-purple-700 disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
             >
               重新发送
             </button>
@@ -191,9 +191,9 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
 
       {/* 验证成功状态 */}
       {isVerified && (
-        <div className="flex items-center gap-2 p-3 bg-green-50/10 border border-green-400/30 rounded-lg">
-          <CheckCircle className="w-5 h-5 text-green-400" />
-          <span className="text-green-300">邮箱验证成功</span>
+        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <span className="text-green-700">邮箱验证成功</span>
         </div>
       )}
 
@@ -201,10 +201,10 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
       {message && (
         <div className={`p-3 rounded-lg text-sm mt-2 ${
           messageType === 'success'
-            ? 'bg-green-50/10 text-green-300 border border-green-400/30'
+            ? 'bg-green-50 text-green-700 border border-green-200'
             : messageType === 'error'
-            ? 'bg-red-50/10 text-red-300 border border-red-400/30'
-            : 'bg-blue-50/10 text-blue-300 border border-blue-400/30'
+            ? 'bg-red-50 text-red-700 border border-red-200'
+            : 'bg-blue-50 text-blue-700 border border-blue-200'
         }`}>
           {message}
         </div>

@@ -13,6 +13,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const membershipRoutes = require('./routes/membership');
 const emailRoutes = require('./routes/email');
+const fortuneRoutes = require('./routes/fortune');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -51,6 +52,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/membership', membershipRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/fortune', fortuneRoutes);
+
+// 会员状态检查路由
+const { getMembershipStatus } = require('./middleware/membership');
+const { authenticateToken } = require('./middleware/auth');
+app.get('/api/membership/status', authenticateToken, getMembershipStatus);
 
 // 404处理
 app.use('*', (req, res) => {
@@ -67,11 +74,15 @@ app.use(errorHandler);
 // 启动服务器
 const startServer = async () => {
   try {
+    console.log('🔄 Starting server initialization...');
+
     // 初始化数据库
+    console.log('🔄 Initializing database...');
     await initDatabase();
     console.log('✅ Database initialized successfully');
 
     // 启动服务器
+    console.log('🔄 Starting HTTP server...');
     app.listen(PORT, () => {
       console.log(`🚀 Destiny API Server is running on port ${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
@@ -80,6 +91,7 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    console.error('Error details:', error.stack);
     process.exit(1);
   }
 };

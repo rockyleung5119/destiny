@@ -5,6 +5,7 @@ import { authAPI } from '../services/api';
 import { services } from '../data/services';
 import { Calendar, Home, Sparkles, Calculator, Clock, Zap, ArrowRight, Lock, Crown } from 'lucide-react';
 import ServicePermissionModal from './ServicePermissionModal';
+import AnalysisModal from './AnalysisModal';
 
 const iconMap = {
   Calendar,
@@ -13,7 +14,11 @@ const iconMap = {
   Calculator,
 };
 
-const Services: React.FC = () => {
+interface ServicesProps {
+  onShowSettings?: () => void;
+}
+
+const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
   const { t } = useLanguage();
   const { membership, canUseService, consumeCredit } = useMembership();
   const [selectedService, setSelectedService] = useState<string | null>(null);
@@ -26,6 +31,16 @@ const Services: React.FC = () => {
     isOpen: false,
     serviceTitle: '',
     reason: '',
+  });
+
+  const [analysisModal, setAnalysisModal] = useState<{
+    isOpen: boolean;
+    serviceId: string;
+    serviceName: string;
+  }>({
+    isOpen: false,
+    serviceId: '',
+    serviceName: '',
   });
 
   const handleAnalyze = async (serviceId: string, serviceTitle: string) => {
@@ -51,27 +66,12 @@ const Services: React.FC = () => {
       return;
     }
 
-    // 开始分析
-    setSelectedService(serviceId);
-    setIsAnalyzing(true);
-
-    try {
-      // 消耗积分
-      consumeCredit();
-
-      // 模拟分析过程
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // 显示分析结果
-      alert(`✨ ${serviceTitle} 分析完成！\n\n您的宇宙洞察已准备就绪。\n剩余积分：${(membership?.remainingCredits || 0) - 1}`);
-
-    } catch (error) {
-      console.error('Analysis error:', error);
-      alert('分析过程中出现错误，请稍后重试。');
-    } finally {
-      setIsAnalyzing(false);
-      setSelectedService(null);
-    }
+    // 打开分析模态框
+    setAnalysisModal({
+      isOpen: true,
+      serviceId,
+      serviceName: serviceTitle,
+    });
   };
 
   const handleLogin = () => {
@@ -94,6 +94,10 @@ const Services: React.FC = () => {
 
   const closeModal = () => {
     setPermissionModal({ isOpen: false, serviceTitle: '', reason: '' });
+  };
+
+  const closeAnalysisModal = () => {
+    setAnalysisModal({ isOpen: false, serviceId: '', serviceName: '' });
   };
 
   return (
@@ -284,6 +288,15 @@ const Services: React.FC = () => {
         reason={permissionModal.reason}
         onLogin={handleLogin}
         onUpgrade={handleUpgrade}
+      />
+
+      {/* Analysis Modal */}
+      <AnalysisModal
+        isOpen={analysisModal.isOpen}
+        onClose={closeAnalysisModal}
+        serviceId={analysisModal.serviceId}
+        serviceName={analysisModal.serviceName}
+        onShowSettings={onShowSettings}
       />
     </section>
   );

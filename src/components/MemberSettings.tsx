@@ -13,6 +13,7 @@ interface UserProfile {
   birthDay?: number;
   birthHour?: number;
   birthPlace?: string;
+  timezone?: string;
   isEmailVerified: boolean;
   profileUpdatedCount: number;
   createdAt: string;
@@ -53,7 +54,8 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
     birthMonth: '',
     birthDay: '',
     birthHour: '',
-    birthPlace: ''
+    birthPlace: '',
+    timezone: ''
   });
 
   // Password form state
@@ -77,6 +79,8 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
   const loadUserProfile = async () => {
     try {
       setIsLoading(true);
+      setMessage('');
+
       const response = await userAPI.getProfile();
       if (response.success && response.user) {
         const user = response.user;
@@ -88,11 +92,16 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           birthMonth: user.birthMonth?.toString() || '',
           birthDay: user.birthDay?.toString() || '',
           birthHour: user.birthHour?.toString() || '',
-          birthPlace: user.birthPlace || ''
+          birthPlace: user.birthPlace || '',
+          timezone: user.timezone || 'Asia/Shanghai'
         });
+      } else {
+        setMessage(response.message || 'Failed to load profile data');
+        setMessageType('error');
       }
     } catch (error) {
-      setMessage('Failed to load profile');
+      console.error('Profile loading error:', error);
+      setMessage('Unable to connect to server. Please check your connection and try again.');
       setMessageType('error');
     } finally {
       setIsLoading(false);
@@ -122,7 +131,8 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
         birthMonth: profileForm.birthMonth ? parseInt(profileForm.birthMonth) : undefined,
         birthDay: profileForm.birthDay ? parseInt(profileForm.birthDay) : undefined,
         birthHour: profileForm.birthHour ? parseInt(profileForm.birthHour) : undefined,
-        birthPlace: profileForm.birthPlace
+        birthPlace: profileForm.birthPlace,
+        timezone: profileForm.timezone
       };
 
       const response = await userAPI.updateProfile(updateData);
@@ -365,7 +375,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                       disabled
                       className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 cursor-not-allowed shadow-sm"
                     />
-                    <p className="text-gray-500 text-sm mt-1">Email cannot be changed</p>
+                    <p className="text-gray-500 text-sm mt-1">{t('emailCannotBeChanged')}</p>
                   </div>
                 </div>
 
@@ -448,6 +458,33 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     placeholder="City, Country"
                   />
+                </div>
+
+                {/* Timezone */}
+                <div>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    <Calendar size={16} className="inline mr-2" />
+                    Timezone (Essential for Accurate Fortune Telling)
+                  </label>
+                  <select
+                    value={profileForm.timezone}
+                    onChange={(e) => setProfileForm({...profileForm, timezone: e.target.value})}
+                    disabled={userProfile?.profileUpdatedCount >= 1}
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    <option value="">Select Timezone</option>
+                    <option value="Asia/Shanghai">Asia/Shanghai (UTC+8) - 中国标准时间</option>
+                    <option value="Asia/Hong_Kong">Asia/Hong_Kong (UTC+8) - 香港时间</option>
+                    <option value="Asia/Taipei">Asia/Taipei (UTC+8) - 台北时间</option>
+                    <option value="Asia/Singapore">Asia/Singapore (UTC+8) - 新加坡时间</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo (UTC+9) - 日本标准时间</option>
+                    <option value="Asia/Seoul">Asia/Seoul (UTC+9) - 韩国标准时间</option>
+                    <option value="America/New_York">America/New_York (UTC-5/-4) - 美国东部时间</option>
+                    <option value="America/Los_Angeles">America/Los_Angeles (UTC-8/-7) - 美国西部时间</option>
+                    <option value="Europe/London">Europe/London (UTC+0/+1) - 英国时间</option>
+                    <option value="Europe/Paris">Europe/Paris (UTC+1/+2) - 欧洲中部时间</option>
+                    <option value="Australia/Sydney">Australia/Sydney (UTC+10/+11) - 澳大利亚东部时间</option>
+                  </select>
                 </div>
 
                 {/* Submit Button */}

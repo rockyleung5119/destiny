@@ -178,10 +178,21 @@ export default function AnalysisFormPage() {
                 })}
               </div>
 
+              {/* AI大模型分析结果 */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  🤖 AI大模型分析结果
+                </h3>
+                <div className="bg-white rounded-lg p-6 shadow-sm">
+                  <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {result.data.analysis.personality || '正在生成分析结果...'}
+                  </div>
+                </div>
+              </div>
+
               {/* 性格分析 */}
               <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 mb-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">性格特点</h3>
-                <p className="text-gray-700 mb-4">{result.data.analysis.personality}</p>
+                <h3 className="text-xl font-bold text-gray-800 mb-4">性格特点总结</h3>
                 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>

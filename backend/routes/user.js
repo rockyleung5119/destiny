@@ -15,7 +15,8 @@ const updateProfileSchema = Joi.object({
   birthMonth: Joi.number().integer().min(1).max(12).optional(),
   birthDay: Joi.number().integer().min(1).max(31).optional(),
   birthHour: Joi.number().integer().min(0).max(23).optional(),
-  birthPlace: Joi.string().max(100).optional()
+  birthPlace: Joi.string().max(100).optional(),
+  timezone: Joi.string().max(50).optional()
 });
 
 const changePasswordSchema = Joi.object({
@@ -27,7 +28,7 @@ const changePasswordSchema = Joi.object({
 router.get('/profile', authenticateToken, asyncHandler(async (req, res) => {
   const user = await dbGet(`
     SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_place,
-           is_email_verified, profile_updated_count, created_at, updated_at
+           timezone, is_email_verified, profile_updated_count, created_at, updated_at
     FROM users WHERE id = ?
   `, [req.user.id]);
 
@@ -54,6 +55,7 @@ router.get('/profile', authenticateToken, asyncHandler(async (req, res) => {
       birthDay: user.birth_day,
       birthHour: user.birth_hour,
       birthPlace: user.birth_place,
+      timezone: user.timezone,
       isEmailVerified: user.is_email_verified,
       profileUpdatedCount: user.profile_updated_count,
       createdAt: user.created_at,
@@ -104,7 +106,8 @@ router.put('/profile', authenticateToken, asyncHandler(async (req, res) => {
                    key === 'birthMonth' ? 'birth_month' :
                    key === 'birthDay' ? 'birth_day' :
                    key === 'birthHour' ? 'birth_hour' :
-                   key === 'birthPlace' ? 'birth_place' : key;
+                   key === 'birthPlace' ? 'birth_place' :
+                   key === 'timezone' ? 'timezone' : key;
       updates.push(`${dbKey} = ?`);
       values.push(val);
     }
@@ -131,7 +134,7 @@ router.put('/profile', authenticateToken, asyncHandler(async (req, res) => {
   // 获取更新后的用户信息
   const updatedUser = await dbGet(`
     SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_place,
-           is_email_verified, profile_updated_count, updated_at
+           timezone, is_email_verified, profile_updated_count, updated_at
     FROM users WHERE id = ?
   `, [req.user.id]);
 
@@ -148,6 +151,7 @@ router.put('/profile', authenticateToken, asyncHandler(async (req, res) => {
       birthDay: updatedUser.birth_day,
       birthHour: updatedUser.birth_hour,
       birthPlace: updatedUser.birth_place,
+      timezone: updatedUser.timezone,
       isEmailVerified: updatedUser.is_email_verified,
       profileUpdatedCount: updatedUser.profile_updated_count,
       updatedAt: updatedUser.updated_at

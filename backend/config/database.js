@@ -84,6 +84,16 @@ const initDatabase = async () => {
         }
       });
 
+      // 添加时区字段
+      db.run(`
+        ALTER TABLE users ADD COLUMN timezone VARCHAR(50) DEFAULT 'Asia/Shanghai'
+      `, (err) => {
+        // 忽略字段已存在的错误
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding timezone column:', err);
+        }
+      });
+
       // 用户会话表
       db.run(`
         CREATE TABLE IF NOT EXISTS user_sessions (
@@ -101,11 +111,27 @@ const initDatabase = async () => {
         CREATE TABLE IF NOT EXISTS fortune_readings (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER NOT NULL,
-          service_type VARCHAR(50) NOT NULL,
-          input_data TEXT,
-          result_data TEXT,
+          reading_type VARCHAR(50) NOT NULL,
+          question TEXT,
+          result TEXT NOT NULL,
+          language VARCHAR(10) DEFAULT 'zh',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      `);
+
+      // API使用记录表
+      db.run(`
+        CREATE TABLE IF NOT EXISTS api_usage (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          endpoint VARCHAR(100) NOT NULL,
+          method VARCHAR(10) NOT NULL,
+          tokens INTEGER DEFAULT 0,
+          success BOOLEAN NOT NULL,
+          error TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
         )
       `);
 
@@ -115,6 +141,9 @@ const initDatabase = async () => {
       db.run('CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications (email)');
       db.run('CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id)');
       db.run('CREATE INDEX IF NOT EXISTS idx_fortune_readings_user_id ON fortune_readings (user_id)');
+      db.run('CREATE INDEX IF NOT EXISTS idx_fortune_readings_type ON fortune_readings (reading_type)');
+      db.run('CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage (user_id)');
+      db.run('CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage (endpoint)');
 
       console.log('✅ Database tables created successfully');
       resolve();

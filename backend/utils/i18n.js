@@ -88,18 +88,16 @@ function getLocalizedMessage(key, language = 'en') {
 }
 
 /**
- * 从请求头中获取语言偏好
+ * 从请求中获取语言偏好
  * @param {Object} req - Express请求对象
  * @returns {string} 语言代码
  */
 function getLanguageFromRequest(req) {
-  // 优先从自定义头部获取
-  const customLang = req.headers['x-language'] || req.headers['accept-language'];
-  
-  if (customLang) {
-    // 解析语言代码
-    const lang = customLang.toLowerCase().split(',')[0].split('-')[0];
-    
+  // 优先从请求体获取语言参数
+  if (req.body && req.body.language) {
+    const lang = req.body.language.toLowerCase();
+    console.log(`🌍 Language from request body: ${lang}`);
+
     // 映射常见的语言代码
     const langMap = {
       'en': 'en',
@@ -108,10 +106,31 @@ function getLanguageFromRequest(req) {
       'fr': 'fr',
       'ja': 'ja'
     };
-    
+
     return langMap[lang] || 'en';
   }
-  
+
+  // 其次从自定义头部获取
+  const customLang = req.headers['x-language'] || req.headers['accept-language'];
+
+  if (customLang) {
+    // 解析语言代码
+    const lang = customLang.toLowerCase().split(',')[0].split('-')[0];
+    console.log(`🌍 Language from headers: ${lang}`);
+
+    // 映射常见的语言代码
+    const langMap = {
+      'en': 'en',
+      'zh': 'zh',
+      'es': 'es',
+      'fr': 'fr',
+      'ja': 'ja'
+    };
+
+    return langMap[lang] || 'en';
+  }
+
+  console.log(`🌍 Using default language: en`);
   return 'en'; // 默认英文
 }
 

@@ -18,6 +18,8 @@ export interface User {
   birthMonth?: number;
   birthDay?: number;
   birthHour?: number;
+  birthPlace?: string;
+  timezone?: string;
   createdAt?: string;
 }
 
