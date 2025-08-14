@@ -7,13 +7,13 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "build": "node build-worker.js"
+    "build": "echo 'No build step needed for Workers'",
+    "db:create": "wrangler d1 create destiny-db",
+    "db:init": "wrangler d1 execute destiny-db --file=./d1-schema.sql",
+    "db:migrate": "wrangler d1 execute destiny-db --file=./d1-schema.sql"
   },
   "dependencies": {
-    "hono": "^4.0.0",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "joi": "^17.11.0"
+    "hono": "^4.0.0"
   },
   "devDependencies": {
     "wrangler": "^3.0.0"

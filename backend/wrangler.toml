@@ -9,7 +9,7 @@ name = "destiny-backend-prod"
 [[d1_databases]]
 binding = "DB"
 database_name = "destiny-db"
-database_id = "75232ebe-55ee-4468-9f78-f3414b934fa2"
+database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
 # 环境变量（在Cloudflare Dashboard中配置）
 [vars]
