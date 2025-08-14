@@ -1,0 +1,51 @@
+# .github/workflows/deploy-frontend.yml
+
+name: Deploy Frontend to Cloudflare Pages
+
+on:
+  # 当代码被推送到 main 分支时触发
+  push:
+    branches:
+      - main
+    paths:
+      # 监控所有前端相关的文件和目录
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - '.env.production'
+      - '.github/workflows/deploy-frontend.yml'
+
+  # 允许您在 GitHub Actions 页面手动触发此工作流
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm' # 缓存npm依赖，加快后续构建速度
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 注意这里的命令是 pages deploy
+          command: pages deploy dist --project-name=destiny-frontend
