@@ -1,30 +1,28 @@
-// Cloudflare Workers 完整应用入口文件
+// Hono的上下文类型，用于更强的类型检查
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
 import { HTTPException } from 'hono/http-exception';
 
-const app = new Hono();
+// 将App的创建放在一个导出的对象中，这是处理环境变量的更健壮模式
+const app = new Hono<{ Bindings: {
+  CORS_ORIGIN: string;
+  JWT_SECRET: string;
+  DB: D1Database;
+  DEEPSEEK_API_KEY: string;
+  DEEPSEEK_BASE_URL: string;
+  DEEPSEEK_MODEL: string;
+}}>();
 
 // CORS 配置
+// 不再使用动态的 (c, next) 回调，直接在中间件配置中处理
 app.use('*', (c, next) => {
-  const allowedOrigins = [
-    c.env.CORS_ORIGIN, // 从环境变量读取生产环境的URL
-    'http://localhost:5173', // 保留本地开发环境的URL
-    'http://localhost:3000'  // 增加一个常见的本地开发端口
-  ].filter(Boolean); // 过滤掉未定义的环境变量
-
   return cors({
-    origin: (origin, callback) => {
-      if (allowedOrigins.includes(origin) || !origin) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: c.env.CORS_ORIGIN || 'https://destiny-frontend.pages.dev', // 直接从env读取，并提供一个备用值
     allowHeaders: ['Content-Type', 'Authorization', 'X-Language'],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
+    maxAge: 86400, // 缓存预检请求结果一天
   })(c, next);
 });
 
