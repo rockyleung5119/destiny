@@ -7,12 +7,26 @@ import { HTTPException } from 'hono/http-exception';
 const app = new Hono();
 
 // CORS 配置
-app.use('*', cors({
-  origin: ['https://fb824531.destiny-360.pages.dev', 'http://localhost:5173'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Language'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true,
-}));
+app.use('*', (c, next) => {
+  const allowedOrigins = [
+    c.env.CORS_ORIGIN, // 从环境变量读取生产环境的URL
+    'http://localhost:5173', // 保留本地开发环境的URL
+    'http://localhost:3000'  // 增加一个常见的本地开发端口
+  ].filter(Boolean); // 过滤掉未定义的环境变量
+
+  return cors({
+    origin: (origin, callback) => {
+      if (allowedOrigins.includes(origin) || !origin) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Language'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  })(c, next);
+});
 
 // 健康检查端点
 app.get('/api/health', (c) => {
