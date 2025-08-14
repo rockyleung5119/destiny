@@ -31,6 +31,14 @@ jobs:
         run: npm install # 第三步：安装 npm 依赖
         working-directory: ./backend # 指定在 backend 目录下执行
 
+      - name: Apply Database Migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'backend'
+          command: d1 execute destiny-db --file=./d1-schema.sql --remote
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3 # 使用官方的 Wrangler Action
         with:
