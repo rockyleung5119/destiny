@@ -6,12 +6,12 @@ import { HTTPException } from 'hono/http-exception';
 
 // 将App的创建放在一个导出的对象中，这是处理环境变量的更健壮模式
 const app = new Hono<{ Bindings: {
-  CORS_ORIGIN: string;
-  JWT_SECRET: string;
-  DB: D1Database;
-  DEEPSEEK_API_KEY: string;
-  DEEPSEEK_BASE_URL: string;
-  DEEPSEEK_MODEL: string;
+  CORS_ORIGIN: string,
+  JWT_SECRET: string,
+  DB: D1Database,
+  DEEPSEEK_API_KEY: string,
+  DEEPSEEK_BASE_URL: string,
+  DEEPSEEK_MODEL: string
 }}>();
 
 // CORS 配置
