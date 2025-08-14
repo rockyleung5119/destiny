@@ -40,9 +40,8 @@ jobs:
           command: d1 execute destiny-db --file=./d1-schema.sql --remote
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3 # 使用官方的 Wrangler Action
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }} # 使用您在 GitHub Secrets 中设置的 API 令牌
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} # 使用您的账户 ID
-          workingDirectory: 'backend' # 指定工作目录为 backend
-          command: deploy # 执行 wrangler deploy 命令
+        run: npx wrangler deploy
+        working-directory: ./backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
