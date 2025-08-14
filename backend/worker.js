@@ -12,7 +12,7 @@ const app = new Hono<{ Bindings: {
   DEEPSEEK_API_KEY: string,
   DEEPSEEK_BASE_URL: string,
   DEEPSEEK_MODEL: string
-}}>();
+}}>()
 
 // CORS 配置
 // 不再使用动态的 (c, next) 回调，直接在中间件配置中处理
