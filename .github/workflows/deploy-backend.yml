@@ -1,0 +1,40 @@
+# .github/workflows/deploy-backend.yml
+
+name: Deploy Backend to Cloudflare Workers
+
+on:
+  # 当代码被推送到 main 分支时触发
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**' # 仅当 backend 目录下的文件发生变化时才触发
+      - '.github/workflows/deploy-backend.yml' # 工作流文件本身变化也触发
+
+  # 允许您在 GitHub Actions 页面手动触发此工作流
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # 使用最新的 Ubuntu 运行环境
+    name: Deploy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # 第一步：拉取代码
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4 # 第二步：设置 Node.js 环境
+        with:
+          node-version: '20' # 使用 Node.js 20 版本
+
+      - name: Install Dependencies
+        run: npm install # 第三步：安装 npm 依赖
+        working-directory: ./backend # 指定在 backend 目录下执行
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3 # 使用官方的 Wrangler Action
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }} # 使用您在 GitHub Secrets 中设置的 API 令牌
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }} # 使用您的账户 ID
+          workingDirectory: 'backend' # 指定工作目录为 backend
+          command: deploy # 执行 wrangler deploy 命令
