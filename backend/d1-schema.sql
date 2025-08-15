@@ -116,3 +116,4 @@ INSERT OR IGNORE INTO memberships (
 ) VALUES (
   1, 'monthly', 1, '2025-12-31 23:59:59', 1000
 );
+
