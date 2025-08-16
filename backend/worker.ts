@@ -308,12 +308,16 @@ app.post('/api/email/send-verification-code', async (c) => {
 });
 
 // 2. 验证邮箱验证码的端点
-app.post('/api/email/verify-code', async (c) => {
+const verifyEmailHandler = async (c: any) => {
   try {
-    const { email, code } = await c.req.json();
+    let { email, code } = await c.req.json();
     if (!email || !code) {
       return c.json({ success: false, message: 'Email and code are required' }, 400);
     }
+
+    // 新增：去除输入内容的前后空格，增强健壮性
+    email = email.trim();
+    code = code.trim();
 
     const type = 'EMAIL_VERIFICATION';
     const now = new Date().toISOString();
@@ -346,7 +350,11 @@ app.post('/api/email/verify-code', async (c) => {
     console.error('Verify email error:', error);
     return c.json({ success: false, message: 'Failed to verify email.' }, 500);
   }
-});
+};
+
+// 新增：为验证逻辑绑定两个可能的路由，增强兼容性
+app.post('/api/email/verify-code', verifyEmailHandler);
+app.post('/api/auth/verify-email', verifyEmailHandler);
 
 
 // 错误处理
