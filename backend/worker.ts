@@ -283,7 +283,10 @@ app.post('/api/email/send-verification-code', async (c) => {
       return c.json({ success: false, message: 'Email is already verified' }, 400);
     }
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // 使用 crypto API 生成密码学安全的随机数，因为 Math.random() 可能不够随机
+    const randomBuffer = new Uint32Array(1);
+    crypto.getRandomValues(randomBuffer);
+    const verificationCode = (randomBuffer[0] % 900000 + 100000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10分钟后过期
     const type = 'EMAIL_VERIFICATION';
 
