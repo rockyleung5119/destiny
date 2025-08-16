@@ -1,26 +1,19 @@
-# 默认配置（适用于所有环境，除非被覆盖）
+# Wrangler 配置文件 - 简化版
+# 只有一个默认配置，以避免在CI/CD中出现环境混淆
+
 name = "destiny-backend"
 main = "worker.ts"
 compatibility_date = "2024-08-01"
 
-# 开发环境配置
-[dev]
-# 开发时使用的D1数据库
-[[d1_databases]]
-binding = "DB"
-database_name = "destiny-db-dev"
-database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
-
-# 生产环境配置
-[env.production]
-# 生产环境使用的D1数据库
+# D1数据库绑定
+# 这是唯一的数据库配置，将用于所有部署
 [[d1_databases]]
 binding = "DB"
 database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
-# 生产环境变量将通过Cloudflare仪表盘设置
-# [env.production.vars]
-# NODE_ENV = "production"
-# ...
+# 注意：
+# 所有的环境变量（如JWT_SECRET, RESEND_API_KEY等）
+# 都应该在Cloudflare的Worker仪表盘中进行设置。
+# 这个文件不再包含任何密钥或特定于环境的变量。
 
