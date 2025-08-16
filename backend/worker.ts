@@ -96,32 +96,13 @@ app.get('/api/health', async (c) => {
     await ensureDemoUser(c.env.DB);
   }
 
-  // --- FINAL DIAGNOSTIC REPORT ---
-  // This report checks the presence and type of all required environment variables.
-  const envStatus = {
-    CORS_ORIGIN: { present: typeof c.env.CORS_ORIGIN !== 'undefined', type: typeof c.env.CORS_ORIGIN },
-    JWT_SECRET: { present: typeof c.env.JWT_SECRET !== 'undefined', type: typeof c.env.JWT_SECRET },
-    DB: { present: typeof c.env.DB !== 'undefined', type: typeof c.env.DB },
-    DEEPSEEK_API_KEY: { present: typeof c.env.DEEPSEEK_API_KEY !== 'undefined', type: typeof c.env.DEEPSEEK_API_KEY },
-    DEEPSEEK_BASE_URL: { present: typeof c.env.DEEPSEEK_BASE_URL !== 'undefined', type: typeof c.env.DEEPSEEK_BASE_URL },
-    DEEPSEEK_MODEL: { present: typeof c.env.DEEPSEEK_MODEL !== 'undefined', type: typeof c.env.DEEPSEEK_MODEL },
-    RESEND_API_KEY: { present: typeof c.env.RESEND_API_KEY !== 'undefined', type: typeof c.env.RESEND_API_KEY },
-    RESEND_FROM_EMAIL: { present: typeof c.env.RESEND_FROM_EMAIL !== 'undefined', type: typeof c.env.RESEND_FROM_EMAIL },
-    RESEND_FROM_NAME: { present: typeof c.env.RESEND_FROM_NAME !== 'undefined', type: typeof c.env.RESEND_FROM_NAME },
-    FRONTEND_URL: { present: typeof c.env.FRONTEND_URL !== 'undefined', type: typeof c.env.FRONTEND_URL },
-    NODE_ENV: { present: typeof c.env.NODE_ENV !== 'undefined', type: typeof c.env.NODE_ENV },
-    STRIPE_SECRET_KEY: { present: typeof c.env.STRIPE_SECRET_KEY !== 'undefined', type: typeof c.env.STRIPE_SECRET_KEY },
-  };
-  // --- END FINAL DIAGNOSTIC REPORT ---
-
   return c.json({
     status: 'ok',
     message: 'Destiny API Server is running on Cloudflare Workers',
     timestamp: new Date().toISOString(),
-    version: '1.0.4-final-diagnostic',
+    version: '1.0.5-final',
     environment: c.env.NODE_ENV || 'development',
-    database: c.env.DB ? 'D1 Connected' : 'No Database',
-    env_status: envStatus // 添加诊断报告
+    database: c.env.DB ? 'D1 Connected' : 'No Database'
   });
 });
 
