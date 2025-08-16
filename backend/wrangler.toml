@@ -1,28 +1,16 @@
-# Wrangler 配置文件 - 最终生产版 V3
-# 此版本明确指定了生产环境的Worker名称，以防止CI/CD创建新的服务。
+# Wrangler 配置文件 - 最终生产版 V4
+# 这是一个用于生产部署的、最简化的配置。
+# 它不包含任何环境（[env]），以避免在CI/CD中产生混淆。
+# 环境变量将完全通过Cloudflare UI进行管理。
 
-# 顶层配置将作为本地开发的默认设置
-name = "destiny-backend-dev"
+name = "destiny-backend"
 main = "worker.ts"
 compatibility_date = "2024-08-01"
 
-# 本地开发使用的D1数据库
-[[d1_databases]]
-binding = "DB"
-database_name = "destiny-db-dev"
-database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
-
-# 生产环境配置
-[env.production]
-# 明确、强制性地指定生产环境的Worker名称
-name = "destiny-backend"
-
-# 生产环境使用的D1数据库
+# D1数据库绑定
+# 这是唯一的数据库配置，将用于所有部署。
 [[d1_databases]]
 binding = "DB"
 database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
-
-# 注意：此配置块没有定义 [env.production.vars] 表，
-# 因此它永远不会覆盖或删除您在Cloudflare UI中设置的环境变量。
 

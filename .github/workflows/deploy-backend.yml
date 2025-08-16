@@ -45,4 +45,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          command: deploy --env production
+          # 使用 --keep-vars 标志来保留在Cloudflare UI中设置的所有环境变量和密钥
+          command: deploy --keep-vars
