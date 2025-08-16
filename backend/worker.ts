@@ -4,7 +4,6 @@ import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
 import { HTTPException } from 'hono/http-exception';
 import verificationTemplate from './templates/exported/verification-email-indicate-top.html';
-import schema from './d1-schema.sql';
 
 // 为环境变量定义一个清晰的类型别名
 type Env = {
@@ -110,30 +109,6 @@ app.get('/api/health', async (c) => {
 // JWT 中间件
 const jwtMiddleware = jwt({
   secret: (c) => c.env.JWT_SECRET || 'destiny-super-secret-jwt-key-for-production',
-});
-
-// --- 新增：一次性数据库初始化端点 ---
-// 注意：这是一个管理端点，部署后应手动调用一次，然后可以考虑移除或加强保护
-app.post('/api/admin/force-db-init', async (c) => {
-  try {
-    // 1. 执行数据库结构初始化 (使用导入的schema)
-    const statements = schema.split(';').filter(s => s.trim().length > 0);
-    const d1Results = await c.env.DB.batch(
-      statements.map(s => c.env.DB.prepare(s))
-    );
-
-    // 2. 确保demo用户存在
-    await ensureDemoUser(c.env.DB);
-
-    return c.json({
-      success: true,
-      message: 'Database initialization complete. Tables created and demo user ensured.',
-      d1_results: d1Results.map(r => ({ ...r, success: r.error === undefined }))
-    });
-  } catch (error) {
-    console.error('DB Init Error:', error);
-    return c.json({ success: false, message: 'Database initialization failed.', error: error.message }, 500);
-  }
 });
 
 // 用户认证路由

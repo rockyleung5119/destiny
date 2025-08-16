@@ -3,11 +3,6 @@ name = "destiny-backend"
 main = "worker.ts"
 compatibility_date = "2024-08-01"
 
-# 新增：定义文本模块规则，以允许直接导入.sql文件
-[[rules]]
-type = "Text"
-globs = ["**/*.sql"]
-
 # 开发环境配置
 [dev]
 # 开发时使用的D1数据库
