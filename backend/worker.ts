@@ -271,7 +271,7 @@ async function sendVerificationEmail(email: string, code: string, env: Env['Bind
 }
 
 // 1. 发送邮箱验证码的端点
-app.post('/api/auth/send-verification-email', async (c) => {
+app.post('/api/email/send-verification-code', async (c) => {
   try {
     const { email } = await c.req.json();
     if (!email) {
