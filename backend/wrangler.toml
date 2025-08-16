@@ -16,7 +16,7 @@ database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 # 生产环境使用的D1数据库
 [[d1_databases]]
 binding = "DB"
-database_name = "destiny-db-prod"
+database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
 # 生产环境变量将通过Cloudflare仪表盘设置
