@@ -101,19 +101,25 @@ CREATE INDEX IF NOT EXISTS idx_fortune_readings_type ON fortune_readings (readin
 CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage (user_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage (endpoint);
 
--- 插入测试用户数据
-INSERT OR IGNORE INTO users (
+-- 强制删除并重建测试用户，以确保数据状态正确
+
+-- 1. 删除现有测试用户和会员数据
+DELETE FROM memberships WHERE user_id = 1;
+DELETE FROM users WHERE id = 1;
+
+-- 2. 重新插入具有正确密码哈希的测试用户
+INSERT INTO users (
   id, email, password_hash, name, gender, birth_year, birth_month, birth_day, birth_hour, 
   birth_place, timezone, is_email_verified, profile_updated_count
 ) VALUES (
-  1, 'demo@example.com', '$2a$10$rOzJqQqQqQqQqQqQqQqQqOzJqQqQqQqQqQqQqQqQqQqQqQqQqQ', 
+  1, 'demo@example.com', 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3', 
   '梁景乐', 'male', 1992, 9, 15, 9, '中国广州', 'Asia/Shanghai', 1, 5
 );
 
--- 插入测试会员数据
-INSERT OR IGNORE INTO memberships (
-  user_id, plan_id, is_active, expires_at, remaining_credits
+-- 3. 重新插入测试会员数据
+INSERT INTO memberships (
+  id, user_id, plan_id, is_active, expires_at, remaining_credits
 ) VALUES (
-  1, 'monthly', 1, '2025-12-31 23:59:59', 1000
+  1, 1, 'monthly', 1, '2025-12-31 23:59:59', 1000
 );
 

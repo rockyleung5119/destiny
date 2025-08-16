@@ -156,8 +156,29 @@ app.post('/api/auth/login', async (c) => {
       'SELECT id, email, password_hash, name FROM users WHERE email = ?'
     ).bind(email).first();
 
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
-      return c.json({ success: false, message: 'Invalid credentials' }, 401);
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    const isPasswordCorrect = await verifyPassword(password, user.password_hash);
+
+    if (!isPasswordCorrect) {
+      // --- TEMPORARY DEBUGGING ---
+      // On failure, return the hashes to see why the comparison is failing.
+      const hashedInput = await hashPassword(password);
+      return c.json({
+        success: false,
+        message: 'Invalid credentials',
+        // This debug info will only be returned on failed login for an existing user.
+        // It is safe because it doesn't expose the password, only the resulting hashes.
+        debug_info: {
+          reason: 'Password verification failed inside the worker.',
+          hash_from_input_password: hashedInput,
+          hash_from_database: user.password_hash,
+          are_hashes_equal_in_worker: hashedInput === user.password_hash
+        }
+      }, 401);
+      // --- END TEMPORARY DEBUGGING ---
     }
 
     const token = await generateJWT(user.id, c.env.JWT_SECRET);
