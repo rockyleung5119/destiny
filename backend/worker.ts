@@ -243,6 +243,50 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
   }
 });
 
+// 新增：更新用户个人资料的端点
+app.put('/api/user/profile', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+    const profileData = await c.req.json();
+
+    // 构建动态��UPDATE查询
+    const fieldsToUpdate = [
+      'name', 'gender', 'birth_year', 'birth_month', 'birth_day', 
+      'birth_hour', 'birth_place', 'timezone'
+    ];
+    
+    const setClauses = [];
+    const bindings = [];
+
+    for (const field of fieldsToUpdate) {
+      if (profileData[field] !== undefined) {
+        setClauses.push(`${field} = ?`);
+        bindings.push(profileData[field]);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return c.json({ success: false, message: 'No fields to update' }, 400);
+    }
+
+    // 添加 updated_at 和 user_id
+    setClauses.push('updated_at = ?');
+    bindings.push(new Date().toISOString());
+    bindings.push(userId);
+
+    const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
+    
+    await c.env.DB.prepare(query).bind(...bindings).run();
+
+    return c.json({ success: true, message: 'Profile updated successfully.' });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return c.json({ success: false, message: 'Failed to update profile.' }, 500);
+  }
+});
+
 // 算命功能路由
 app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   try {
