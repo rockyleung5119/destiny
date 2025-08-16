@@ -100,7 +100,7 @@ app.get('/api/health', async (c) => {
     status: 'ok',
     message: 'Destiny API Server is running on Cloudflare Workers',
     timestamp: new Date().toISOString(),
-    version: '1.0.2-crypto-fix-deployed',
+    version: '1.0.3-final', // 更新版本号
     environment: c.env.NODE_ENV || 'development',
     database: c.env.DB ? 'D1 Connected' : 'No Database'
   });
@@ -202,14 +202,12 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
   }
 });
 
-// 新增：更新用户个人资料的端点
 app.put('/api/user/profile', jwtMiddleware, async (c) => {
   try {
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const profileData = await c.req.json();
 
-    // 构建动态��UPDATE查询
     const fieldsToUpdate = [
       'name', 'gender', 'birth_year', 'birth_month', 'birth_day', 
       'birth_hour', 'birth_place', 'timezone'
@@ -229,7 +227,6 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'No fields to update' }, 400);
     }
 
-    // 添加 updated_at 和 user_id
     setClauses.push('updated_at = ?');
     bindings.push(new Date().toISOString());
     bindings.push(userId);
@@ -277,15 +274,11 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   }
 });
 
-// --- 新增：邮箱验证码服务 ---
-
-// 从HTML模板加载并填充验证码的辅助函数
+// 邮箱验证码服务
 function getEmailHtml(code: string): string {
-  // 将模板中的占位符 `{{verification_code}}` 替换为真实的验证码
   return verificationTemplate.replace('{{verification_code}}', code);
 }
 
-// 发送验证码邮件的辅助函数
 async function sendVerificationEmail(email: string, code: string, env: Env['Bindings']) {
   const subject = 'Your Destiny Verification Code';
   const htmlBody = getEmailHtml(code);
@@ -313,7 +306,6 @@ async function sendVerificationEmail(email: string, code: string, env: Env['Bind
   return await response.json();
 }
 
-// 1. 发送邮箱验证码的端点
 app.post('/api/email/send-verification-code', async (c) => {
   try {
     const { email } = await c.req.json();
@@ -321,30 +313,25 @@ app.post('/api/email/send-verification-code', async (c) => {
       return c.json({ success: false, message: 'Email is required' }, 400);
     }
 
-    // 检查用户是否已注册且已验证
     const user = await c.env.DB.prepare('SELECT is_email_verified FROM users WHERE email = ?').bind(email).first();
     if (user && user.is_email_verified) {
       return c.json({ success: false, message: 'Email is already verified' }, 400);
     }
 
-    // 使用 crypto API 生成密码学安全的随机数，因为 Math.random() 可能不够随机
     const randomBuffer = new Uint32Array(1);
     crypto.getRandomValues(randomBuffer);
     const verificationCode = (randomBuffer[0] % 900000 + 100000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10分钟后过期
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const type = 'EMAIL_VERIFICATION';
 
-    // 将旧的同类型验证码标记为已使用
     await c.env.DB.prepare(
       'UPDATE verification_codes SET is_used = 1 WHERE email = ? AND type = ? AND is_used = 0'
     ).bind(email, type).run();
 
-    // 插入新的验证码
     await c.env.DB.prepare(
       'INSERT INTO verification_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)'
     ).bind(email, verificationCode, type, expiresAt).run();
 
-    // 发送邮件
     await sendVerificationEmail(email, verificationCode, c.env);
 
     return c.json({ success: true, message: 'Verification code sent successfully.' });
@@ -354,7 +341,6 @@ app.post('/api/email/send-verification-code', async (c) => {
   }
 });
 
-// 2. 验证邮箱验证码的端点
 const verifyEmailHandler = async (c: any) => {
   try {
     let { email, code } = await c.req.json();
@@ -362,14 +348,12 @@ const verifyEmailHandler = async (c: any) => {
       return c.json({ success: false, message: 'Email and code are required' }, 400);
     }
 
-    // 新增：去除输入内容的前后空格，增强健壮性
     email = email.trim();
     code = code.trim();
 
     const type = 'EMAIL_VERIFICATION';
     const now = new Date().toISOString();
 
-    // 查找有效的验证码
     const storedCode = await c.env.DB.prepare(
       'SELECT id, expires_at FROM verification_codes WHERE email = ? AND code = ? AND type = ? AND is_used = 0'
     ).bind(email, code, type).first();
@@ -379,15 +363,12 @@ const verifyEmailHandler = async (c: any) => {
     }
 
     if (now > storedCode.expires_at) {
-      // 将过期的验证码标记为已使用
       await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
       return c.json({ success: false, message: 'Verification code has expired.' }, 400);
     }
 
-    // 验证成功，将验证码标记为已使用
     await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
 
-    // 将用户标记为已验证
     await c.env.DB.prepare('UPDATE users SET is_email_verified = 1, updated_at = ? WHERE email = ?')
       .bind(now, email)
       .run();
@@ -399,10 +380,8 @@ const verifyEmailHandler = async (c: any) => {
   }
 };
 
-// 新增：为验证逻辑绑定两个可能的路由，增强兼容性
 app.post('/api/email/verify-code', verifyEmailHandler);
 app.post('/api/auth/verify-email', verifyEmailHandler);
-
 
 // 错误处理
 app.onError((err, c) => {
