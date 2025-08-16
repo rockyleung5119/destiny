@@ -199,19 +199,7 @@ app.post('/api/auth/login', async (c) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    // --- FINAL DIAGNOSTIC CATCH BLOCK ---
-    // Return a more detailed error to understand the root cause of the crash.
-    return c.json({
-      success: false,
-      message: 'An unexpected error occurred during login.',
-      // This provides safe, specific details about why the operation failed.
-      error_details: {
-        name: error.name,
-        message: error.message,
-        cause: error.cause ? String(error.cause) : 'N/A'
-      }
-    }, 500);
-    // --- END FINAL DIAGNOSTIC CATCH BLOCK ---
+    return c.json({ success: false, message: 'Login failed' }, 500);
   }
 });
 
