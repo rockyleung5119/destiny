@@ -156,33 +156,8 @@ app.post('/api/auth/login', async (c) => {
       'SELECT id, email, password_hash, name FROM users WHERE email = ?'
     ).bind(email).first();
 
-    if (!user) {
-      return c.json({ success: false, message: 'User not found' }, 404);
-    }
-
-    const isPasswordCorrect = await verifyPassword(password, user.password_hash);
-
-    if (!isPasswordCorrect) {
-      // --- FINAL ENHANCED DEBUGGING ---
-      const hashedInput = await hashPassword(password);
-      const dbHash = user.password_hash || ''; // Ensure it's a string
-      return c.json({
-        success: false,
-        message: 'Invalid credentials',
-        debug_info: {
-          reason: 'Password verification failed. This is the final diagnostic step.',
-          hash_from_input_password: {
-            value: hashedInput,
-            length: hashedInput.length
-          },
-          hash_from_database: {
-            value: dbHash,
-            length: dbHash.length
-          },
-          are_hashes_equal_in_worker: hashedInput === dbHash
-        }
-      }, 401);
-      // --- END FINAL DEBUGGING ---
+    if (!user || !(await verifyPassword(password, user.password_hash))) {
+      return c.json({ success: false, message: 'Invalid credentials' }, 401);
     }
 
     const token = await generateJWT(user.id, c.env.JWT_SECRET);
