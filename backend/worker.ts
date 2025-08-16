@@ -199,23 +199,7 @@ app.post('/api/auth/login', async (c) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    // --- FINAL DIAGNOSTIC CATCH BLOCK V2 ---
-    // This will report the status of critical environment variables at the time of the crash.
-    return c.json({
-      success: false,
-      message: 'A fatal error occurred during login. See error_details.',
-      error_details: {
-        error_message: error.message,
-        error_cause: error.cause ? String(error.cause) : 'N/A',
-        environment_status: {
-          is_db_binding_present: typeof c.env.DB !== 'undefined',
-          is_jwt_secret_present: typeof c.env.JWT_SECRET !== 'undefined',
-          db_binding_type: typeof c.env.DB,
-          jwt_secret_type: typeof c.env.JWT_SECRET
-        }
-      }
-    }, 500);
-    // --- END FINAL DIAGNOSTIC CATCH BLOCK V2 ---
+    return c.json({ success: false, message: 'Login failed' }, 500);
   }
 });
 
