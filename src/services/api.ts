@@ -166,46 +166,36 @@ export const emailAPI = {
 export const authAPI = {
   // 用户注册
   async register(userData: RegisterData): Promise<AuthResponse> {
-    const response = await apiRequest<{ success: boolean; message: string; data: { user: any; token: string } }>('/auth/register', {
+    // 后端直接返回 AuthResponse 结构，无需嵌套 data 对象
+    const response = await apiRequest<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
 
     // 保存token到localStorage
-    if (response.success && response.data.token) {
-      localStorage.setItem('authToken', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    if (response.success && response.token) {
+      localStorage.setItem('authToken', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
     }
 
-    // 返回符合AuthResponse格式的数据
-    return {
-      success: response.success,
-      message: response.message,
-      token: response.data.token,
-      user: response.data.user
-    };
+    return response;
   },
 
   // 用户登录
   async login(loginData: LoginData): Promise<AuthResponse> {
-    const response = await apiRequest<{ success: boolean; message: string; data: { user: any; token: string } }>('/auth/login', {
+    // 后端直接返回 AuthResponse 结构，无需嵌套 data 对象
+    const response = await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(loginData),
     });
 
     // 保存token到localStorage
-    if (response.success && response.data.token) {
-      localStorage.setItem('authToken', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    if (response.success && response.token) {
+      localStorage.setItem('authToken', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
     }
 
-    // 返回符合AuthResponse格式的数据
-    return {
-      success: response.success,
-      message: response.message,
-      token: response.data.token,
-      user: response.data.user
-    };
+    return response;
   },
 
   // 获取用户信息
