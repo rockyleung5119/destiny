@@ -232,6 +232,124 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   }
 });
 
+// --- 新增：邮箱验证码服务 ---
+
+// 发送验证码邮件的辅助函数
+async function sendVerificationEmail(email: string, code: string, env: Env['Bindings']) {
+  const subject = 'Your Destiny Verification Code';
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333;">
+      <h2>Welcome to Destiny!</h2>
+      <p>Your verification code is:</p>
+      <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #4A90E2;">${code}</p>
+      <p>This code will expire in 10 minutes.</p>
+      <p>If you did not request this, please ignore this email.</p>
+    </div>
+  `;
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: env.RESEND_FROM_NAME ? `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>` : env.RESEND_FROM_EMAIL,
+      to: [email],
+      subject: subject,
+      html: htmlBody,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Failed to send email:', errorData);
+    throw new Error('Failed to send verification email.');
+  }
+
+  return await response.json();
+}
+
+// 1. 发送邮箱验证码的端点
+app.post('/api/auth/send-verification-email', async (c) => {
+  try {
+    const { email } = await c.req.json();
+    if (!email) {
+      return c.json({ success: false, message: 'Email is required' }, 400);
+    }
+
+    // 检查用户是否已注册且已验证
+    const user = await c.env.DB.prepare('SELECT is_email_verified FROM users WHERE email = ?').bind(email).first();
+    if (user && user.is_email_verified) {
+      return c.json({ success: false, message: 'Email is already verified' }, 400);
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10分钟后过期
+    const type = 'EMAIL_VERIFICATION';
+
+    // 将旧的同类型验证码标记为已使用
+    await c.env.DB.prepare(
+      'UPDATE verification_codes SET is_used = 1 WHERE email = ? AND type = ? AND is_used = 0'
+    ).bind(email, type).run();
+
+    // 插入新的验证码
+    await c.env.DB.prepare(
+      'INSERT INTO verification_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)'
+    ).bind(email, verificationCode, type, expiresAt).run();
+
+    // 发送邮件
+    await sendVerificationEmail(email, verificationCode, c.env);
+
+    return c.json({ success: true, message: 'Verification code sent successfully.' });
+  } catch (error) {
+    console.error('Send verification email error:', error);
+    return c.json({ success: false, message: 'Failed to send verification code.' }, 500);
+  }
+});
+
+// 2. 验证邮箱验证码的端点
+app.post('/api/auth/verify-email', async (c) => {
+  try {
+    const { email, code } = await c.req.json();
+    if (!email || !code) {
+      return c.json({ success: false, message: 'Email and code are required' }, 400);
+    }
+
+    const type = 'EMAIL_VERIFICATION';
+    const now = new Date().toISOString();
+
+    // 查找有效的验证码
+    const storedCode = await c.env.DB.prepare(
+      'SELECT id, expires_at FROM verification_codes WHERE email = ? AND code = ? AND type = ? AND is_used = 0'
+    ).bind(email, code, type).first();
+
+    if (!storedCode) {
+      return c.json({ success: false, message: 'Invalid or expired verification code.' }, 400);
+    }
+
+    if (now > storedCode.expires_at) {
+      // 将过期的验证码标记为已使用
+      await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
+      return c.json({ success: false, message: 'Verification code has expired.' }, 400);
+    }
+
+    // 验证成功，将验证码标记为已使用
+    await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
+
+    // 将用户标记为已验证
+    await c.env.DB.prepare('UPDATE users SET is_email_verified = 1, updated_at = ? WHERE email = ?')
+      .bind(now, email)
+      .run();
+
+    return c.json({ success: true, message: 'Email verified successfully.' });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    return c.json({ success: false, message: 'Failed to verify email.' }, 500);
+  }
+});
+
+
 // 错误处理
 app.onError((err, c) => {
   console.error('Application error:', err);
