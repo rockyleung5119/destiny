@@ -1,78 +1,26 @@
-# 默认配置（开发/预览环境）
+# 默认配置（适用于所有环境，除非被覆盖）
 name = "destiny-backend"
 main = "worker.ts"
 compatibility_date = "2024-08-01"
 
-# 开发环境D1数据库配置
+# 开发环境配置
+[dev]
+# 开发时使用的D1数据库
 [[d1_databases]]
 binding = "DB"
 database_name = "destiny-db-dev"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
-# 开发环境变量
-[vars]
-NODE_ENV = "development"
-JWT_SECRET = "destiny-super-secret-jwt-key-for-development"
-DEEPSEEK_API_KEY = "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn"
-DEEPSEEK_BASE_URL = "https://api.siliconflow.cn/v1/chat/completions"
-DEEPSEEK_MODEL = "Pro/deepseek-ai/DeepSeek-R1"
-RESEND_API_KEY = "re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP"
-RESEND_FROM_EMAIL = "info@info.indicate.top"
-RESEND_FROM_NAME = "Indicate.Top"
-EMAIL_SERVICE = "resend"
-FRONTEND_URL = "http://localhost:5173"
-CORS_ORIGIN = "http://localhost:5173"
-STRIPE_SECRET_KEY = "sk_test_51234567890abcdef"
-STRIPE_PUBLISHABLE_KEY = "pk_test_51234567890abcdef"
-
 # 生产环境配置
 [env.production]
-name = "destiny-backend-prod"
-
-# 生产环境D1数据库配置
-[[env.production.d1_databases]]
+# 生产环境使用的D1数据库
+[[d1_databases]]
 binding = "DB"
 database_name = "destiny-db-prod"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
-# 生产环境变量
-[env.production.vars]
-NODE_ENV = "production"
-JWT_SECRET = "destiny-super-secret-jwt-key-for-production"
-DEEPSEEK_API_KEY = "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn"
-DEEPSEEK_BASE_URL = "https://api.siliconflow.cn/v1/chat/completions"
-DEEPSEEK_MODEL = "Pro/deepseek-ai/DeepSeek-R1"
-RESEND_API_KEY = "re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP"
-RESEND_FROM_EMAIL = "info@info.indicate.top"
-RESEND_FROM_NAME = "Indicate.Top"
-EMAIL_SERVICE = "resend"
-FRONTEND_URL = "https://destiny-frontend.pages.dev"
-CORS_ORIGIN = "https://destiny-frontend.pages.dev"
-STRIPE_SECRET_KEY = "sk_live_your_live_stripe_key_here"
-STRIPE_PUBLISHABLE_KEY = "pk_live_your_live_stripe_key_here"
+# 生产环境变量将通过Cloudflare仪表盘设置
+# [env.production.vars]
+# NODE_ENV = "production"
+# ...
 
-# 预览环境配置
-[env.preview]
-name = "destiny-backend-preview"
-
-# 预览环境D1数据库配置
-[[env.preview.d1_databases]]
-binding = "DB"
-database_name = "destiny-db-preview"
-database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
-
-# 预览环境变量
-[env.preview.vars]
-NODE_ENV = "preview"
-JWT_SECRET = "destiny-super-secret-jwt-key-for-preview"
-DEEPSEEK_API_KEY = "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn"
-DEEPSEEK_BASE_URL = "https://api.siliconflow.cn/v1/chat/completions"
-DEEPSEEK_MODEL = "Pro/deepseek-ai/DeepSeek-R1"
-RESEND_API_KEY = "re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP"
-RESEND_FROM_EMAIL = "info@info.indicate.top"
-RESEND_FROM_NAME = "Indicate.Top"
-EMAIL_SERVICE = "resend"
-FRONTEND_URL = "https://destiny-frontend.pages.dev"
-CORS_ORIGIN = "https://destiny-frontend.pages.dev"
-STRIPE_SECRET_KEY = "sk_test_51234567890abcdef"
-STRIPE_PUBLISHABLE_KEY = "pk_test_51234567890abcdef"

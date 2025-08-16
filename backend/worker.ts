@@ -111,6 +111,95 @@ const jwtMiddleware = jwt({
   secret: (c) => c.env.JWT_SECRET || 'destiny-super-secret-jwt-key-for-production',
 });
 
+// --- 新增：一次性数据库初始化端点 ---
+// 注意：这是一个管理端点，部署后应手动调用一次，然后可以考虑移除或加强保护
+app.post('/api/admin/force-db-init', async (c) => {
+  const schema = `-- Destiny项目 D1数据库初始化脚本
+
+-- 用户表
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL,
+  gender TEXT,
+  birth_year INTEGER,
+  birth_month INTEGER,
+  birth_day INTEGER,
+  birth_hour INTEGER,
+  birth_place TEXT,
+  timezone TEXT DEFAULT 'Asia/Shanghai',
+  is_email_verified INTEGER DEFAULT 0,
+  profile_updated_count INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 会员表
+CREATE TABLE IF NOT EXISTS memberships (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  plan_id TEXT NOT NULL,
+  is_active INTEGER DEFAULT 1,
+  expires_at TEXT,
+  remaining_credits INTEGER,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- 通用验证码表
+CREATE TABLE IF NOT EXISTS verification_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  type TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER DEFAULT 0,
+  is_used INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(email, type, code)
+);
+
+-- 算命记录表
+CREATE TABLE IF NOT EXISTS fortune_readings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  reading_type TEXT NOT NULL,
+  question TEXT,
+  result TEXT NOT NULL,
+  language TEXT DEFAULT 'zh',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_memberships_user_id ON memberships (user_id);
+CREATE INDEX IF NOT EXISTS idx_fortune_readings_user_id ON fortune_readings (user_id);
+`;
+
+  try {
+    // 1. 执行数据库结构初始化
+    const statements = schema.split(';').filter(s => s.trim().length > 0);
+    const d1Results = await c.env.DB.batch(
+      statements.map(s => c.env.DB.prepare(s))
+    );
+
+    // 2. 确保demo用户存在
+    await ensureDemoUser(c.env.DB);
+
+    return c.json({
+      success: true,
+      message: 'Database initialization complete. Tables created and demo user ensured.',
+      d1_results: d1Results.map(r => ({ ...r, success: r.error === undefined }))
+    });
+  } catch (error) {
+    console.error('DB Init Error:', error);
+    return c.json({ success: false, message: 'Database initialization failed.', error: error.message }, 500);
+  }
+});
+
 // 用户认证路由
 app.post('/api/auth/register', async (c) => {
   try {
