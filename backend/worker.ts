@@ -28,15 +28,19 @@ type Env = {
 const app = new Hono<Env>();
 
 // CORS 配置
-app.use('*', (c, next) => {
-  return cors({
-    origin: c.env.CORS_ORIGIN || 'https://destiny-frontend.pages.dev',
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Language'],
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true,
-    maxAge: 86400,
-  })(c, next);
-});
+app.use('*', cors({
+  origin: [
+    'https://destiny-frontend.pages.dev',
+    'http://localhost:3000',
+    'http://localhost:5173', // Vite's default
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173'
+  ],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Language'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  maxAge: 86400,
+}));
 
 // 数据库初始化和demo用户确保
 async function ensureDemoUser(db: D1Database) {
