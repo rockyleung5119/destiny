@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
 import { HTTPException } from 'hono/http-exception';
+import verificationTemplate from './templates/exported/verification-email-indicate-top.html';
 
 // 为环境变量定义一个清晰的类型别名
 type Env = {
@@ -234,18 +235,16 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
 
 // --- 新增：邮箱验证码服务 ---
 
+// 从HTML模板加载并填充验证码的辅助函数
+function getEmailHtml(code: string): string {
+  // 将模板中的占位符 `{{verification_code}}` 替换为真实的验证码
+  return verificationTemplate.replace('{{verification_code}}', code);
+}
+
 // 发送验证码邮件的辅助函数
 async function sendVerificationEmail(email: string, code: string, env: Env['Bindings']) {
   const subject = 'Your Destiny Verification Code';
-  const htmlBody = `
-    <div style="font-family: Arial, sans-serif; color: #333;">
-      <h2>Welcome to Destiny!</h2>
-      <p>Your verification code is:</p>
-      <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #4A90E2;">${code}</p>
-      <p>This code will expire in 10 minutes.</p>
-      <p>If you did not request this, please ignore this email.</p>
-    </div>
-  `;
+  const htmlBody = getEmailHtml(code);
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -309,7 +308,7 @@ app.post('/api/email/send-verification-code', async (c) => {
 });
 
 // 2. 验证邮箱验证码的端点
-app.post('/api/auth/verify-email', async (c) => {
+app.post('/api/email/verify-code', async (c) => {
   try {
     const { email, code } = await c.req.json();
     if (!email || !code) {
