@@ -112,7 +112,7 @@ INSERT INTO users (
   id, email, password_hash, name, gender, birth_year, birth_month, birth_day, birth_hour, 
   birth_place, timezone, is_email_verified, profile_updated_count
 ) VALUES (
-  1, 'demo@example.com', 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3', 
+  1, 'demo@example.com', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 
   '梁景乐', 'male', 1992, 9, 15, 9, '中国广州', 'Asia/Shanghai', 1, 5
 );
 
