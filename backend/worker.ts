@@ -100,7 +100,7 @@ app.get('/api/health', async (c) => {
     status: 'ok',
     message: 'Destiny API Server is running on Cloudflare Workers',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '1.0.2-crypto-fix-deployed',
     environment: c.env.NODE_ENV || 'development',
     database: c.env.DB ? 'D1 Connected' : 'No Database'
   });
