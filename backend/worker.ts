@@ -13,6 +13,14 @@ type Env = {
     DEEPSEEK_API_KEY: string;
     DEEPSEEK_BASE_URL: string;
     DEEPSEEK_MODEL: string;
+    RESEND_API_KEY: string;
+    RESEND_FROM_EMAIL: string;
+    RESEND_FROM_NAME: string;
+    EMAIL_SERVICE: string;
+    FRONTEND_URL: string;
+    NODE_ENV: string;
+    STRIPE_SECRET_KEY: string;
+    STRIPE_PUBLISHABLE_KEY: string;
   }
 }
 
@@ -30,13 +38,66 @@ app.use('*', (c, next) => {
   })(c, next);
 });
 
+// 数据库初始化和demo用户确保
+async function ensureDemoUser(db: D1Database) {
+  try {
+    // 检查demo用户是否存在
+    const demoUser = await db.prepare(
+      'SELECT id FROM users WHERE email = ?'
+    ).bind('demo@example.com').first();
+
+    if (!demoUser) {
+      // 创建demo用户
+      const hashedPassword = await hashPassword('password123');
+      const result = await db.prepare(
+        'INSERT INTO users (email, password_hash, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_place, timezone, is_email_verified, profile_updated_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        'demo@example.com',
+        hashedPassword,
+        '梁景乐',
+        'male',
+        1992,
+        9,
+        15,
+        9,
+        '中国广州',
+        'Asia/Shanghai',
+        1,
+        5
+      ).run();
+
+      // 创建demo用户的会员记录
+      if (result.meta.last_row_id) {
+        await db.prepare(
+          'INSERT INTO memberships (user_id, plan_id, is_active, expires_at, remaining_credits) VALUES (?, ?, ?, ?, ?)'
+        ).bind(
+          result.meta.last_row_id,
+          'monthly',
+          1,
+          '2025-12-31 23:59:59',
+          1000
+        ).run();
+      }
+    }
+  } catch (error) {
+    console.error('Error ensuring demo user:', error);
+  }
+}
+
 // 健康检查端点
-app.get('/api/health', (c) => {
+app.get('/api/health', async (c) => {
+  // 确保demo用户存在（仅在生产环境的D1数据库中）
+  if (c.env.DB && c.env.NODE_ENV === 'production') {
+    await ensureDemoUser(c.env.DB);
+  }
+
   return c.json({
     status: 'ok',
     message: 'Destiny API Server is running on Cloudflare Workers',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    environment: c.env.NODE_ENV || 'development',
+    database: c.env.DB ? 'D1 Connected' : 'No Database'
   });
 });
 

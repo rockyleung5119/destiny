@@ -1,6 +1,6 @@
 // API服务配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD ? 'https://destiny-backend.your-account.workers.dev' : 'http://localhost:3001/api');
+  (import.meta.env.PROD ? 'https://destiny-backend.jerryliang5119.workers.dev' : 'http://localhost:3001');
 
 // 开发模式开关 - 设置为true使用模拟数据
 const USE_MOCK_API = false;
