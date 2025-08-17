@@ -1,6 +1,7 @@
--- Destiny项目 D1数据库初始化脚本
+-- 安全的数据库结构更新脚本
+-- 只更新表结构，不会删除或修改现有数据
 
--- 用户表
+-- 用户表 - 使用 CREATE TABLE IF NOT EXISTS 确保不会覆盖现有表
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
@@ -92,7 +93,16 @@ CREATE TABLE IF NOT EXISTS api_usage (
   FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 );
 
--- 创建索引
+-- 添加缺失的字段（如果不存在）
+-- 这些 ALTER TABLE 语句会安全地添加字段，如果字段已存在会被忽略
+
+-- 添加 birth_minute 字段
+ALTER TABLE users ADD COLUMN birth_minute INTEGER;
+
+-- 为现有用户设置默认的 birth_minute 值
+UPDATE users SET birth_minute = 0 WHERE birth_minute IS NULL;
+
+-- 创建索引（如果不存在）
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_memberships_user_id ON memberships (user_id);
 CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications (email);
@@ -101,26 +111,3 @@ CREATE INDEX IF NOT EXISTS idx_fortune_readings_user_id ON fortune_readings (use
 CREATE INDEX IF NOT EXISTS idx_fortune_readings_type ON fortune_readings (reading_type);
 CREATE INDEX IF NOT EXISTS idx_api_usage_user_id ON api_usage (user_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_endpoint ON api_usage (endpoint);
-
--- 强制删除并重建测试用户，以确保数据状态正确
-
--- 1. 删除现有测试用户和会员数据
-DELETE FROM memberships WHERE user_id = 1;
-DELETE FROM users WHERE id = 1;
-
--- 2. 重新插入具有正确密码哈希的测试用户
-INSERT INTO users (
-  id, email, password_hash, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_minute,
-  birth_place, timezone, is_email_verified, profile_updated_count
-) VALUES (
-  1, 'demo@example.com', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f',
-  '梁景乐', 'male', 1992, 9, 15, 9, 30, '中国广州', 'Asia/Shanghai', 1, 5
-);
-
--- 3. 重新插入测试会员数据
-INSERT INTO memberships (
-  id, user_id, plan_id, is_active, expires_at, remaining_credits
-) VALUES (
-  1, 1, 'monthly', 1, '2025-12-31 23:59:59', 1000
-);
-
