@@ -898,19 +898,50 @@ app.post('/api/email/send-verification-code', async (c) => {
       isAlreadyVerified = true;
     }
 
-    // 检查是否在短时间内重复发送
+    // 检查是否在短时间内重复发送（60秒限制）
     console.log('⏰ Checking for recent verification codes...');
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    console.log('⏰ One minute ago timestamp:', oneMinuteAgo);
+
     const recentCode = await c.env.DB.prepare(`
       SELECT created_at FROM verification_codes
-      WHERE email = ? AND type = 'EMAIL_VERIFICATION' AND created_at > datetime('now', '-1 minute')
+      WHERE email = ? AND type = 'EMAIL_VERIFICATION' AND created_at > ?
       ORDER BY created_at DESC LIMIT 1
-    `).bind(email).first();
+    `).bind(email, oneMinuteAgo).first();
+    console.log('⏰ Recent code check result:', recentCode);
 
     if (recentCode) {
       console.log('❌ Recent verification code found, rate limiting');
+      const timeDiff = Date.now() - new Date(recentCode.created_at).getTime();
+      const remainingSeconds = Math.ceil((60 * 1000 - timeDiff) / 1000);
+      console.log('⏰ Time difference:', timeDiff, 'ms, remaining:', remainingSeconds, 'seconds');
+
       return c.json({
         success: false,
-        message: 'Please wait 60 seconds before sending another verification code'
+        message: `Please wait ${remainingSeconds} seconds before sending another verification code`,
+        remainingSeconds: remainingSeconds
+      }, 429);
+    }
+
+    // 检查是否超过每日发送限制（3次后需要等待30分钟）
+    console.log('📊 Checking daily send limit...');
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    console.log('📊 Thirty minutes ago timestamp:', thirtyMinutesAgo);
+
+    const recentCodes = await c.env.DB.prepare(`
+      SELECT COUNT(*) as count FROM verification_codes
+      WHERE email = ? AND type = 'EMAIL_VERIFICATION' AND created_at > ?
+    `).bind(email, thirtyMinutesAgo).all();
+
+    const recentCount = recentCodes.results[0]?.count || 0;
+    console.log('📊 Recent codes count in last 30 minutes:', recentCount);
+
+    if (recentCount >= 3) {
+      console.log('❌ Daily limit exceeded, enforcing 30-minute cooldown');
+      return c.json({
+        success: false,
+        message: 'You have reached the maximum number of verification code requests. Please wait 30 minutes before trying again.',
+        cooldownMinutes: 30
       }, 429);
     }
 
@@ -1046,17 +1077,28 @@ app.post('/api/auth/send-delete-verification', jwtMiddleware, async (c) => {
     }
     console.log('✅ User found, email:', user.email);
 
-    // 检查是否在短时间内重复发送
+    // 检查是否在短时间内重复发送（60秒限制）
+    console.log('⏰ Checking for recent delete account verification codes...');
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    console.log('⏰ One minute ago timestamp:', oneMinuteAgo);
+
     const recentCode = await c.env.DB.prepare(`
       SELECT created_at FROM verification_codes
-      WHERE email = ? AND type = 'DELETE_ACCOUNT' AND created_at > datetime('now', '-1 minute')
+      WHERE email = ? AND type = 'DELETE_ACCOUNT' AND created_at > ?
       ORDER BY created_at DESC LIMIT 1
-    `).bind(user.email).first();
+    `).bind(user.email, oneMinuteAgo).first();
+    console.log('⏰ Recent delete code check result:', recentCode);
 
     if (recentCode) {
+      console.log('❌ Recent delete verification code found, rate limiting');
+      const timeDiff = Date.now() - new Date(recentCode.created_at).getTime();
+      const remainingSeconds = Math.ceil((60 * 1000 - timeDiff) / 1000);
+      console.log('⏰ Time difference:', timeDiff, 'ms, remaining:', remainingSeconds, 'seconds');
+
       return c.json({
         success: false,
-        message: 'Please wait 60 seconds before sending another verification code'
+        message: `Please wait ${remainingSeconds} seconds before sending another verification code`,
+        remainingSeconds: remainingSeconds
       }, 429);
     }
 

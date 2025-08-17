@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate Limit Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .countdown {
+            font-weight: bold;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏰ Rate Limit Fix Test</h1>
+        
+        <!-- 测试60秒速率限制 -->
+        <div class="test-section">
+            <h3>测试1: 60秒速率限制</h3>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="testEmail" value="494159635@qq.com" placeholder="输入要测试的邮箱地址">
+            </div>
+            <button onclick="testRateLimit()" id="rateLimitBtn">发送验证码</button>
+            <button onclick="checkLastSendTime()">检查上次发送时间</button>
+            <div id="rateLimitResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试30分钟限制 -->
+        <div class="test-section">
+            <h3>测试2: 30分钟限制（3次后）</h3>
+            <p>连续发送3次验证码后，应该触发30分钟的冷却期</p>
+            <button onclick="testDailyLimit()" id="dailyLimitBtn">连续发送测试</button>
+            <div id="dailyLimitResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 数据库时间检查 -->
+        <div class="test-section">
+            <h3>测试3: 数据库时间检查</h3>
+            <p>检查数据库时间和本地时间的同步情况</p>
+            <button onclick="checkDatabaseTime()">检查数据库时间</button>
+            <div id="timeCheckResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试日志 -->
+        <div class="test-section">
+            <h3>测试日志</h3>
+            <button onclick="clearLogs()">清空日志</button>
+            <div id="testLogs" class="result info">
+                测试日志将显示在这里...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+        let countdownTimer = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function clearLogs() {
+            document.getElementById('testLogs').textContent = '测试日志已清空...\n';
+        }
+
+        function startCountdown(seconds, buttonId) {
+            const button = document.getElementById(buttonId);
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            button.disabled = true;
+            let remaining = seconds;
+            
+            countdownTimer = setInterval(() => {
+                if (remaining > 0) {
+                    button.textContent = `等待 ${remaining}秒`;
+                    remaining--;
+                } else {
+                    clearInterval(countdownTimer);
+                    button.disabled = false;
+                    button.textContent = '发送验证码';
+                    countdownTimer = null;
+                }
+            }, 1000);
+        }
+
+        async function testRateLimit() {
+            const email = document.getElementById('testEmail').value.trim();
+            
+            if (!email) {
+                showResult('rateLimitResult', '❌ 请输入邮箱地址', 'error');
+                return;
+            }
+
+            try {
+                log(`⏰ 测试60秒速率限制: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/email/send-verification-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, language: 'en' })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 429) {
+                    // 速率限制
+                    const remainingSeconds = data.remainingSeconds || 60;
+                    showResult('rateLimitResult', `⏰ 速率限制生效\n错误信息: ${data.message}\n剩余时间: ${remainingSeconds}秒\n\n这是正确的行为！`, 'warning');
+                    startCountdown(remainingSeconds, 'rateLimitBtn');
+                } else if (data.success) {
+                    showResult('rateLimitResult', `✅ 验证码发送成功！\n${data.message}\n\n现在可以测试60秒限制了。`, 'success');
+                    startCountdown(60, 'rateLimitBtn');
+                } else {
+                    showResult('rateLimitResult', `❌ 发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('rateLimitResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkLastSendTime() {
+            try {
+                log('🔍 检查上次发送时间...');
+                
+                const response = await fetch(`${API_BASE_URL}/api/debug/db-check`);
+                const data = await response.json();
+                
+                if (data.recentData && data.recentData.verification_codes) {
+                    const recentCodes = data.recentData.verification_codes;
+                    const emailCodes = recentCodes.filter(code => 
+                        code.email === document.getElementById('testEmail').value.trim() && 
+                        code.type === 'EMAIL_VERIFICATION'
+                    );
+                    
+                    if (emailCodes.length > 0) {
+                        const lastCode = emailCodes[0];
+                        const lastSendTime = new Date(lastCode.created_at);
+                        const now = new Date();
+                        const timeDiff = now - lastSendTime;
+                        const secondsDiff = Math.floor(timeDiff / 1000);
+                        
+                        let timeInfo = `上次发送时间: ${lastCode.created_at}\n`;
+                        timeInfo += `当前时间: ${now.toISOString()}\n`;
+                        timeInfo += `时间差: ${secondsDiff}秒\n`;
+                        timeInfo += `状态: ${secondsDiff >= 60 ? '✅ 可以发送' : '⏰ 需要等待'}`;
+                        
+                        showResult('rateLimitResult', timeInfo, secondsDiff >= 60 ? 'success' : 'warning');
+                    } else {
+                        showResult('rateLimitResult', '📭 没有找到该邮箱的验证码记录', 'info');
+                    }
+                }
+            } catch (error) {
+                log(`❌ 检查错误: ${error.message}`);
+                showResult('rateLimitResult', `❌ 检查错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDailyLimit() {
+            const email = document.getElementById('testEmail').value.trim();
+            
+            if (!email) {
+                showResult('dailyLimitResult', '❌ 请输入邮箱地址', 'error');
+                return;
+            }
+
+            showResult('dailyLimitResult', '🔄 开始连续发送测试...', 'info');
+            
+            for (let i = 1; i <= 4; i++) {
+                try {
+                    log(`📧 第${i}次发送验证码...`);
+                    
+                    const response = await fetch(`${API_BASE_URL}/api/email/send-verification-code`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email, language: 'en' })
+                    });
+
+                    const data = await response.json();
+                    log(`📧 第${i}次响应: ${response.status} - ${data.message}`);
+
+                    if (response.status === 429) {
+                        if (data.cooldownMinutes) {
+                            showResult('dailyLimitResult', `✅ 30分钟限制生效！\n第${i}次发送时触发\n错误信息: ${data.message}\n冷却时间: ${data.cooldownMinutes}分钟`, 'success');
+                        } else {
+                            showResult('dailyLimitResult', `⏰ 60秒限制生效\n第${i}次发送时触发\n错误信息: ${data.message}`, 'warning');
+                        }
+                        break;
+                    } else if (data.success) {
+                        log(`✅ 第${i}次发送成功`);
+                        if (i < 4) {
+                            // 等待61秒再发送下一次
+                            await new Promise(resolve => setTimeout(resolve, 61000));
+                        }
+                    } else {
+                        showResult('dailyLimitResult', `❌ 第${i}次发送失败: ${data.message}`, 'error');
+                        break;
+                    }
+                } catch (error) {
+                    log(`❌ 第${i}次发送错误: ${error.message}`);
+                    showResult('dailyLimitResult', `❌ 第${i}次发送错误: ${error.message}`, 'error');
+                    break;
+                }
+            }
+        }
+
+        async function checkDatabaseTime() {
+            try {
+                log('🕐 检查数据库时间...');
+                
+                const response = await fetch(`${API_BASE_URL}/api/debug/db-check`);
+                const data = await response.json();
+                
+                const localTime = new Date().toISOString();
+                const dbTimestamp = data.timestamp;
+                
+                let timeInfo = `本地时间: ${localTime}\n`;
+                timeInfo += `数据库时间: ${dbTimestamp}\n`;
+                
+                if (dbTimestamp) {
+                    const timeDiff = new Date(localTime) - new Date(dbTimestamp);
+                    timeInfo += `时间差: ${Math.abs(timeDiff)}毫秒\n`;
+                    timeInfo += `同步状态: ${Math.abs(timeDiff) < 5000 ? '✅ 同步正常' : '⚠️ 可能有时差'}`;
+                }
+                
+                showResult('timeCheckResult', timeInfo, 'info');
+                
+            } catch (error) {
+                log(`❌ 时间检查错误: ${error.message}`);
+                showResult('timeCheckResult', `❌ 时间检查错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动开始
+        window.onload = function() {
+            log('⏰ Rate Limit Fix Test 页面已加载');
+            log('📍 测试目标: 验证60秒和30分钟速率限制是否正常工作');
+        };
+    </script>
+</body>
+</html>
