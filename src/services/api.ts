@@ -32,9 +32,20 @@ export interface User {
   birthMonth?: number;
   birthDay?: number;
   birthHour?: number;
+  birthMinute?: number;
   birthPlace?: string;
   timezone?: string;
+  isEmailVerified?: boolean;
+  profileUpdatedCount?: number;
   createdAt?: string;
+  updatedAt?: string;
+  membership?: {
+    planId: string;
+    isActive: boolean;
+    expiresAt: string;
+    remainingCredits?: number;
+    createdAt: string;
+  } | null;
 }
 
 export interface AuthResponse {
@@ -200,7 +211,7 @@ export const authAPI = {
 
   // 获取用户信息
   async getProfile(): Promise<User> {
-    const response = await apiRequest<{ success: boolean; user: User }>('/auth/profile');
+    const response = await apiRequest<{ success: boolean; user: User }>('/user/profile');
     return response.user;
   },
 
@@ -354,7 +365,7 @@ export const stripeAPI = {
 // 用户相关API
 export const userAPI = {
   // 获取用户详细信息
-  async getProfile(): Promise<ApiResponse> {
+  async getProfile(): Promise<{ success: boolean; user: User; message?: string }> {
     return await apiRequest('/user/profile');
   },
 

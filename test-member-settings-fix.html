@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Settings 修复验证</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .login-form {
+            display: grid;
+            gap: 10px;
+            max-width: 300px;
+        }
+        .fix-summary {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Member Settings 修复验证</h1>
+        
+        <div class="fix-summary">
+            <h4>修复内容总结</h4>
+            <ul>
+                <li>✅ 修复了 userAPI.getProfile() 的返回类型</li>
+                <li>✅ 更新了 User 接口，包含所有必要字段</li>
+                <li>✅ 改进了 MemberSettings 组件的错误处理</li>
+                <li>✅ 修复了 AuthContext 中的 refreshUser 方法</li>
+                <li>✅ 添加了详细的调试日志</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>1. 登录测试</h3>
+            <div class="login-form">
+                <input type="email" id="email" placeholder="邮箱" value="demo@example.com">
+                <input type="password" id="password" placeholder="密码" value="password123">
+                <button onclick="testLogin()">登录</button>
+            </div>
+            <div id="login-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 用户资料API测试</h3>
+            <button onclick="testUserProfile()" id="profile-btn" disabled>测试 userAPI.getProfile()</button>
+            <div id="profile-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 模拟 MemberSettings 加载</h3>
+            <button onclick="simulateMemberSettings()" id="member-settings-btn" disabled>模拟 MemberSettings 组件加载</button>
+            <div id="member-settings-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. AuthContext refreshUser 测试</h3>
+            <button onclick="testRefreshUser()" id="refresh-btn" disabled>测试 refreshUser 方法</button>
+            <div id="refresh-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev/api';
+        let authToken = null;
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        // 模拟前端的 apiRequest 函数
+        async function apiRequest(endpoint, options = {}) {
+            const baseUrl = API_BASE_URL;
+            const url = `${baseUrl}${endpoint}`;
+            
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+            };
+
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                defaultHeaders.Authorization = `Bearer ${token}`;
+            }
+
+            const currentLanguage = localStorage.getItem('language') || 'en';
+            defaultHeaders['X-Language'] = currentLanguage;
+            
+            const config = {
+                ...options,
+                headers: {
+                    ...defaultHeaders,
+                    ...options.headers,
+                },
+            };
+            
+            console.log(`🔗 API Request: ${url}`, config);
+            const response = await fetch(url, config);
+            console.log(`📡 Response status: ${response.status}`, response.statusText);
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+                console.error('❌ API Error:', errorMessage, data);
+                throw new Error(errorMessage);
+            }
+
+            console.log('✅ API Success:', data);
+            return data;
+        }
+
+        // 模拟 userAPI
+        const userAPI = {
+            async getProfile() {
+                return await apiRequest('/user/profile');
+            }
+        };
+
+        async function testLogin() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                showResult('login-result', '正在登录...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showResult('login-result', `✅ 登录成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}`, 'success');
+                    
+                    // 启用其他按钮
+                    document.getElementById('profile-btn').disabled = false;
+                    document.getElementById('member-settings-btn').disabled = false;
+                    document.getElementById('refresh-btn').disabled = false;
+                } else {
+                    showResult('login-result', `❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('login-result', `❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUserProfile() {
+            if (!authToken) {
+                showResult('profile-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('profile-result', '正在测试 userAPI.getProfile()...', 'info');
+                
+                const response = await userAPI.getProfile();
+                
+                showResult('profile-result', `✅ userAPI.getProfile() 成功！\n\n响应格式检查:\n- success: ${response.success}\n- user存在: ${!!response.user}\n- 用户名: ${response.user?.name}\n- 会员状态: ${response.user?.membership ? '有会员' : '无会员'}\n\n完整响应:\n${JSON.stringify(response, null, 2)}`, 'success');
+            } catch (error) {
+                showResult('profile-result', `❌ userAPI.getProfile() 失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateMemberSettings() {
+            if (!authToken) {
+                showResult('member-settings-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('member-settings-result', '正在模拟 MemberSettings 组件加载...', 'info');
+                
+                // 模拟 MemberSettings 的 loadUserProfile 方法
+                console.log('🔄 开始加载用户资料...');
+                const response = await userAPI.getProfile();
+                console.log('📡 API响应:', response);
+                
+                if (response && response.success && response.user) {
+                    const user = response.user;
+                    console.log('✅ 用户数据获取成功:', user);
+
+                    // 模拟设置表单数据
+                    const profileForm = {
+                        name: user.name || '',
+                        gender: user.gender || '',
+                        birthYear: user.birthYear?.toString() || '',
+                        birthMonth: user.birthMonth?.toString() || '',
+                        birthDay: user.birthDay?.toString() || '',
+                        birthHour: user.birthHour?.toString() || '',
+                        birthMinute: user.birthMinute?.toString() || '',
+                        birthPlace: user.birthPlace || '',
+                        timezone: user.timezone || 'Asia/Shanghai'
+                    };
+                    
+                    console.log('✅ 用户资料加载完成');
+                    
+                    showResult('member-settings-result', `✅ MemberSettings 组件加载成功！\n\n用户信息:\n- 姓名: ${user.name}\n- 邮箱: ${user.email}\n- 性别: ${user.gender || '未设置'}\n- 出生年份: ${user.birthYear || '未设置'}\n- 时区: ${user.timezone || '未设置'}\n- 邮箱验证: ${user.isEmailVerified ? '已验证' : '未验证'}\n- 资料更新次数: ${user.profileUpdatedCount}\n- 会员状态: ${user.membership ? '有会员' : '无会员'}\n\n表单数据:\n${JSON.stringify(profileForm, null, 2)}`, 'success');
+                } else {
+                    console.error('❌ API响应格式错误:', response);
+                    const errorMessage = response?.message || '加载个人资料失败';
+                    showResult('member-settings-result', `❌ MemberSettings 加载失败: ${errorMessage}\n响应格式: ${JSON.stringify(response)}`, 'error');
+                }
+            } catch (error) {
+                console.error('❌ 用户资料加载错误:', error);
+                
+                let errorMessage = '无法连接到服务器。请检查您的网络连接并重试。';
+                if (error.message) {
+                    errorMessage += ` (${error.message})`;
+                }
+                if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    errorMessage = '网络连接失败，请检查网络连接或服务器状态';
+                }
+                
+                showResult('member-settings-result', `❌ MemberSettings 加载失败: ${errorMessage}`, 'error');
+            }
+        }
+
+        async function testRefreshUser() {
+            if (!authToken) {
+                showResult('refresh-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('refresh-result', '正在测试 AuthContext refreshUser...', 'info');
+                
+                // 模拟 AuthContext 的 refreshUser 方法
+                const response = await userAPI.getProfile();
+                if (response && response.success && response.user) {
+                    // 模拟更新localStorage
+                    localStorage.setItem('user', JSON.stringify(response.user));
+                    
+                    showResult('refresh-result', `✅ refreshUser 成功！\n\n用户数据已更新:\n- ID: ${response.user.id}\n- 姓名: ${response.user.name}\n- 邮箱: ${response.user.email}\n- 会员状态: ${response.user.membership ? '有会员' : '无会员'}\n\n已保存到 localStorage`, 'success');
+                } else {
+                    showResult('refresh-result', `❌ refreshUser 失败: 响应格式错误\n${JSON.stringify(response)}`, 'error');
+                }
+            } catch (error) {
+                showResult('refresh-result', `❌ refreshUser 失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时检查是否已登录
+        window.onload = function() {
+            if (localStorage.getItem('authToken')) {
+                authToken = localStorage.getItem('authToken');
+                document.getElementById('profile-btn').disabled = false;
+                document.getElementById('member-settings-btn').disabled = false;
+                document.getElementById('refresh-btn').disabled = false;
+                
+                showResult('login-result', '✅ 检测到已保存的登录状态', 'success');
+            }
+        };
+    </script>
+</body>
+</html>

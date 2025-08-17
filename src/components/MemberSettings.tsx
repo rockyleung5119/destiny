@@ -92,19 +92,17 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
       setIsLoading(true);
       setMessage('');
 
+      console.log('🔄 开始加载用户资料...');
       const response = await userAPI.getProfile();
-      if (response.success && response.user) {
-        const user = response.user;
+      console.log('📡 API响应:', response);
 
-        // 转换会员数据字段名
+      if (response && response.success && response.user) {
+        const user = response.user;
+        console.log('✅ 用户数据获取成功:', user);
+
+        // 会员数据已经在后端转换为正确的字段名
         const processedUser = {
-          ...user,
-          membership: user.membership ? {
-            planId: user.membership.plan_id,
-            isActive: user.membership.is_active,
-            expiresAt: user.membership.expires_at,
-            remainingCredits: user.membership.remaining_credits
-          } : null
+          ...user
         };
 
         setUserProfile(processedUser);
@@ -119,13 +117,27 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           birthPlace: user.birthPlace || '',
           timezone: user.timezone || 'Asia/Shanghai'
         });
+
+        console.log('✅ 用户资料加载完成');
       } else {
-        setMessage(response.message || t('failedToLoadProfile'));
+        console.error('❌ API响应格式错误:', response);
+        const errorMessage = response?.message || t('failedToLoadProfile');
+        setMessage(`${errorMessage} (响应格式: ${JSON.stringify(response)})`);
         setMessageType('error');
       }
     } catch (error) {
-      console.error('Profile loading error:', error);
-      setMessage(t('unableToConnect'));
+      console.error('❌ 用户资料加载错误:', error);
+
+      // 提供更详细的错误信息
+      let errorMessage = t('unableToConnect');
+      if (error.message) {
+        errorMessage += ` (${error.message})`;
+      }
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = '网络连接失败，请检查网络连接或服务器状态';
+      }
+
+      setMessage(errorMessage);
       setMessageType('error');
     } finally {
       setIsLoading(false);

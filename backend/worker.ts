@@ -178,6 +178,48 @@ app.post('/api/auth/login', async (c) => {
   }
 });
 
+// Token验证端点
+app.post('/api/auth/verify', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place, timezone, is_email_verified, profile_updated_count, created_at, updated_at FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (!user) {
+      return c.json({ valid: false, message: 'User not found' }, 404);
+    }
+
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      gender: user.gender,
+      birthYear: user.birth_year,
+      birthMonth: user.birth_month,
+      birthDay: user.birth_day,
+      birthHour: user.birth_hour,
+      birthMinute: user.birth_minute,
+      birthPlace: user.birth_place,
+      timezone: user.timezone,
+      isEmailVerified: user.is_email_verified,
+      profileUpdatedCount: user.profile_updated_count,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at
+    };
+
+    return c.json({
+      valid: true,
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return c.json({ valid: false, message: 'Token verification failed' }, 401);
+  }
+});
+
 // 受保护的用户路由
 app.get('/api/user/profile', jwtMiddleware, async (c) => {
   try {
@@ -185,16 +227,46 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
     const userId = payload.userId;
 
     const user = await c.env.DB.prepare(
-      'SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_place, timezone, created_at FROM users WHERE id = ?'
+      'SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place, timezone, is_email_verified, profile_updated_count, created_at, updated_at FROM users WHERE id = ?'
     ).bind(userId).first();
 
     if (!user) {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
+    // 获取会员信息
+    const membership = await c.env.DB.prepare(
+      'SELECT plan_id, is_active, expires_at, remaining_credits, created_at FROM memberships WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1'
+    ).bind(userId).first();
+
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      gender: user.gender,
+      birthYear: user.birth_year,
+      birthMonth: user.birth_month,
+      birthDay: user.birth_day,
+      birthHour: user.birth_hour,
+      birthMinute: user.birth_minute,
+      birthPlace: user.birth_place,
+      timezone: user.timezone,
+      isEmailVerified: user.is_email_verified,
+      profileUpdatedCount: user.profile_updated_count,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      membership: membership ? {
+        planId: membership.plan_id,
+        isActive: membership.is_active,
+        expiresAt: membership.expires_at,
+        remainingCredits: membership.remaining_credits,
+        createdAt: membership.created_at
+      } : null
+    };
+
     return c.json({
       success: true,
-      user
+      user: userResponse
     });
   } catch (error) {
     console.error('Profile error:', error);
@@ -240,6 +312,49 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
   } catch (error) {
     console.error('Update profile error:', error);
     return c.json({ success: false, message: 'Failed to update profile.' }, 500);
+  }
+});
+
+// 会员状态API
+app.get('/api/membership/status', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    const membership = await c.env.DB.prepare(
+      'SELECT plan_id, is_active, expires_at, remaining_credits, created_at, updated_at FROM memberships WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1'
+    ).bind(userId).first();
+
+    if (!membership) {
+      return c.json({
+        success: true,
+        data: {
+          plan_id: null,
+          is_active: false,
+          expires_at: null,
+          remaining_credits: 0,
+          created_at: null,
+          updated_at: null,
+          plan: null
+        }
+      });
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        plan_id: membership.plan_id,
+        is_active: membership.is_active,
+        expires_at: membership.expires_at,
+        remaining_credits: membership.remaining_credits,
+        created_at: membership.created_at,
+        updated_at: membership.updated_at,
+        plan: membership
+      }
+    });
+  } catch (error) {
+    console.error('Membership status error:', error);
+    return c.json({ success: false, message: 'Failed to get membership status' }, 500);
   }
 });
 

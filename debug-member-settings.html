@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Settings API 调试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .login-form {
+            display: grid;
+            gap: 10px;
+            max-width: 300px;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Member Settings API 调试工具</h1>
+        
+        <div class="debug-info">
+            <h4>当前环境信息</h4>
+            <div id="env-info"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>1. 登录测试</h3>
+            <div class="login-form">
+                <input type="email" id="email" placeholder="邮箱" value="demo@example.com">
+                <input type="password" id="password" placeholder="密码" value="password123">
+                <button onclick="testLogin()">登录</button>
+            </div>
+            <div id="login-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 直接API调用测试</h3>
+            <button onclick="testDirectAPI()" id="direct-api-btn" disabled>直接调用 /user/profile</button>
+            <div id="direct-api-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 模拟前端API调用</h3>
+            <button onclick="testFrontendAPI()" id="frontend-api-btn" disabled>模拟前端 userAPI.getProfile()</button>
+            <div id="frontend-api-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 网络连接测试</h3>
+            <button onclick="testNetworkConnection()">测试网络连接</button>
+            <div id="network-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. CORS 测试</h3>
+            <button onclick="testCORS()">测试 CORS 配置</button>
+            <div id="cors-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev/api';
+        let authToken = null;
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function showEnvInfo() {
+            const envInfo = document.getElementById('env-info');
+            envInfo.innerHTML = `
+                <strong>API Base URL:</strong> ${API_BASE_URL}<br>
+                <strong>当前域名:</strong> ${window.location.origin}<br>
+                <strong>User Agent:</strong> ${navigator.userAgent}<br>
+                <strong>本地存储的Token:</strong> ${localStorage.getItem('authToken') ? '存在' : '不存在'}<br>
+                <strong>本地存储的用户:</strong> ${localStorage.getItem('user') ? '存在' : '不存在'}
+            `;
+        }
+
+        async function testLogin() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                showResult('login-result', '正在登录...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showResult('login-result', `✅ 登录成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}\nToken: ${authToken.substring(0, 20)}...`, 'success');
+                    
+                    // 启用其他按钮
+                    document.getElementById('direct-api-btn').disabled = false;
+                    document.getElementById('frontend-api-btn').disabled = false;
+                    
+                    showEnvInfo();
+                } else {
+                    showResult('login-result', `❌ 登录失败: ${data.message}\n完整响应: ${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('login-result', `❌ 网络错误: ${error.message}\n错误详情: ${error.stack}`, 'error');
+            }
+        }
+
+        async function testDirectAPI() {
+            if (!authToken) {
+                showResult('direct-api-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('direct-api-result', '正在调用 API...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/user/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'X-Language': 'zh'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok) {
+                    showResult('direct-api-result', `✅ API调用成功！\n状态码: ${response.status}\n响应数据:\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('direct-api-result', `❌ API调用失败\n状态码: ${response.status}\n错误信息: ${data.message || data.error}\n完整响应:\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('direct-api-result', `❌ 网络错误: ${error.message}\n错误类型: ${error.name}\n错误详情: ${error.stack}`, 'error');
+            }
+        }
+
+        async function testFrontendAPI() {
+            if (!authToken) {
+                showResult('frontend-api-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('frontend-api-result', '正在模拟前端API调用...', 'info');
+                
+                // 模拟前端的 apiRequest 函数
+                const apiRequest = async (endpoint, options = {}) => {
+                    const baseUrl = API_BASE_URL;
+                    const url = `${baseUrl}${endpoint}`;
+                    
+                    const defaultHeaders = {
+                        'Content-Type': 'application/json',
+                    };
+
+                    const token = localStorage.getItem('authToken');
+                    if (token) {
+                        defaultHeaders.Authorization = `Bearer ${token}`;
+                    }
+
+                    const currentLanguage = localStorage.getItem('language') || 'en';
+                    defaultHeaders['X-Language'] = currentLanguage;
+                    
+                    const config = {
+                        ...options,
+                        headers: {
+                            ...defaultHeaders,
+                            ...options.headers,
+                        },
+                    };
+                    
+                    console.log(`🔗 API Request: ${url}`, config);
+                    const response = await fetch(url, config);
+                    console.log(`📡 Response status: ${response.status}`, response.statusText);
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+                        console.error('❌ API Error:', errorMessage, data);
+                        throw new Error(errorMessage);
+                    }
+
+                    console.log('✅ API Success:', data);
+                    return data;
+                };
+
+                // 模拟 userAPI.getProfile()
+                const result = await apiRequest('/user/profile');
+                
+                showResult('frontend-api-result', `✅ 前端API调用成功！\n返回数据:\n${JSON.stringify(result, null, 2)}`, 'success');
+                
+                // 检查数据格式
+                if (result.success && result.user) {
+                    showResult('frontend-api-result', 
+                        showResult('frontend-api-result', `✅ 前端API调用成功！\n数据格式正确: success=${result.success}\n用户数据存在: ${!!result.user}\n用户名: ${result.user.name}\n邮箱: ${result.user.email}\n会员状态: ${result.user.membership ? '有会员' : '无会员'}\n\n完整数据:\n${JSON.stringify(result, null, 2)}`, 'success')
+                    );
+                } else {
+                    showResult('frontend-api-result', `⚠️ 数据格式异常\n期望格式: { success: true, user: {...} }\n实际格式: ${JSON.stringify(result, null, 2)}`, 'error');
+                }
+                
+            } catch (error) {
+                showResult('frontend-api-result', `❌ 前端API调用失败: ${error.message}\n错误详情: ${error.stack}`, 'error');
+            }
+        }
+
+        async function testNetworkConnection() {
+            try {
+                showResult('network-result', '正在测试网络连接...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('network-result', `✅ 网络连接正常！\n服务器状态: ${data.status}\n服务器信息: ${data.message}\n时间戳: ${data.timestamp}`, 'success');
+                } else {
+                    showResult('network-result', `❌ 服务器响应异常: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                showResult('network-result', `❌ 网络连接失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCORS() {
+            try {
+                showResult('cors-result', '正在测试 CORS 配置...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'OPTIONS'
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                    'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                };
+                
+                showResult('cors-result', `✅ CORS 测试完成\n状态码: ${response.status}\nCORS 头信息:\n${JSON.stringify(corsHeaders, null, 2)}`, 'success');
+            } catch (error) {
+                showResult('cors-result', `❌ CORS 测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时显示环境信息
+        window.onload = function() {
+            showEnvInfo();
+            
+            // 如果已经有token，启用相关按钮
+            if (localStorage.getItem('authToken')) {
+                authToken = localStorage.getItem('authToken');
+                document.getElementById('direct-api-btn').disabled = false;
+                document.getElementById('frontend-api-btn').disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

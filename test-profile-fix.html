@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人资料API修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .login-form {
+            display: grid;
+            gap: 10px;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 个人资料API修复测试</h1>
+        
+        <div class="test-section">
+            <h3>1. 健康检查</h3>
+            <button onclick="testHealth()">测试健康检查</button>
+            <div id="health-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 用户登录</h3>
+            <div class="login-form">
+                <input type="email" id="email" placeholder="邮箱" value="demo@example.com">
+                <input type="password" id="password" placeholder="密码" value="password123">
+                <button onclick="testLogin()">登录</button>
+            </div>
+            <div id="login-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 获取用户资料</h3>
+            <button onclick="testProfile()" id="profile-btn" disabled>获取用户资料</button>
+            <div id="profile-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 获取会员状态</h3>
+            <button onclick="testMembershipStatus()" id="membership-btn" disabled>获取会员状态</button>
+            <div id="membership-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Token验证</h3>
+            <button onclick="testTokenVerify()" id="verify-btn" disabled>验证Token</button>
+            <div id="verify-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev/api';
+        let authToken = null;
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('health-result', `✅ 健康检查成功！\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('health-result', `❌ 健康检查失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('health-result', `❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLogin() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    authToken = data.token;
+                    showResult('login-result', `✅ 登录成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}`, 'success');
+                    
+                    // 启用其他按钮
+                    document.getElementById('profile-btn').disabled = false;
+                    document.getElementById('membership-btn').disabled = false;
+                    document.getElementById('verify-btn').disabled = false;
+                } else {
+                    showResult('login-result', `❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('login-result', `❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProfile() {
+            if (!authToken) {
+                showResult('profile-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/user/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showResult('profile-result', `✅ 用户资料获取成功！\n${JSON.stringify(data.user, null, 2)}`, 'success');
+                } else {
+                    showResult('profile-result', `❌ 用户资料获取失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('profile-result', `❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMembershipStatus() {
+            if (!authToken) {
+                showResult('membership-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/membership/status`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showResult('membership-result', `✅ 会员状态获取成功！\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    showResult('membership-result', `❌ 会员状态获取失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('membership-result', `❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTokenVerify() {
+            if (!authToken) {
+                showResult('verify-result', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.valid) {
+                    showResult('verify-result', `✅ Token验证成功！\n${JSON.stringify(data.user, null, 2)}`, 'success');
+                } else {
+                    showResult('verify-result', `❌ Token验证失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('verify-result', `❌ 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动测试健康检查
+        window.onload = function() {
+            testHealth();
+        };
+    </script>
+</body>
+</html>

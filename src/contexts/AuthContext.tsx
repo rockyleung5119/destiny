@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { authAPI } from '../services/api';
+import { authAPI, userAPI } from '../services/api';
 
 interface User {
   id: number;
@@ -10,11 +10,20 @@ interface User {
   birthMonth?: number;
   birthDay?: number;
   birthHour?: number;
+  birthMinute?: number;
   birthPlace?: string;
+  timezone?: string;
   isEmailVerified: boolean;
   profileUpdatedCount: number;
   createdAt: string;
   updatedAt?: string;
+  membership?: {
+    planId: string;
+    isActive: boolean;
+    expiresAt: string;
+    remainingCredits?: number;
+    createdAt: string;
+  } | null;
 }
 
 interface AuthContextType {
@@ -135,10 +144,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const user = await authAPI.getProfile();
-      if (user) {
-        setUser(user);
-        localStorage.setItem('user', JSON.stringify(user));
+      // 使用userAPI来获取完整的用户资料
+      const response = await userAPI.getProfile();
+      if (response && response.success && response.user) {
+        setUser(response.user);
+        localStorage.setItem('user', JSON.stringify(response.user));
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);
