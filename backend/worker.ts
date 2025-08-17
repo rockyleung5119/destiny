@@ -283,28 +283,46 @@ const jwtMiddleware = async (c, next) => {
 // 用户认证路由
 app.post('/api/auth/register', async (c) => {
   try {
-    const { email, password, name } = await c.req.json();
+    console.log('📝 Registration request received');
+    const requestBody = await c.req.json();
+    console.log('📝 Request body:', JSON.stringify(requestBody, null, 2));
+
+    const { email, password, name } = requestBody;
 
     if (!email || !password || !name) {
+      console.log('❌ Missing required fields');
       return c.json({ success: false, message: 'Missing required fields' }, 400);
     }
 
+    console.log('🔍 Checking if user already exists...');
     const existingUser = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE email = ?'
+      'SELECT id, name FROM users WHERE email = ?'
     ).bind(email).first();
+    console.log('🔍 Existing user check result:', existingUser);
 
     if (existingUser) {
-      return c.json({ success: false, message: 'User already exists' }, 400);
+      console.log('❌ User already exists');
+      return c.json({
+        success: false,
+        message: `This email is already registered. If this is your account, please try logging in instead.`,
+        code: 'USER_EXISTS'
+      }, 409);
     }
 
+    console.log('🔐 Hashing password...');
     const hashedPassword = await hashPassword(password);
+
+    console.log('💾 Creating new user...');
     const result = await c.env.DB.prepare(
       'INSERT INTO users (email, password_hash, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
     ).bind(email, hashedPassword, name, new Date().toISOString(), new Date().toISOString()).run();
+    console.log('💾 Database insert result:', result);
 
     const userId = result.meta.last_row_id;
+    console.log('🎫 Generating JWT token for user ID:', userId);
     const token = await generateJWT(userId, c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA');
 
+    console.log('✅ Registration successful');
     return c.json({
       success: true,
       message: 'User registered successfully',
@@ -316,8 +334,25 @@ app.post('/api/auth/register', async (c) => {
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    return c.json({ success: false, message: 'Registration failed' }, 500);
+    console.error('❌ Registration error:', error);
+    console.error('❌ Error stack:', error.stack);
+
+    // 检查是否是数据库约束错误
+    if (error.message && error.message.includes('UNIQUE constraint failed')) {
+      console.log('❌ Database constraint error - user already exists');
+      return c.json({
+        success: false,
+        message: 'This email is already registered. If this is your account, please try logging in instead.',
+        code: 'USER_EXISTS'
+      }, 409);
+    }
+
+    // 其他错误
+    return c.json({
+      success: false,
+      message: 'Registration failed. Please try again later.',
+      error: error.message
+    }, 500);
   }
 });
 

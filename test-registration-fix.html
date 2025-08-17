@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Registration Fix Test</h1>
+        
+        <!-- 测试已存在邮箱注册 -->
+        <div class="test-section">
+            <h3>测试1: 已存在邮箱注册</h3>
+            <p>测试邮箱：494159635@qq.com（数据库中已存在）</p>
+            <p>预期结果：应该返回清晰的错误信息，提示用户该邮箱已注册</p>
+            <button onclick="testExistingEmailRegistration()">测试已存在邮箱注册</button>
+            <div id="existingEmailResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试新邮箱注册 -->
+        <div class="test-section">
+            <h3>测试2: 新邮箱注册</h3>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="newEmail" value="test@example.com" placeholder="输入新的邮箱地址">
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="password" id="newPassword" value="123456" placeholder="输入密码">
+            </div>
+            <div class="form-group">
+                <label>姓名:</label>
+                <input type="text" id="newName" value="测试用户" placeholder="输入姓名">
+            </div>
+            <button onclick="testNewEmailRegistration()">测试新邮箱注册</button>
+            <div id="newEmailResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试缺少字段 -->
+        <div class="test-section">
+            <h3>测试3: 缺少必填字段</h3>
+            <p>测试缺少必填字段的情况</p>
+            <button onclick="testMissingFields()">测试缺少字段</button>
+            <div id="missingFieldsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试日志 -->
+        <div class="test-section">
+            <h3>测试日志</h3>
+            <button onclick="clearLogs()">清空日志</button>
+            <div id="testLogs" class="result info">
+                测试日志将显示在这里...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function clearLogs() {
+            document.getElementById('testLogs').textContent = '测试日志已清空...\n';
+        }
+
+        async function testExistingEmailRegistration() {
+            const email = '494159635@qq.com';
+            const password = '123456';
+            const name = 'Test User';
+            
+            try {
+                log(`🔄 测试已存在邮箱注册: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password, name })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 409 && data.code === 'USER_EXISTS') {
+                    showResult('existingEmailResult', `✅ 修复成功！\n状态码: ${response.status}\n错误代码: ${data.code}\n错误信息: ${data.message}\n\n这是正确的行为：返回了清晰的错误信息。`, 'success');
+                } else if (!data.success && data.message.includes('already')) {
+                    showResult('existingEmailResult', `✅ 部分修复\n错误信息: ${data.message}\n\n虽然错误信息正确，但状态码或错误代码可能需要优化。`, 'warning');
+                } else if (!data.success && data.message === 'Registration failed') {
+                    showResult('existingEmailResult', `❌ 修复尚未生效\n错误信息: ${data.message}\n\n仍然返回通用错误信息，修复可能还没有部署。`, 'error');
+                } else {
+                    showResult('existingEmailResult', `⚠️ 意外结果\n响应: ${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('existingEmailResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testNewEmailRegistration() {
+            const email = document.getElementById('newEmail').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const name = document.getElementById('newName').value.trim();
+            
+            if (!email || !password || !name) {
+                showResult('newEmailResult', '❌ 请填写所有字段', 'error');
+                return;
+            }
+
+            try {
+                log(`🔄 测试新邮箱注册: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password, name })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('newEmailResult', `✅ 注册成功！\n用户ID: ${data.user.id}\n用户名: ${data.user.name}\n邮箱: ${data.user.email}\n\n注意：请记住删除测试用户。`, 'success');
+                } else {
+                    showResult('newEmailResult', `❌ 注册失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('newEmailResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMissingFields() {
+            try {
+                log('🔄 测试缺少必填字段...');
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: 'test@example.com' }) // 缺少password和name
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 400 && data.message === 'Missing required fields') {
+                    showResult('missingFieldsResult', `✅ 验证正确！\n状态码: ${response.status}\n错误信息: ${data.message}`, 'success');
+                } else {
+                    showResult('missingFieldsResult', `⚠️ 意外结果\n响应: ${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('missingFieldsResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动开始测试
+        window.onload = function() {
+            log('🔧 Registration Fix Test 页面已加载');
+            log('📍 测试目标: 验证注册API的错误处理是否正确');
+        };
+    </script>
+</body>
+</html>

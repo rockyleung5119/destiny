@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Production Fix Test</h1>
+        
+        <!-- 测试已验证邮箱发送验证码 -->
+        <div class="test-section">
+            <h3>测试修复效果：已验证邮箱发送验证码</h3>
+            <p>测试邮箱：494159635@qq.com（数据库显示已验证）</p>
+            <button onclick="testVerifiedEmailSendCode()">测试发送验证码</button>
+            <div id="verifiedEmailResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试其他邮箱 -->
+        <div class="test-section">
+            <h3>测试其他邮箱</h3>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="testEmail" value="test@example.com" placeholder="输入要测试的邮箱地址">
+            </div>
+            <button onclick="testOtherEmailSendCode()">测试发送验证码</button>
+            <div id="otherEmailResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 环境检查 -->
+        <div class="test-section">
+            <h3>环境检查</h3>
+            <button onclick="checkEnvironment()">检查环境配置</button>
+            <div id="envResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 数据库检查 -->
+        <div class="test-section">
+            <h3>数据库检查</h3>
+            <button onclick="checkDatabase()">检查数据库状态</button>
+            <div id="dbResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试日志 -->
+        <div class="test-section">
+            <h3>测试日志</h3>
+            <button onclick="clearLogs()">清空日志</button>
+            <div id="testLogs" class="result info">
+                测试日志将显示在这里...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function clearLogs() {
+            document.getElementById('testLogs').textContent = '测试日志已清空...\n';
+        }
+
+        async function testVerifiedEmailSendCode() {
+            const email = '494159635@qq.com';
+            
+            try {
+                log(`🔄 测试已验证邮箱发送验证码: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/email/send-verification-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, language: 'en' })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('verifiedEmailResult', `✅ 修复成功！\n${data.message}\n\n这证明已验证的邮箱现在可以重新发送验证码了。`, 'success');
+                } else {
+                    if (data.message === 'Email is already verified') {
+                        showResult('verifiedEmailResult', `❌ 修复尚未生效\n错误信息: ${data.message}\n\n这说明修复还没有部署到生产环境。`, 'error');
+                    } else {
+                        showResult('verifiedEmailResult', `⚠️ 其他错误\n错误信息: ${data.message}`, 'warning');
+                    }
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('verifiedEmailResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOtherEmailSendCode() {
+            const email = document.getElementById('testEmail').value.trim();
+            
+            if (!email) {
+                showResult('otherEmailResult', '❌ 请输入邮箱地址', 'error');
+                return;
+            }
+
+            try {
+                log(`🔄 测试其他邮箱发送验证码: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/email/send-verification-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, language: 'en' })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('otherEmailResult', `✅ 验证码发送成功！\n${data.message}`, 'success');
+                } else {
+                    showResult('otherEmailResult', `❌ 发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('otherEmailResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkEnvironment() {
+            try {
+                log('🔧 检查环境配置...');
+                
+                const response = await fetch(`${API_BASE_URL}/api/debug/env-check`);
+                const data = await response.json();
+                
+                log(`🔧 环境检查: ${JSON.stringify(data, null, 2)}`);
+                
+                let envInfo = `环境检查结果:\n`;
+                envInfo += `- 时间戳: ${data.timestamp}\n`;
+                envInfo += `- Resend API Key: ${data.resend?.apiKey || '❌ Missing'}\n`;
+                envInfo += `- From Email: ${data.resend?.fromEmail || '❌ Missing'}\n`;
+                envInfo += `- From Name: ${data.resend?.fromName || '❌ Missing'}\n`;
+                envInfo += `- JWT Secret: ${data.jwt?.secret || '❌ Missing'}\n`;
+                envInfo += `- CORS Origin: ${data.cors?.origin || '❌ Missing'}\n`;
+                envInfo += `- 邮件模板: ${data.template?.imported ? '✅ 已导入' : '❌ 未导入'}\n`;
+                
+                showResult('envResult', envInfo, 'info');
+                
+            } catch (error) {
+                log(`❌ 环境检查错误: ${error.message}`);
+                showResult('envResult', `❌ 环境检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkDatabase() {
+            try {
+                log('🗄️ 检查数据库状态...');
+                
+                const response = await fetch(`${API_BASE_URL}/api/debug/db-check`);
+                const data = await response.json();
+                
+                log(`🗄️ 数据库检查: ${JSON.stringify(data, null, 2)}`);
+                
+                let dbInfo = `数据库检查结果:\n`;
+                dbInfo += `- 数据库可用: ${data.database?.available ? '✅ 是' : '❌ 否'}\n`;
+                dbInfo += `- 连接状态: ${data.database?.connection || 'Unknown'}\n\n`;
+                
+                if (data.tables) {
+                    dbInfo += `数据表状态:\n`;
+                    for (const [tableName, tableInfo] of Object.entries(data.tables)) {
+                        if (tableInfo.exists) {
+                            dbInfo += `- ${tableName}: ✅ 存在 (${tableInfo.count} 条记录)\n`;
+                        } else {
+                            dbInfo += `- ${tableName}: ❌ 不存在\n`;
+                        }
+                    }
+                }
+                
+                if (data.recentData?.verification_codes && Array.isArray(data.recentData.verification_codes)) {
+                    dbInfo += `\n最近的验证码记录 (${data.recentData.verification_codes.length} 条):\n`;
+                    data.recentData.verification_codes.forEach((record, index) => {
+                        dbInfo += `  ${index + 1}. ${record.email} - ${record.type} - ${record.is_used ? '已使用' : '未使用'}\n`;
+                    });
+                }
+                
+                showResult('dbResult', dbInfo, 'info');
+                
+            } catch (error) {
+                log(`❌ 数据库检查错误: ${error.message}`);
+                showResult('dbResult', `❌ 数据库检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动检查
+        window.onload = function() {
+            log('🔧 Production Fix Test 页面已加载');
+            log('📍 测试目标: 验证已验证邮箱是否可以重新发送验证码');
+        };
+    </script>
+</body>
+</html>
