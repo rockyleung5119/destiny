@@ -107,6 +107,125 @@ app.get('/api/health', async (c) => {
   });
 });
 
+// 环境变量检查端点（仅用于调试）
+app.get('/api/debug/env-check', (c) => {
+  const envCheck = {
+    timestamp: new Date().toISOString(),
+    resend: {
+      apiKey: c.env.RESEND_API_KEY ? `${c.env.RESEND_API_KEY.substring(0, 10)}...` : '❌ Missing',
+      fromEmail: c.env.RESEND_FROM_EMAIL || '❌ Missing',
+      fromName: c.env.RESEND_FROM_NAME || '❌ Missing'
+    },
+    jwt: {
+      secret: c.env.JWT_SECRET ? `${c.env.JWT_SECRET.substring(0, 10)}...` : '❌ Missing'
+    },
+    cors: {
+      origin: c.env.CORS_ORIGIN || '❌ Missing'
+    },
+    database: {
+      available: !!c.env.DB
+    },
+    template: {
+      imported: !!verificationTemplate,
+      length: verificationTemplate?.length || 0
+    }
+  };
+
+  return c.json(envCheck);
+});
+
+// 数据库检查端点（仅用于调试）
+app.get('/api/debug/db-check', async (c) => {
+  try {
+    console.log('🔍 Starting database check...');
+
+    const dbCheck = {
+      timestamp: new Date().toISOString(),
+      database: {
+        available: !!c.env.DB,
+        connection: 'unknown'
+      },
+      tables: {},
+      recentData: {}
+    };
+
+    if (!c.env.DB) {
+      dbCheck.database.connection = 'not_available';
+      return c.json(dbCheck);
+    }
+
+    // 测试数据库连接
+    try {
+      const testQuery = await c.env.DB.prepare('SELECT 1 as test').first();
+      dbCheck.database.connection = testQuery ? 'connected' : 'failed';
+      console.log('✅ Database connection test passed');
+    } catch (error) {
+      dbCheck.database.connection = 'error: ' + error.message;
+      console.error('❌ Database connection test failed:', error);
+    }
+
+    // 检查表是否存在
+    const tables = ['users', 'verification_codes', 'email_verifications'];
+    for (const table of tables) {
+      try {
+        const result = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM ${table}`).first();
+        dbCheck.tables[table] = {
+          exists: true,
+          count: result.count
+        };
+        console.log(`✅ Table ${table} exists with ${result.count} records`);
+      } catch (error) {
+        dbCheck.tables[table] = {
+          exists: false,
+          error: error.message
+        };
+        console.error(`❌ Table ${table} check failed:`, error.message);
+      }
+    }
+
+    // 检查最近的验证码记录
+    try {
+      const recentCodes = await c.env.DB.prepare(`
+        SELECT email, code, type, expires_at, is_used, created_at
+        FROM verification_codes
+        ORDER BY created_at DESC
+        LIMIT 5
+      `).all();
+
+      dbCheck.recentData.verification_codes = recentCodes.results || [];
+      console.log(`✅ Found ${recentCodes.results?.length || 0} recent verification codes`);
+    } catch (error) {
+      dbCheck.recentData.verification_codes = { error: error.message };
+      console.error('❌ Failed to fetch recent verification codes:', error);
+    }
+
+    // 检查email_verifications表（如果存在）
+    try {
+      const recentEmailCodes = await c.env.DB.prepare(`
+        SELECT email, code, expires_at, is_used, created_at
+        FROM email_verifications
+        ORDER BY created_at DESC
+        LIMIT 5
+      `).all();
+
+      dbCheck.recentData.email_verifications = recentEmailCodes.results || [];
+      console.log(`✅ Found ${recentEmailCodes.results?.length || 0} recent email verification codes`);
+    } catch (error) {
+      dbCheck.recentData.email_verifications = { error: error.message };
+      console.error('❌ Failed to fetch recent email verification codes:', error);
+    }
+
+    return c.json(dbCheck);
+  } catch (error) {
+    console.error('❌ Database check failed:', error);
+    return c.json({
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      stack: error.stack
+    }, 500);
+  }
+});
+
 // JWT 中间件 - 增强错误处理
 const jwtMiddleware = async (c, next) => {
   try {
@@ -573,107 +692,294 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
 
 // 邮箱验证码服务
 function getEmailHtml(code: string): string {
-  return verificationTemplate.replace('{{verification_code}}', code);
+  try {
+    console.log('📧 Using imported template, length:', verificationTemplate?.length || 0);
+    if (verificationTemplate && verificationTemplate.length > 0) {
+      return verificationTemplate.replace('{{verification_code}}', code);
+    } else {
+      console.log('⚠️ Imported template is empty, using fallback template');
+      return getFallbackEmailHtml(code);
+    }
+  } catch (error) {
+    console.error('❌ Error with imported template, using fallback:', error);
+    return getFallbackEmailHtml(code);
+  }
+}
+
+// 备用邮件模板
+function getFallbackEmailHtml(code: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destiny - Email Verification</title>
+</head>
+<body style="margin: 0; padding: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial, sans-serif; min-height: 100vh;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: rgba(255, 255, 255, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); backdrop-filter: blur(10px);">
+
+        <!-- Header -->
+        <div style="text-align: center; padding: 40px 20px 20px 20px; background: transparent;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                <div style="position: relative; width: 64px; height: 64px; background: linear-gradient(135deg, #facc15 0%, #f97316 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                    <svg style="width: 32px; height: 32px; color: white;" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                </div>
+            </div>
+            <h1 style="color: #1f2937; margin: 0; font-size: 32px; font-weight: 800; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Destiny</h1>
+            <p style="color: #6b7280; margin: 8px 0 0 0; font-size: 16px; font-weight: 500;">Ancient Divination Arts</p>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 0 40px;">
+            <h2 style="color: #1f2937; text-align: center; margin: 0 0 20px 0; font-size: 28px; font-weight: 700;">Email Verification</h2>
+            <p style="color: #4b5563; text-align: center; margin: 0 0 30px 0; font-size: 18px; line-height: 1.6;">Please use the verification code below to complete your email verification:</p>
+
+            <!-- Verification Code -->
+            <div style="background: rgba(255,255,255,0.8); padding: 40px; border-radius: 20px; margin: 40px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;">
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); color: #1f2937; display: inline-block; padding: 24px 40px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 2px solid rgba(139, 92, 246, 0.2);">
+                    <span style="font-size: 42px; font-weight: 800; letter-spacing: 12px; font-family: 'Courier New', monospace; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${code}</span>
+                </div>
+                <p style="color: #6b7280; margin: 0; font-size: 16px; font-weight: 500;">Verification code expires in 10 minutes</p>
+            </div>
+
+            <div style="background: rgba(255, 248, 220, 0.8); border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 30px 0;">
+                <p style="color: #92400e; margin: 0; font-size: 16px; font-weight: 500;">
+                    <strong>Security Notice:</strong> If you didn't request this verification code, please ignore this email and secure your account.
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding: 40px 20px; background: transparent;">
+            <p style="color: #9ca3af; margin: 0; font-size: 14px;">
+                © 2024 Destiny. All rights reserved.<br>
+                Ancient wisdom meets modern technology.
+            </p>
+        </div>
+    </div>
+</body>
+</html>`;
 }
 
 async function sendVerificationEmail(email: string, code: string, env: Env['Bindings']) {
+  console.log('📧 Starting email sending process...');
+  console.log('📧 Target email:', email);
+  console.log('📧 Verification code:', code);
+
+  // 检查环境变量
+  console.log('🔧 Environment variables check:');
+  console.log('- RESEND_API_KEY:', env.RESEND_API_KEY ? `${env.RESEND_API_KEY.substring(0, 10)}...` : '❌ Missing');
+  console.log('- RESEND_FROM_EMAIL:', env.RESEND_FROM_EMAIL || '❌ Missing');
+  console.log('- RESEND_FROM_NAME:', env.RESEND_FROM_NAME || '❌ Missing');
+
+  if (!env.RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY is missing');
+    throw new Error('Email service configuration error: Missing API key');
+  }
+
+  if (!env.RESEND_FROM_EMAIL) {
+    console.error('❌ RESEND_FROM_EMAIL is missing');
+    throw new Error('Email service configuration error: Missing from email');
+  }
+
   const subject = 'Your Destiny Verification Code';
   const htmlBody = getEmailHtml(code);
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: env.RESEND_FROM_NAME ? `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>` : env.RESEND_FROM_EMAIL,
-      to: [email],
-      subject: subject,
-      html: htmlBody,
-    }),
-  });
+  console.log('📧 Email content prepared:');
+  console.log('- Subject:', subject);
+  console.log('- HTML body length:', htmlBody.length);
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error('Failed to send email:', errorData);
-    throw new Error('Failed to send verification email.');
+  const emailPayload = {
+    from: env.RESEND_FROM_NAME ? `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>` : env.RESEND_FROM_EMAIL,
+    to: [email],
+    subject: subject,
+    html: htmlBody,
+  };
+
+  console.log('📧 Email payload:', JSON.stringify(emailPayload, null, 2));
+
+  try {
+    console.log('🚀 Sending request to Resend API...');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    console.log('📧 Resend API response status:', response.status);
+    console.log('📧 Resend API response headers:', [...response.headers.entries()]);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Resend API error response:', errorData);
+      throw new Error(`Resend API error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Email sent successfully:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ Email sending failed:', error);
+    throw new Error(`Failed to send verification email: ${error.message}`);
   }
-
-  return await response.json();
 }
 
 app.post('/api/email/send-verification-code', async (c) => {
   try {
-    const { email } = await c.req.json();
+    console.log('📧 Email verification code request received');
+
+    const requestBody = await c.req.json();
+    console.log('📧 Request body:', JSON.stringify(requestBody, null, 2));
+
+    const { email, language } = requestBody;
     if (!email) {
+      console.log('❌ Email is missing from request');
       return c.json({ success: false, message: 'Email is required' }, 400);
     }
 
+    console.log('📧 Processing email:', email);
+
+    // 验证邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('❌ Invalid email format:', email);
+      return c.json({ success: false, message: 'Invalid email format' }, 400);
+    }
+
+    console.log('🔍 Checking if email is already verified...');
     const user = await c.env.DB.prepare('SELECT is_email_verified FROM users WHERE email = ?').bind(email).first();
+    console.log('🔍 User query result:', user);
+
     if (user && user.is_email_verified) {
+      console.log('❌ Email is already verified');
       return c.json({ success: false, message: 'Email is already verified' }, 400);
     }
 
+    // 检查是否在短时间内重复发送
+    console.log('⏰ Checking for recent verification codes...');
+    const recentCode = await c.env.DB.prepare(`
+      SELECT created_at FROM verification_codes
+      WHERE email = ? AND type = 'EMAIL_VERIFICATION' AND created_at > datetime('now', '-1 minute')
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(email).first();
+
+    if (recentCode) {
+      console.log('❌ Recent verification code found, rate limiting');
+      return c.json({
+        success: false,
+        message: 'Please wait 60 seconds before sending another verification code'
+      }, 429);
+    }
+
+    console.log('🎲 Generating verification code...');
     const randomBuffer = new Uint32Array(1);
     crypto.getRandomValues(randomBuffer);
     const verificationCode = (randomBuffer[0] % 900000 + 100000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const type = 'EMAIL_VERIFICATION';
 
-    await c.env.DB.prepare(
-      'UPDATE verification_codes SET is_used = 1 WHERE email = ? AND type = ? AND is_used = 0'
+    console.log('🎲 Generated verification code:', verificationCode);
+    console.log('⏰ Expires at:', expiresAt);
+
+    console.log('💾 Cleaning up old verification codes...');
+    // 删除该邮箱和类型的所有旧验证码，避免UNIQUE约束冲突
+    const deleteResult = await c.env.DB.prepare(
+      'DELETE FROM verification_codes WHERE email = ? AND type = ?'
     ).bind(email, type).run();
+    console.log('💾 Delete result:', deleteResult);
 
-    await c.env.DB.prepare(
-      'INSERT INTO verification_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)'
-    ).bind(email, verificationCode, type, expiresAt).run();
+    console.log('💾 Saving new verification code to database...');
+    const now = new Date().toISOString();
+    const insertResult = await c.env.DB.prepare(
+      'INSERT INTO verification_codes (email, code, type, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).bind(email, verificationCode, type, expiresAt, now).run();
+    console.log('💾 Insert result:', insertResult);
 
+    console.log('📧 Sending verification email...');
     await sendVerificationEmail(email, verificationCode, c.env);
 
+    console.log('✅ Verification code sent successfully');
     return c.json({ success: true, message: 'Verification code sent successfully.' });
   } catch (error) {
-    console.error('Send verification email error:', error);
-    return c.json({ success: false, message: 'Failed to send verification code.' }, 500);
+    console.error('❌ Send verification email error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Failed to send verification code.',
+      error: error.message
+    }, 500);
   }
 });
 
 const verifyEmailHandler = async (c: any) => {
   try {
-    let { email, code } = await c.req.json();
+    console.log('🔐 Email verification request received');
+
+    const requestBody = await c.req.json();
+    console.log('🔐 Request body:', JSON.stringify(requestBody, null, 2));
+
+    let { email, code } = requestBody;
     if (!email || !code) {
+      console.log('❌ Missing email or code');
       return c.json({ success: false, message: 'Email and code are required' }, 400);
     }
 
     email = email.trim();
     code = code.trim();
 
+    console.log('🔐 Processing verification for email:', email);
+    console.log('🔐 Verification code:', code);
+
     const type = 'EMAIL_VERIFICATION';
     const now = new Date().toISOString();
 
+    console.log('🔍 Looking up verification code in database...');
     const storedCode = await c.env.DB.prepare(
       'SELECT id, expires_at FROM verification_codes WHERE email = ? AND code = ? AND type = ? AND is_used = 0'
     ).bind(email, code, type).first();
 
+    console.log('🔍 Database query result:', storedCode);
+
     if (!storedCode) {
+      console.log('❌ Invalid or expired verification code');
       return c.json({ success: false, message: 'Invalid or expired verification code.' }, 400);
     }
 
+    console.log('⏰ Checking expiration time...');
+    console.log('⏰ Current time:', now);
+    console.log('⏰ Expires at:', storedCode.expires_at);
+
     if (now > storedCode.expires_at) {
+      console.log('❌ Verification code has expired');
       await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
       return c.json({ success: false, message: 'Verification code has expired.' }, 400);
     }
 
+    console.log('💾 Marking verification code as used...');
     await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
 
-    await c.env.DB.prepare('UPDATE users SET is_email_verified = 1, updated_at = ? WHERE email = ?')
+    console.log('💾 Updating user email verification status...');
+    const updateResult = await c.env.DB.prepare('UPDATE users SET is_email_verified = 1, updated_at = ? WHERE email = ?')
       .bind(now, email)
       .run();
+    console.log('💾 User update result:', updateResult);
 
+    console.log('✅ Email verified successfully');
     return c.json({ success: true, message: 'Email verified successfully.' });
   } catch (error) {
-    console.error('Verify email error:', error);
-    return c.json({ success: false, message: 'Failed to verify email.' }, 500);
+    console.error('❌ Verify email error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Failed to verify email.',
+      error: error.message
+    }, 500);
   }
 };
 
@@ -683,14 +989,19 @@ app.post('/api/auth/verify-email', verifyEmailHandler);
 // 发送删除账号验证码
 app.post('/api/auth/send-delete-verification', jwtMiddleware, async (c) => {
   try {
+    console.log('📧 Send delete verification code request received');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
+    console.log('👤 User ID:', userId);
 
     // 获取用户邮箱
+    console.log('🔍 Fetching user email from database...');
     const user = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first();
     if (!user) {
+      console.log('❌ User not found in database');
       return c.json({ success: false, message: 'User not found' }, 404);
     }
+    console.log('✅ User found, email:', user.email);
 
     // 检查是否在短时间内重复发送
     const recentCode = await c.env.DB.prepare(`
@@ -713,15 +1024,16 @@ app.post('/api/auth/send-delete-verification', jwtMiddleware, async (c) => {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5分钟过期
     const type = 'DELETE_ACCOUNT';
 
-    // 使之前的验证码失效
+    // 删除之前的验证码，避免UNIQUE约束冲突
     await c.env.DB.prepare(
-      'UPDATE verification_codes SET is_used = 1 WHERE email = ? AND type = ? AND is_used = 0'
+      'DELETE FROM verification_codes WHERE email = ? AND type = ?'
     ).bind(user.email, type).run();
 
     // 保存新验证码
+    const now = new Date().toISOString();
     await c.env.DB.prepare(
-      'INSERT INTO verification_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)'
-    ).bind(user.email, verificationCode, type, expiresAt).run();
+      'INSERT INTO verification_codes (email, code, type, expires_at, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).bind(user.email, verificationCode, type, expiresAt, now).run();
 
     // 发送邮件
     const subject = 'Account Deletion Verification Code - Destiny';
@@ -774,12 +1086,17 @@ app.post('/api/auth/send-delete-verification', jwtMiddleware, async (c) => {
 // 删除账号
 app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
   try {
+    console.log('🗑️ Delete account request received');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
+    console.log('👤 User ID:', userId);
+
     const { verificationCode } = await c.req.json();
+    console.log('📝 Verification code received, length:', verificationCode?.length);
 
     // 验证输入
     if (!verificationCode || verificationCode.length !== 6) {
+      console.log('❌ Invalid verification code format');
       return c.json({
         success: false,
         message: 'Valid verification code is required'
@@ -787,26 +1104,35 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
     }
 
     // 获取用户信息
+    console.log('🔍 Fetching user from database...');
     const user = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first();
     if (!user) {
+      console.log('❌ User not found in database');
       return c.json({ success: false, message: 'User not found' }, 404);
     }
+    console.log('✅ User found, email:', user.email);
 
     // 验证验证码
+    console.log('🔐 Verifying verification code...');
     const storedCode = await c.env.DB.prepare(
       'SELECT id, expires_at FROM verification_codes WHERE email = ? AND type = ? AND code = ? AND is_used = 0'
     ).bind(user.email, 'DELETE_ACCOUNT', verificationCode).first();
 
     if (!storedCode) {
+      console.log('❌ Invalid verification code or already used');
       return c.json({
         success: false,
         message: 'Invalid verification code'
       }, 400);
     }
+    console.log('✅ Verification code found, expires at:', storedCode.expires_at);
 
     // 检查验证码是否过期
     const now = new Date().toISOString();
+    console.log('⏰ Current time:', now, 'Expires at:', storedCode.expires_at);
+
     if (now > storedCode.expires_at) {
+      console.log('❌ Verification code has expired');
       // 标记验证码为已使用
       await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
       return c.json({
@@ -816,18 +1142,27 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
     }
 
     // 标记验证码为已使用
+    console.log('🔐 Marking verification code as used...');
     await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
 
     // 删除用户相关的所有数据（由于外键约束，会级联删除）
-    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+    console.log('🗑️ Deleting user from database...');
+    const deleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+    console.log('🗑️ Delete result:', deleteResult);
 
+    console.log('✅ Account deleted successfully');
     return c.json({
       success: true,
       message: 'Account deleted successfully'
     });
   } catch (error) {
-    console.error('Delete account error:', error);
-    return c.json({ success: false, message: 'Failed to delete account' }, 500);
+    console.error('❌ Delete account error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Failed to delete account',
+      error: error.message
+    }, 500);
   }
 });
 

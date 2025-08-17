@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .countdown {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Email Verification Test</h1>
+        
+        <!-- 发送验证码测试 -->
+        <div class="test-section">
+            <h3>1. 发送验证码测试</h3>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="testEmail" value="494159635@qq.com" placeholder="输入要测试的邮箱地址">
+            </div>
+            <button onclick="sendVerificationCode()" id="sendCodeBtn">发送验证码</button>
+            <span id="countdown" class="countdown" style="display: none;"></span>
+            <div id="sendResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 验证验证码测试 -->
+        <div class="test-section">
+            <h3>2. 验证验证码测试</h3>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="verifyEmail" value="494159635@qq.com" placeholder="输入邮箱地址">
+            </div>
+            <div class="form-group">
+                <label>验证码:</label>
+                <input type="text" id="verificationCode" placeholder="输入6位验证码" maxlength="6">
+            </div>
+            <button onclick="verifyCode()">验证验证码</button>
+            <div id="verifyResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 环境变量检查 -->
+        <div class="test-section">
+            <h3>3. 环境变量检查</h3>
+            <button onclick="checkEnvironment()">检查环境配置</button>
+            <div id="envResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 数据库检查 -->
+        <div class="test-section">
+            <h3>4. 数据库检查</h3>
+            <button onclick="checkDatabase()">检查数据库状态</button>
+            <div id="dbResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试日志 -->
+        <div class="test-section">
+            <h3>5. 测试日志</h3>
+            <button onclick="clearLogs()">清空日志</button>
+            <div id="testLogs" class="result info">
+                测试日志将显示在这里...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+        let countdownTimer = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function clearLogs() {
+            document.getElementById('testLogs').textContent = '测试日志已清空...\n';
+        }
+
+        function startCountdown(seconds) {
+            const countdownElement = document.getElementById('countdown');
+            const sendBtn = document.getElementById('sendCodeBtn');
+            
+            countdownElement.style.display = 'inline';
+            sendBtn.disabled = true;
+            
+            let remaining = seconds;
+            countdownElement.textContent = `(${remaining}秒后可重新发送)`;
+            
+            countdownTimer = setInterval(() => {
+                remaining--;
+                if (remaining > 0) {
+                    countdownElement.textContent = `(${remaining}秒后可重新发送)`;
+                } else {
+                    clearInterval(countdownTimer);
+                    countdownElement.style.display = 'none';
+                    sendBtn.disabled = false;
+                }
+            }, 1000);
+        }
+
+        async function sendVerificationCode() {
+            const email = document.getElementById('testEmail').value.trim();
+            
+            if (!email) {
+                showResult('sendResult', '❌ 请输入邮箱地址', 'error');
+                return;
+            }
+
+            // 验证邮箱格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showResult('sendResult', '❌ 邮箱格式不正确', 'error');
+                return;
+            }
+
+            try {
+                log(`🔄 开始发送验证码到: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/email/send-verification-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('sendResult', `✅ 验证码发送成功！\n${data.message}\n请检查邮箱: ${email}`, 'success');
+                    startCountdown(60);
+                    
+                    // 自动填充验证邮箱
+                    document.getElementById('verifyEmail').value = email;
+                } else {
+                    showResult('sendResult', `❌ 发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 发送验证码错误: ${error.message}`);
+                showResult('sendResult', `❌ 发送错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyCode() {
+            const email = document.getElementById('verifyEmail').value.trim();
+            const code = document.getElementById('verificationCode').value.trim();
+            
+            if (!email || !code) {
+                showResult('verifyResult', '❌ 请输入邮箱地址和验证码', 'error');
+                return;
+            }
+
+            if (code.length !== 6) {
+                showResult('verifyResult', '❌ 验证码必须是6位数字', 'error');
+                return;
+            }
+
+            try {
+                log(`🔐 开始验证验证码: ${code} for ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/email/verify-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, code })
+                });
+
+                log(`🔐 验证API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`🔐 验证API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('verifyResult', `✅ 验证成功！\n${data.message}`, 'success');
+                } else {
+                    showResult('verifyResult', `❌ 验证失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 验证错误: ${error.message}`);
+                showResult('verifyResult', `❌ 验证错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkEnvironment() {
+            try {
+                log('🔧 检查环境配置...');
+
+                // 测试健康检查
+                const healthResponse = await fetch(`${API_BASE_URL}/api/health`);
+                const healthData = await healthResponse.json();
+
+                log(`🔧 健康检查: ${JSON.stringify(healthData, null, 2)}`);
+
+                // 检查环境变量
+                const envResponse = await fetch(`${API_BASE_URL}/api/debug/env-check`);
+                const envData = await envResponse.json();
+
+                log(`🔧 环境变量检查: ${JSON.stringify(envData, null, 2)}`);
+
+                let envInfo = `环境检查结果:\n`;
+                envInfo += `- API Base URL: ${API_BASE_URL}\n`;
+                envInfo += `- 健康检查: ${healthData.status || 'Unknown'}\n`;
+                envInfo += `- 数据库: ${healthData.database || 'Unknown'}\n`;
+                envInfo += `- 环境: ${healthData.environment || 'Unknown'}\n\n`;
+
+                envInfo += `Resend API 配置:\n`;
+                envInfo += `- API Key: ${envData.resend?.apiKey || '❌ Missing'}\n`;
+                envInfo += `- From Email: ${envData.resend?.fromEmail || '❌ Missing'}\n`;
+                envInfo += `- From Name: ${envData.resend?.fromName || '❌ Missing'}\n\n`;
+
+                envInfo += `其他配置:\n`;
+                envInfo += `- JWT Secret: ${envData.jwt?.secret || '❌ Missing'}\n`;
+                envInfo += `- CORS Origin: ${envData.cors?.origin || '❌ Missing'}\n`;
+                envInfo += `- 邮件模板: ${envData.template?.imported ? '✅ 已导入' : '❌ 未导入'} (${envData.template?.length || 0} 字符)\n`;
+
+                // 检查是否有关键配置缺失
+                const missingConfigs = [];
+                if (!envData.resend?.apiKey || envData.resend.apiKey.includes('Missing')) {
+                    missingConfigs.push('RESEND_API_KEY');
+                }
+                if (!envData.resend?.fromEmail || envData.resend.fromEmail.includes('Missing')) {
+                    missingConfigs.push('RESEND_FROM_EMAIL');
+                }
+
+                if (missingConfigs.length > 0) {
+                    envInfo += `\n⚠️ 缺失的关键配置: ${missingConfigs.join(', ')}\n`;
+                    envInfo += `这可能是邮件发送失败的原因！`;
+                    showResult('envResult', envInfo, 'error');
+                } else {
+                    envInfo += `\n✅ 所有关键配置都已设置`;
+                    showResult('envResult', envInfo, 'success');
+                }
+
+            } catch (error) {
+                log(`❌ 环境检查错误: ${error.message}`);
+                showResult('envResult', `❌ 环境检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkDatabase() {
+            try {
+                log('🗄️ 检查数据库状态...');
+
+                const dbResponse = await fetch(`${API_BASE_URL}/api/debug/db-check`);
+                const dbData = await dbResponse.json();
+
+                log(`🗄️ 数据库检查: ${JSON.stringify(dbData, null, 2)}`);
+
+                let dbInfo = `数据库检查结果:\n`;
+                dbInfo += `- 数据库可用: ${dbData.database?.available ? '✅ 是' : '❌ 否'}\n`;
+                dbInfo += `- 连接状态: ${dbData.database?.connection || 'Unknown'}\n\n`;
+
+                if (dbData.tables) {
+                    dbInfo += `数据表状态:\n`;
+                    for (const [tableName, tableInfo] of Object.entries(dbData.tables)) {
+                        if (tableInfo.exists) {
+                            dbInfo += `- ${tableName}: ✅ 存在 (${tableInfo.count} 条记录)\n`;
+                        } else {
+                            dbInfo += `- ${tableName}: ❌ 不存在 (${tableInfo.error})\n`;
+                        }
+                    }
+                }
+
+                if (dbData.recentData) {
+                    dbInfo += `\n最近的验证码记录:\n`;
+
+                    if (dbData.recentData.verification_codes && Array.isArray(dbData.recentData.verification_codes)) {
+                        dbInfo += `verification_codes 表 (${dbData.recentData.verification_codes.length} 条):\n`;
+                        dbData.recentData.verification_codes.forEach((record, index) => {
+                            dbInfo += `  ${index + 1}. ${record.email} - ${record.type} - ${record.is_used ? '已使用' : '未使用'} - ${record.created_at}\n`;
+                        });
+                    } else if (dbData.recentData.verification_codes?.error) {
+                        dbInfo += `verification_codes 表: ❌ ${dbData.recentData.verification_codes.error}\n`;
+                    }
+
+                    if (dbData.recentData.email_verifications && Array.isArray(dbData.recentData.email_verifications)) {
+                        dbInfo += `\nemail_verifications 表 (${dbData.recentData.email_verifications.length} 条):\n`;
+                        dbData.recentData.email_verifications.forEach((record, index) => {
+                            dbInfo += `  ${index + 1}. ${record.email} - ${record.is_used ? '已使用' : '未使用'} - ${record.created_at}\n`;
+                        });
+                    } else if (dbData.recentData.email_verifications?.error) {
+                        dbInfo += `email_verifications 表: ❌ ${dbData.recentData.email_verifications.error}\n`;
+                    }
+                }
+
+                // 判断整体状态
+                const hasErrors = !dbData.database?.available ||
+                                 dbData.database?.connection?.includes('error') ||
+                                 (dbData.tables && Object.values(dbData.tables).some(t => !t.exists));
+
+                showResult('dbResult', dbInfo, hasErrors ? 'error' : 'success');
+
+            } catch (error) {
+                log(`❌ 数据库检查错误: ${error.message}`);
+                showResult('dbResult', `❌ 数据库检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动检查环境
+        window.onload = function() {
+            log('📧 邮箱验证测试页面已加载');
+            checkEnvironment();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Functions Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .danger {
+            background: #dc3545;
+        }
+        .danger:hover {
+            background: #c82333;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.ready {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.not-ready {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 API Functions Test Suite</h1>
+        
+        <!-- 登录测试 -->
+        <div class="test-section">
+            <h3>1. 登录测试 <span id="loginStatus" class="status not-ready">Not Ready</span></h3>
+            <div class="form-group">
+                <label>邮箱:</label>
+                <input type="email" id="loginEmail" value="demo@example.com">
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="password" id="loginPassword" value="password123">
+            </div>
+            <button onclick="testLogin()">登录</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Change Password测试 -->
+        <div class="test-section">
+            <h3>2. Change Password测试 <span id="passwordStatus" class="status not-ready">Not Ready</span></h3>
+            <div class="form-group">
+                <label>当前密码:</label>
+                <input type="password" id="currentPassword" value="password123">
+            </div>
+            <div class="form-group">
+                <label>新密码:</label>
+                <input type="password" id="newPassword" value="newpassword123">
+            </div>
+            <button onclick="testChangePassword()" id="changePasswordBtn" disabled>更改密码</button>
+            <button onclick="testLoginWithNewPassword()" id="testNewPasswordBtn" disabled>测试新密码登录</button>
+            <div id="changePasswordResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Delete Account测试 -->
+        <div class="test-section">
+            <h3>3. Delete Account测试 <span id="deleteStatus" class="status not-ready">Not Ready</span></h3>
+            <button onclick="testSendDeleteCode()" id="sendDeleteCodeBtn" disabled>发送删除验证码</button>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>验证码 (6位数字):</label>
+                <input type="text" id="deleteVerificationCode" placeholder="输入邮箱中收到的6位验证码" maxlength="6">
+            </div>
+            <button onclick="testDeleteAccount()" id="deleteAccountBtn" disabled class="danger">删除账号 (危险)</button>
+            <div id="deleteAccountResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试结果汇总 -->
+        <div class="test-section">
+            <h3>4. 测试结果汇总</h3>
+            <div id="testSummary" class="result info">
+                等待测试开始...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+        let authToken = '';
+        let testResults = {
+            login: null,
+            changePassword: null,
+            deleteAccount: null
+        };
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function updateStatus(statusId, ready) {
+            const element = document.getElementById(statusId);
+            element.textContent = ready ? 'Ready' : 'Not Ready';
+            element.className = `status ${ready ? 'ready' : 'not-ready'}`;
+        }
+
+        function updateSummary() {
+            const summary = document.getElementById('testSummary');
+            let text = '测试结果汇总:\n';
+            text += `登录: ${testResults.login || '未测试'}\n`;
+            text += `更改密码: ${testResults.changePassword || '未测试'}\n`;
+            text += `删除账号: ${testResults.deleteAccount || '未测试'}\n`;
+            summary.textContent = text;
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                console.log('🔄 Testing login...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('Login response:', data);
+
+                if (data.success && data.token) {
+                    authToken = data.token;
+                    testResults.login = '✅ 成功';
+                    showResult('loginResult', `✅ 登录成功！\n用户: ${data.user.name}\nToken: ${authToken.substring(0, 20)}...`, 'success');
+                    
+                    // 启用其他测试
+                    updateStatus('loginStatus', true);
+                    updateStatus('passwordStatus', true);
+                    updateStatus('deleteStatus', true);
+                    document.getElementById('changePasswordBtn').disabled = false;
+                    document.getElementById('sendDeleteCodeBtn').disabled = false;
+                } else {
+                    testResults.login = '❌ 失败: ' + data.message;
+                    showResult('loginResult', `❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                testResults.login = '❌ 错误: ' + error.message;
+                console.error('Login error:', error);
+                showResult('loginResult', `❌ 登录错误: ${error.message}`, 'error');
+            }
+            updateSummary();
+        }
+
+        async function testChangePassword() {
+            if (!authToken) {
+                showResult('changePasswordResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+
+            try {
+                console.log('🔄 Testing change password...');
+                const response = await fetch(`${API_BASE_URL}/api/user/change-password`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+
+                const data = await response.json();
+                console.log('Change password response:', data);
+
+                if (data.success) {
+                    testResults.changePassword = '✅ 成功';
+                    showResult('changePasswordResult', `✅ 密码更改成功！\n${data.message}`, 'success');
+                    document.getElementById('testNewPasswordBtn').disabled = false;
+                } else {
+                    testResults.changePassword = '❌ 失败: ' + data.message;
+                    showResult('changePasswordResult', `❌ 密码更改失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                testResults.changePassword = '❌ 错误: ' + error.message;
+                console.error('Change password error:', error);
+                showResult('changePasswordResult', `❌ 更改密码错误: ${error.message}`, 'error');
+            }
+            updateSummary();
+        }
+
+        async function testLoginWithNewPassword() {
+            const email = document.getElementById('loginEmail').value;
+            const newPassword = document.getElementById('newPassword').value;
+
+            try {
+                console.log('🔍 Testing login with new password...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password: newPassword })
+                });
+
+                const data = await response.json();
+                console.log('New password login response:', data);
+
+                if (data.success) {
+                    showResult('changePasswordResult', `✅ 新密码验证成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}`, 'success');
+                } else {
+                    showResult('changePasswordResult', `❌ 新密码验证失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('New password verification error:', error);
+                showResult('changePasswordResult', `❌ 验证错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSendDeleteCode() {
+            if (!authToken) {
+                showResult('deleteAccountResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            try {
+                console.log('📧 Testing send delete verification code...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/send-delete-verification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                console.log('Send delete code response:', data);
+
+                if (data.success) {
+                    showResult('deleteAccountResult', `✅ 删除验证码发送成功！\n${data.message}\n请检查邮箱并输入验证码`, 'success');
+                    document.getElementById('deleteAccountBtn').disabled = false;
+                } else {
+                    showResult('deleteAccountResult', `❌ 发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Send delete code error:', error);
+                showResult('deleteAccountResult', `❌ 发送错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDeleteAccount() {
+            if (!authToken) {
+                showResult('deleteAccountResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            const verificationCode = document.getElementById('deleteVerificationCode').value;
+            if (!verificationCode || verificationCode.length !== 6) {
+                showResult('deleteAccountResult', '❌ 请输入6位验证码', 'error');
+                return;
+            }
+
+            if (!confirm('⚠️ 确认删除账号？此操作不可撤销！这只是测试，请谨慎操作！')) {
+                return;
+            }
+
+            try {
+                console.log('🗑️ Testing delete account...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/delete-account`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ verificationCode })
+                });
+
+                const data = await response.json();
+                console.log('Delete account response:', data);
+
+                if (data.success) {
+                    testResults.deleteAccount = '✅ 成功';
+                    showResult('deleteAccountResult', `✅ 账号删除成功！\n${data.message}`, 'success');
+                } else {
+                    testResults.deleteAccount = '❌ 失败: ' + data.message;
+                    showResult('deleteAccountResult', `❌ 删除失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                testResults.deleteAccount = '❌ 错误: ' + error.message;
+                console.error('Delete account error:', error);
+                showResult('deleteAccountResult', `❌ 删除错误: ${error.message}`, 'error');
+            }
+            updateSummary();
+        }
+
+        // 初始化
+        updateSummary();
+    </script>
+</body>
+</html>
