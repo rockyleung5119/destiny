@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Destiny API 测试</h1>
+    
+    <button onclick="testHealth()">测试健康检查</button>
+    <button onclick="testLogin()">测试登录</button>
+    <button onclick="testProfile()">测试用户资料</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+        let authToken = null;
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testHealth() {
+            try {
+                addResult('🔄 测试健康检查...', 'info');
+                const response = await fetch(`${API_BASE_URL}/api/health`);
+                const data = await response.json();
+                addResult(`✅ 健康检查成功: ${JSON.stringify(data)}`, 'success');
+            } catch (error) {
+                addResult(`❌ 健康检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLogin() {
+            try {
+                addResult('🔄 测试登录...', 'info');
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'demo@example.com',
+                        password: 'secret123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    authToken = data.token;
+                    addResult(`✅ 登录成功: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    addResult(`❌ 登录失败: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ 登录错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProfile() {
+            if (!authToken) {
+                addResult('❌ 请先登录获取token', 'error');
+                return;
+            }
+
+            try {
+                addResult('🔄 测试用户资料...', 'info');
+                const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    addResult(`✅ 用户资料获取成功: ${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    addResult(`❌ 用户资料获取失败: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ 用户资料错误: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

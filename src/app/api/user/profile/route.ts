@@ -60,7 +60,30 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     throw new ValidationError('User not found');
   }
 
-  return createApiResponse(userProfile);
+  // 转换数据格式以匹配前端期望
+  const transformedProfile = {
+    ...userProfile,
+    // 如果有birthDate，解析为分离的字段
+    ...(userProfile.birthDate && {
+      birthYear: userProfile.birthDate.getFullYear(),
+      birthMonth: userProfile.birthDate.getMonth() + 1,
+      birthDay: userProfile.birthDate.getDate(),
+      birthHour: userProfile.birthDate.getHours(),
+      birthMinute: userProfile.birthDate.getMinutes()
+    }),
+    // 添加其他前端需要的字段
+    isEmailVerified: true, // 假设已验证
+    profileUpdatedCount: 0, // 默认值
+    membership: userProfile.subscriptionType ? {
+      planId: userProfile.subscriptionType,
+      isActive: userProfile.subscriptionEnd ? new Date(userProfile.subscriptionEnd) > new Date() : false,
+      expiresAt: userProfile.subscriptionEnd?.toISOString() || '',
+      remainingCredits: 10, // 默认值
+      createdAt: userProfile.createdAt.toISOString()
+    } : null
+  };
+
+  return createApiResponse(transformedProfile);
 });
 
 // PUT /api/user/profile - Update user profile

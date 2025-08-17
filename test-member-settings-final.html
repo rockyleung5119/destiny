@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Settings 修复测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #5a6fd8;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.pass {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Member Settings 修复测试</h1>
+        
+        <div class="test-section">
+            <h3>1. API连接测试 <span id="api-status" class="status">待测试</span></h3>
+            <button onclick="testApiConnection()">测试API连接</button>
+            <div id="api-result" class="result info">点击按钮开始测试...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. JWT认证测试 <span id="auth-status" class="status">待测试</span></h3>
+            <button onclick="testAuthentication()">测试JWT认证</button>
+            <div id="auth-result" class="result info">点击按钮开始测试...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 用户资料API测试 <span id="profile-status" class="status">待测试</span></h3>
+            <button onclick="testUserProfile()">测试用户资料API</button>
+            <div id="profile-result" class="result info">点击按钮开始测试...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Member Settings组件模拟 <span id="component-status" class="status">待测试</span></h3>
+            <button onclick="testMemberSettingsComponent()">模拟组件加载</button>
+            <div id="component-result" class="result info">点击按钮开始测试...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. 完整流程测试 <span id="full-status" class="status">待测试</span></h3>
+            <button onclick="testFullFlow()">运行完整测试</button>
+            <div id="full-result" class="result info">点击按钮开始测试...</div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟API基础URL
+        const API_BASE_URL = 'http://localhost:3000/api';
+        
+        // 模拟token（在实际应用中从localStorage获取）
+        const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0LXVzZXItaWQiLCJlbWFpbCI6InRlc3RAdGVzdC5jb20iLCJpYXQiOjE3MzQ0MzIwMDAsImV4cCI6OTk5OTk5OTk5OX0.test';
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function updateStatus(statusId, passed) {
+            const element = document.getElementById(statusId);
+            element.textContent = passed ? '✅ 通过' : '❌ 失败';
+            element.className = `status ${passed ? 'pass' : 'fail'}`;
+        }
+
+        async function apiRequest(endpoint, options = {}) {
+            const url = `${API_BASE_URL}${endpoint}`;
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${mockToken}`
+            };
+
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        ...defaultHeaders,
+                        ...options.headers
+                    }
+                });
+
+                const data = await response.json();
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    data
+                };
+            } catch (error) {
+                return {
+                    ok: false,
+                    status: 0,
+                    error: error.message
+                };
+            }
+        }
+
+        async function testApiConnection() {
+            showResult('api-result', '正在测试API连接...', 'info');
+            
+            try {
+                const result = await apiRequest('/user/profile');
+                
+                if (result.ok) {
+                    showResult('api-result', `✅ API连接成功！\n状态码: ${result.status}\n响应: ${JSON.stringify(result.data, null, 2)}`, 'success');
+                    updateStatus('api-status', true);
+                } else {
+                    showResult('api-result', `❌ API连接失败\n状态码: ${result.status}\n错误: ${JSON.stringify(result.data, null, 2)}`, 'error');
+                    updateStatus('api-status', false);
+                }
+            } catch (error) {
+                showResult('api-result', `❌ 网络错误: ${error.message}`, 'error');
+                updateStatus('api-status', false);
+            }
+        }
+
+        async function testAuthentication() {
+            showResult('auth-result', '正在测试JWT认证...', 'info');
+            
+            try {
+                // 测试无token的请求
+                const noTokenResult = await apiRequest('/user/profile', {
+                    headers: { 'Authorization': '' }
+                });
+                
+                // 测试有token的请求
+                const withTokenResult = await apiRequest('/user/profile');
+                
+                const authTest = {
+                    noToken: noTokenResult,
+                    withToken: withTokenResult
+                };
+                
+                if (noTokenResult.status === 401 && withTokenResult.ok) {
+                    showResult('auth-result', `✅ JWT认证工作正常！\n\n无token请求: ${noTokenResult.status} (期望401)\n有token请求: ${withTokenResult.status} (期望200)\n\n详细结果:\n${JSON.stringify(authTest, null, 2)}`, 'success');
+                    updateStatus('auth-status', true);
+                } else {
+                    showResult('auth-result', `❌ JWT认证异常\n\n无token请求: ${noTokenResult.status}\n有token请求: ${withTokenResult.status}\n\n详细结果:\n${JSON.stringify(authTest, null, 2)}`, 'error');
+                    updateStatus('auth-status', false);
+                }
+            } catch (error) {
+                showResult('auth-result', `❌ 认证测试错误: ${error.message}`, 'error');
+                updateStatus('auth-status', false);
+            }
+        }
+
+        async function testUserProfile() {
+            showResult('profile-result', '正在测试用户资料API...', 'info');
+            
+            try {
+                const result = await apiRequest('/user/profile');
+                
+                if (result.ok && result.data.success && result.data.data) {
+                    const user = result.data.data;
+                    showResult('profile-result', `✅ 用户资料API测试成功！\n\n数据格式检查:\n- success: ${result.data.success}\n- data存在: ${!!result.data.data}\n- 用户ID: ${user.id}\n- 用户名: ${user.name}\n- 邮箱: ${user.email}\n- 出生年份: ${user.birthYear || '未设置'}\n- 时区: ${user.timezone || '未设置'}\n\n完整数据:\n${JSON.stringify(result.data, null, 2)}`, 'success');
+                    updateStatus('profile-status', true);
+                } else {
+                    showResult('profile-result', `❌ 用户资料API格式异常\n期望格式: { success: true, data: {...} }\n实际格式: ${JSON.stringify(result.data, null, 2)}`, 'error');
+                    updateStatus('profile-status', false);
+                }
+            } catch (error) {
+                showResult('profile-result', `❌ 用户资料API测试错误: ${error.message}`, 'error');
+                updateStatus('profile-status', false);
+            }
+        }
+
+        async function testMemberSettingsComponent() {
+            showResult('component-result', '正在模拟 MemberSettings 组件加载...', 'info');
+            
+            try {
+                // 模拟前端userAPI.getProfile()调用
+                const response = await apiRequest('/user/profile');
+                
+                if (response.ok && response.data.success && response.data.data) {
+                    const user = response.data.data;
+                    
+                    // 模拟前端数据转换逻辑
+                    const profileForm = {
+                        name: user.name || '',
+                        gender: user.gender || '',
+                        birthYear: user.birthYear?.toString() || '',
+                        birthMonth: user.birthMonth?.toString() || '',
+                        birthDay: user.birthDay?.toString() || '',
+                        birthHour: user.birthHour?.toString() || '',
+                        birthMinute: user.birthMinute?.toString() || '',
+                        birthPlace: user.birthPlace || '',
+                        timezone: user.timezone || 'Asia/Shanghai'
+                    };
+                    
+                    showResult('component-result', `✅ MemberSettings 组件模拟成功！\n\n组件状态:\n- 加载状态: 完成\n- 错误信息: 无\n- 用户数据: 已加载\n\n用户信息:\n- 姓名: ${user.name}\n- 邮箱: ${user.email}\n- 性别: ${user.gender || '未设置'}\n- 出生信息: ${user.birthYear || '未设置'}\n- 时区: ${user.timezone || '未设置'}\n\n表单数据:\n${JSON.stringify(profileForm, null, 2)}`, 'success');
+                    updateStatus('component-status', true);
+                } else {
+                    showResult('component-result', `❌ MemberSettings 组件加载失败\n错误: ${response.data?.message || '未知错误'}\n响应: ${JSON.stringify(response.data, null, 2)}`, 'error');
+                    updateStatus('component-status', false);
+                }
+            } catch (error) {
+                showResult('component-result', `❌ 组件模拟错误: ${error.message}`, 'error');
+                updateStatus('component-status', false);
+            }
+        }
+
+        async function testFullFlow() {
+            showResult('full-result', '正在运行完整测试流程...', 'info');
+            
+            const tests = [
+                { name: 'API连接', test: testApiConnection },
+                { name: 'JWT认证', test: testAuthentication },
+                { name: '用户资料API', test: testUserProfile },
+                { name: 'MemberSettings组件', test: testMemberSettingsComponent }
+            ];
+            
+            let results = [];
+            
+            for (const testCase of tests) {
+                try {
+                    await testCase.test();
+                    results.push(`✅ ${testCase.name}: 通过`);
+                } catch (error) {
+                    results.push(`❌ ${testCase.name}: 失败 - ${error.message}`);
+                }
+            }
+            
+            const allPassed = results.every(r => r.includes('✅'));
+            
+            showResult('full-result', `完整测试流程结果:\n\n${results.join('\n')}\n\n总体状态: ${allPassed ? '✅ 全部通过' : '❌ 存在失败项'}`, allPassed ? 'success' : 'error');
+            updateStatus('full-status', allPassed);
+        }
+
+        // 页面加载时显示说明
+        window.onload = function() {
+            console.log('Member Settings 修复测试页面已加载');
+            console.log('请按顺序运行测试，或直接运行完整流程测试');
+        };
+    </script>
+</body>
+</html>

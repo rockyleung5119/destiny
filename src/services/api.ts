@@ -83,12 +83,12 @@ export interface ResetPasswordData {
 
 // HTTP请求工具函数
 export async function apiRequest<T>(
-  endpoint: string, 
+  endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   // 确保不会重复/api路径
-  const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
-  const url = `${baseUrl}${endpoint}`;
+  const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
+  const url = `${baseUrl}/api${endpoint}`;
   
   // 默认请求头
   const defaultHeaders: HeadersInit = {
@@ -366,7 +366,13 @@ export const stripeAPI = {
 export const userAPI = {
   // 获取用户详细信息
   async getProfile(): Promise<{ success: boolean; user: User; message?: string }> {
-    return await apiRequest('/user/profile');
+    const response = await apiRequest<{ success: boolean; user: User; message?: string }>('/user/profile');
+    // 后端直接返回 { success: boolean, user: User } 格式，无需转换
+    return {
+      success: response.success || false,
+      user: response.user,
+      message: response.message
+    };
   },
 
   // 更新用户资料

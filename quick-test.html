@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>快速测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Member Settings 修复测试</h1>
+    
+    <button onclick="testLogin()">1. 测试登录</button>
+    <button onclick="testProfile()" id="profileBtn" disabled>2. 测试获取资料</button>
+    <button onclick="testMemberSettings()" id="memberBtn" disabled>3. 测试Member Settings</button>
+    
+    <div id="result" class="result info">点击按钮开始测试...</div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev/api';
+        let authToken = null;
+
+        function showResult(message, type = 'info') {
+            const element = document.getElementById('result');
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        async function testLogin() {
+            try {
+                showResult('正在登录...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email: 'demo@example.com', 
+                        password: 'password123' 
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    authToken = data.token;
+                    showResult(`✅ 登录成功！\nToken: ${authToken.substring(0, 30)}...\n用户: ${data.user.name}`, 'success');
+                    document.getElementById('profileBtn').disabled = false;
+                    document.getElementById('memberBtn').disabled = false;
+                } else {
+                    showResult(`❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ 登录错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProfile() {
+            if (!authToken) {
+                showResult('❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('正在获取用户资料...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/user/profile`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showResult(`✅ 获取资料成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}\n会员: ${data.user.membership ? '有' : '无'}`, 'success');
+                } else {
+                    showResult(`❌ 获取资料失败: ${data.message}\n状态码: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ 获取资料错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMemberSettings() {
+            if (!authToken) {
+                showResult('❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                showResult('正在模拟Member Settings页面调用...', 'info');
+                
+                // 模拟前端userAPI.getProfile()调用
+                const response = await fetch(`${API_BASE_URL}/user/profile`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'X-Language': 'zh'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success && data.user) {
+                    // 模拟MemberSettings组件的数据处理
+                    const user = data.user;
+                    const profileForm = {
+                        name: user.name || '',
+                        gender: user.gender || '',
+                        birthYear: user.birthYear?.toString() || '',
+                        birthMonth: user.birthMonth?.toString() || '',
+                        birthDay: user.birthDay?.toString() || '',
+                        birthHour: user.birthHour?.toString() || '',
+                        birthMinute: user.birthMinute?.toString() || '',
+                        birthPlace: user.birthPlace || '',
+                        timezone: user.timezone || 'Asia/Shanghai'
+                    };
+                    
+                    showResult(`✅ Member Settings 测试成功！\n\n用户资料:\n- 姓名: ${profileForm.name}\n- 性别: ${profileForm.gender}\n- 出生年: ${profileForm.birthYear}\n- 出生月: ${profileForm.birthMonth}\n- 出生日: ${profileForm.birthDay}\n- 出生时: ${profileForm.birthHour}\n- 出生地: ${profileForm.birthPlace}\n- 时区: ${profileForm.timezone}\n\n✅ 数据格式正确，Member Settings页面应该能正常工作！`, 'success');
+                } else {
+                    showResult(`❌ Member Settings 测试失败!\n响应格式错误: ${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Member Settings 测试错误: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

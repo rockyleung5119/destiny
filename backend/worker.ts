@@ -106,10 +106,59 @@ app.get('/api/health', async (c) => {
   });
 });
 
-// JWT 中间件
-const jwtMiddleware = jwt({
-  secret: (c) => c.env.JWT_SECRET || 'destiny-super-secret-jwt-key-for-production',
-});
+// JWT 中间件 - 增强错误处理
+const jwtMiddleware = async (c, next) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Missing or invalid Authorization header');
+      return c.json({
+        success: false,
+        message: 'Authorization header required'
+      }, 401);
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    if (!token) {
+      console.error('❌ No token provided');
+      return c.json({
+        success: false,
+        message: 'Access token required'
+      }, 401);
+    }
+
+    // 使用环境变量中的JWT_SECRET，如果没有则使用默认值
+    const jwtSecret = c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA';
+    console.log('🔑 Using JWT Secret (first 10 chars):', jwtSecret.substring(0, 10) + '...');
+
+    // 手动验证JWT token
+    try {
+      // 使用hono/jwt的verify函数
+      const { verify } = await import('hono/jwt');
+      const payload = await verify(token, jwtSecret);
+      console.log('✅ JWT验证成功:', payload);
+
+      // 将payload存储到context中
+      c.set('jwtPayload', payload);
+
+      await next();
+    } catch (jwtError) {
+      console.error('❌ JWT验证失败:', jwtError);
+      return c.json({
+        success: false,
+        message: 'Invalid or expired token'
+      }, 401);
+    }
+  } catch (error) {
+    console.error('❌ JWT中间件错误:', error);
+    return c.json({
+      success: false,
+      message: 'Authentication error'
+    }, 500);
+  }
+};
 
 // 用户认证路由
 app.post('/api/auth/register', async (c) => {
@@ -133,10 +182,18 @@ app.post('/api/auth/register', async (c) => {
       'INSERT INTO users (email, password_hash, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
     ).bind(email, hashedPassword, name, new Date().toISOString(), new Date().toISOString()).run();
 
+    const userId = result.meta.last_row_id;
+    const token = await generateJWT(userId, c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA');
+
     return c.json({
       success: true,
       message: 'User registered successfully',
-      userId: result.meta.last_row_id
+      token,
+      user: {
+        id: userId,
+        email,
+        name
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -160,7 +217,7 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ success: false, message: 'Invalid credentials' }, 401);
     }
 
-    const token = await generateJWT(user.id, c.env.JWT_SECRET);
+    const token = await generateJWT(user.id, c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA');
 
     return c.json({
       success: true,
@@ -223,21 +280,44 @@ app.post('/api/auth/verify', jwtMiddleware, async (c) => {
 // 受保护的用户路由
 app.get('/api/user/profile', jwtMiddleware, async (c) => {
   try {
-    const payload = c.get('jwtPayload');
-    const userId = payload.userId;
+    console.log('🔄 Getting user profile...');
 
+    const payload = c.get('jwtPayload');
+    console.log('📋 JWT Payload:', payload);
+
+    if (!payload || !payload.userId) {
+      console.error('❌ Invalid JWT payload');
+      return c.json({ success: false, message: 'Invalid authentication token' }, 401);
+    }
+
+    const userId = payload.userId;
+    console.log('👤 User ID:', userId);
+
+    // 检查数据库连接
+    if (!c.env.DB) {
+      console.error('❌ Database not available');
+      return c.json({ success: false, message: 'Database connection error' }, 500);
+    }
+
+    console.log('🔍 Querying user data...');
     const user = await c.env.DB.prepare(
       'SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place, timezone, is_email_verified, profile_updated_count, created_at, updated_at FROM users WHERE id = ?'
     ).bind(userId).first();
 
+    console.log('👤 User query result:', user);
+
     if (!user) {
+      console.error('❌ User not found for ID:', userId);
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
+    console.log('🔍 Querying membership data...');
     // 获取会员信息
     const membership = await c.env.DB.prepare(
       'SELECT plan_id, is_active, expires_at, remaining_credits, created_at FROM memberships WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1'
     ).bind(userId).first();
+
+    console.log('💳 Membership query result:', membership);
 
     const userResponse = {
       id: user.id,
@@ -264,13 +344,19 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
       } : null
     };
 
+    console.log('✅ Returning user response:', userResponse);
     return c.json({
       success: true,
       user: userResponse
     });
   } catch (error) {
-    console.error('Profile error:', error);
-    return c.json({ success: false, message: 'Failed to get profile' }, 500);
+    console.error('❌ Profile error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    }, 500);
   }
 });
 
@@ -525,21 +611,15 @@ async function verifyPassword(password, hash) {
 }
 
 async function generateJWT(userId, secret) {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = { userId, exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) };
+  // 使用hono/jwt的sign函数来确保兼容性
+  const { sign } = await import('hono/jwt');
 
-  const encoder = new TextEncoder();
-  const headerB64 = btoa(JSON.stringify(header));
-  const payloadB64 = btoa(JSON.stringify(payload));
+  const payload = {
+    userId,
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24小时过期
+  };
 
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']),
-    encoder.encode(`${headerB64}.${payloadB64}`)
-  );
-
-  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  return `${headerB64}.${payloadB64}.${signatureB64}`;
+  return await sign(payload, secret);
 }
 
 async function callDeepSeekAPI(user, question, language, env) {

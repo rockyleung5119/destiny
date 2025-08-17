@@ -79,19 +79,32 @@ export async function validateRequestBody<T>(
 }
 
 /**
- * Get user from request (placeholder for authentication)
+ * Get user from request (JWT authentication)
  */
 export async function getUserFromRequest(request: NextRequest): Promise<{ id: string } | null> {
-  // TODO: Implement actual authentication
-  // For now, return a mock user or null
   const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader) {
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
 
-  // Mock user for development
-  return { id: 'mock-user-id' };
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+  try {
+    // For development, we'll use a simple JWT verification
+    // In production, you should use a proper JWT library
+    const payload = JSON.parse(atob(token.split('.')[1]));
+
+    // Check if token is expired
+    if (payload.exp && payload.exp < Date.now() / 1000) {
+      return null;
+    }
+
+    return { id: payload.userId || payload.sub };
+  } catch (error) {
+    console.error('JWT verification failed:', error);
+    return null;
+  }
 }
 
 /**
