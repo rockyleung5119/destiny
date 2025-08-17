@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logo Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .fix-summary {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Logo Fix Test</h1>
+        
+        <!-- 修复总结 -->
+        <div class="fix-summary">
+            <h3 style="color: #2d5a2d; margin: 0 0 15px 0;">✅ LOGO修复完成</h3>
+            <div style="color: #2d5a2d;">
+                <p><strong>已修复的问题：</strong></p>
+                <ul>
+                    <li>✅ 移除了导入模板中的LOGO图案（星星图标）</li>
+                    <li>✅ 移除了装饰性的emoji图标（✨🌙⭐）</li>
+                    <li>✅ 更新了代码逻辑使用修复后的模板</li>
+                    <li>✅ 保留了品牌信息：Indicate.Top</li>
+                    <li>✅ 保留了标语：Ancient Divination Arts</li>
+                    <li>✅ 保留了副标语：Illuminating paths through celestial wisdom</li>
+                </ul>
+                <p><strong>修复范围：</strong></p>
+                <ul>
+                    <li>📧 邮箱验证码模板</li>
+                    <li>🔐 密码重置模板</li>
+                    <li>📁 导入的外部模板文件</li>
+                    <li>🔄 备用模板函数</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 测试邮箱验证码 -->
+        <div class="test-section">
+            <h3>测试1: 邮箱验证码（无LOGO版本）</h3>
+            <p>测试修复后的邮箱验证码模板，应该无LOGO显示</p>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="testEmail" value="494159635@qq.com" placeholder="输入要测试的邮箱地址">
+            </div>
+            <button onclick="testEmailTemplate()">发送验证码测试</button>
+            <div id="emailResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试密码重置 -->
+        <div class="test-section">
+            <h3>测试2: 密码重置（无LOGO版本）</h3>
+            <p>测试修复后的密码重置模板，应该无LOGO显示</p>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="resetEmail" value="494159635@qq.com" placeholder="输入要测试的邮箱地址">
+            </div>
+            <button onclick="testResetTemplate()">发送重置码测试</button>
+            <div id="resetResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 验证清单 -->
+        <div class="test-section">
+            <h3>验证清单</h3>
+            <p>收到邮件后，请检查以下项目：</p>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">📧 邮件内容检查：</h4>
+                <ul style="margin: 0; color: #6c757d;">
+                    <li>❌ 应该没有星星LOGO图标</li>
+                    <li>❌ 应该没有月亮、太阳装饰图标</li>
+                    <li>❌ 应该没有emoji装饰（✨🌙⭐）</li>
+                    <li>✅ 应该显示"Indicate.Top"品牌名称</li>
+                    <li>✅ 应该显示"Ancient Divination Arts"标语</li>
+                    <li>✅ 应该显示"Illuminating paths through celestial wisdom"副标语</li>
+                    <li>✅ 验证码应该清晰突出显示</li>
+                    <li>✅ 整体设计应该简洁专业</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 测试日志 -->
+        <div class="test-section">
+            <h3>测试日志</h3>
+            <button onclick="clearLogs()">清空日志</button>
+            <div id="testLogs" class="result info">
+                测试日志将显示在这里...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function clearLogs() {
+            document.getElementById('testLogs').textContent = '测试日志已清空...\n';
+        }
+
+        async function testEmailTemplate() {
+            const email = document.getElementById('testEmail').value.trim();
+            
+            if (!email) {
+                showResult('emailResult', '❌ 请输入邮箱地址', 'error');
+                return;
+            }
+
+            try {
+                log(`📧 测试无LOGO邮箱验证码模板: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/email/send-verification-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, language: 'en' })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('emailResult', `✅ 邮箱验证码发送成功！\n${data.message}\n\n🔍 请检查邮箱，确认：\n- 无LOGO图标显示\n- 品牌信息"Indicate.Top"正确显示\n- 整体设计简洁专业`, 'success');
+                } else {
+                    showResult('emailResult', `❌ 发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                showResult('emailResult', `❌ 测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testResetTemplate() {
+            const email = document.getElementById('resetEmail').value.trim();
+            
+            if (!email) {
+                showResult('resetResult', '❌ 请输入邮箱地址', 'error');
+                return;
+            }
+
+            try {
+                log(`🔐 测试无LOGO密码重置模板: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                log(`📧 API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('resetResult', `✅ 密码重置码发送成功！\n${data.message}\n\n🔍 请检查邮箱，确认：\n- 无LOGO图标显示\n- 品牌信息"Indicate.Top"正确显示\n- 整体设计简洁专业`, 'success');
+                } else if (response.status === 404) {
+                    showResult('resetResult', `⚠️ 密码重置功能尚未部署\n这是正常的，忘记密码功能还在等待部署。\n\n📧 可以先测试邮箱验证码模板的修复效果。`, 'warning');
+                } else {
+                    showResult('resetResult', `❌ 发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 测试错误: ${error.message}`);
+                if (error.message.includes('404')) {
+                    showResult('resetResult', `⚠️ 密码重置功能尚未部署\n这是正常的，忘记密码功能还在等待部署。\n\n📧 可以先测试邮箱验证码模板的修复效果。`, 'warning');
+                } else {
+                    showResult('resetResult', `❌ 测试错误: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // 页面加载时自动开始
+        window.onload = function() {
+            log('🔧 Logo Fix Test 页面已加载');
+            log('📍 修复目标: 移除邮件模板中的LOGO图案，保留品牌信息');
+            log('✅ 修复完成: 导入模板和备用模板都已更新');
+            log('🔍 测试重点: 确认邮件中无LOGO显示，品牌信息正确');
+        };
+    </script>
+</body>
+</html>

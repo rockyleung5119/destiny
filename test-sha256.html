@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SHA256 Hash Calculator</title>
+</head>
+<body>
+    <h1>SHA256 Hash Calculator</h1>
+    <input type="text" id="password" placeholder="Enter password" value="password123">
+    <button onclick="calculateHash()">Calculate SHA256</button>
+    <div id="result"></div>
+
+    <script>
+        async function calculateHash() {
+            const password = document.getElementById('password').value;
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            document.getElementById('result').innerHTML = `<p>Password: ${password}</p><p>SHA256: ${hashHex}</p>`;
+        }
+        
+        // Auto calculate on load
+        window.onload = calculateHash;
+    </script>
+</body>
+</html>

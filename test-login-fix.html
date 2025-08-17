@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .fix-summary {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Login Fix Test</h1>
+        
+        <!-- 修复总结 -->
+        <div class="fix-summary">
+            <h3 style="color: #2d5a2d; margin: 0 0 15px 0;">✅ 登录修复完成</h3>
+            <div style="color: #2d5a2d;">
+                <p><strong>修复内容：</strong></p>
+                <ul>
+                    <li>✅ 统一所有密码功能使用SHA256哈希</li>
+                    <li>✅ 简化了hashPassword()函数</li>
+                    <li>✅ 简化了verifyPassword()函数</li>
+                    <li>✅ 移除了复杂的bcrypt和WebCrypto逻辑</li>
+                    <li>✅ 更新了数据库中的密码哈希格式</li>
+                    <li>✅ 保持了注册、登录、重置密码的一致性</li>
+                </ul>
+                <p><strong>测试账号：</strong></p>
+                <ul>
+                    <li>📧 邮箱：demo@example.com</li>
+                    <li>🔐 密码：password123</li>
+                    <li>🔑 SHA256哈希：ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 测试登录 -->
+        <div class="test-section">
+            <h3>测试1: 登录功能</h3>
+            <p>测试修复后的登录功能，使用统一的SHA256哈希验证</p>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="loginEmail" value="demo@example.com" placeholder="输入邮箱地址">
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="password" id="loginPassword" value="password123" placeholder="输入密码">
+            </div>
+            <button onclick="testLogin()">测试登录</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 测试注册 -->
+        <div class="test-section">
+            <h3>测试2: 注册功能</h3>
+            <p>测试注册功能是否使用统一的SHA256哈希</p>
+            <div class="form-group">
+                <label>邮箱地址:</label>
+                <input type="email" id="regEmail" value="test@example.com" placeholder="输入新邮箱地址">
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="password" id="regPassword" value="test123" placeholder="输入密码">
+            </div>
+            <div class="form-group">
+                <label>姓名:</label>
+                <input type="text" id="regName" value="Test User" placeholder="输入姓名">
+            </div>
+            <button onclick="testRegister()">测试注册</button>
+            <div id="regResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- SHA256计算器 -->
+        <div class="test-section">
+            <h3>SHA256计算器</h3>
+            <p>验证密码哈希计算是否正确</p>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="text" id="hashInput" value="password123" placeholder="输入要计算哈希的密码">
+            </div>
+            <button onclick="calculateSHA256()">计算SHA256</button>
+            <div id="hashResult" class="result info" style="display: block;">
+                等待计算...
+            </div>
+        </div>
+
+        <!-- 测试日志 -->
+        <div class="test-section">
+            <h3>测试日志</h3>
+            <button onclick="clearLogs()">清空日志</button>
+            <div id="testLogs" class="result info">
+                测试日志将显示在这里...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        function clearLogs() {
+            document.getElementById('testLogs').textContent = '测试日志已清空...\n';
+        }
+
+        async function calculateSHA256() {
+            const password = document.getElementById('hashInput').value;
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(password);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                showResult('hashResult', `密码: ${password}\nSHA256: ${hashHex}`, 'info');
+                log(`🔐 计算SHA256哈希: ${password} -> ${hashHex}`);
+            } catch (error) {
+                showResult('hashResult', `计算错误: ${error.message}`, 'error');
+                log(`❌ SHA256计算错误: ${error.message}`);
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showResult('loginResult', '❌ 请输入邮箱和密码', 'error');
+                return;
+            }
+
+            try {
+                log(`🔐 测试登录: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                log(`📧 登录API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 登录API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('loginResult', `✅ 登录成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}\nToken: ${data.token.substring(0, 20)}...`, 'success');
+                } else {
+                    showResult('loginResult', `❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 登录测试错误: ${error.message}`);
+                showResult('loginResult', `❌ 登录测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRegister() {
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const name = document.getElementById('regName').value.trim();
+            
+            if (!email || !password || !name) {
+                showResult('regResult', '❌ 请填写所有字段', 'error');
+                return;
+            }
+
+            try {
+                log(`📝 测试注册: ${email}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password, name })
+                });
+
+                log(`📧 注册API响应状态: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📧 注册API响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    showResult('regResult', `✅ 注册成功！\n用户ID: ${data.user.id}\n邮箱: ${data.user.email}\n\n🔍 请检查数据库中的密码哈希格式是否为SHA256`, 'success');
+                } else {
+                    showResult('regResult', `❌ 注册失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 注册测试错误: ${error.message}`);
+                showResult('regResult', `❌ 注册测试错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动开始
+        window.onload = function() {
+            log('🔧 Login Fix Test 页面已加载');
+            log('📍 修复目标: 统一所有密码功能使用SHA256哈希');
+            log('✅ 修复完成: 简化了密码哈希和验证逻辑');
+            log('🔍 测试重点: 确认登录功能恢复正常');
+            calculateSHA256(); // 自动计算默认密码的哈希
+        };
+    </script>
+</body>
+</html>

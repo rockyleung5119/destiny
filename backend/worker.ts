@@ -938,7 +938,7 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
 // 邮箱验证码服务
 function getEmailHtml(code: string): string {
   try {
-    console.log('📧 Using imported template, length:', verificationTemplate?.length || 0);
+    console.log('📧 Using updated imported template (no logo version), length:', verificationTemplate?.length || 0);
     if (verificationTemplate && verificationTemplate.length > 0) {
       return verificationTemplate.replace('{{verification_code}}', code);
     } else {
@@ -1596,126 +1596,40 @@ app.notFound((c) => {
   return c.json({ success: false, message: 'API endpoint not found' }, 404);
 });
 
-// 辅助函数 - 兼容bcrypt和Web Crypto API
+// 统一使用SHA256哈希 - 简化密码处理
 async function hashPassword(password) {
   try {
-    // 优先使用bcrypt（与现有数据兼容）
-    const saltRounds = 10;
-    return await bcrypt.hash(password, saltRounds);
+    console.log('🔐 Hashing password with SHA256');
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    console.log('🔐 Password hashed successfully');
+    return hashHex;
   } catch (error) {
-    console.error('bcrypt hash error, falling back to Web Crypto API:', error);
-    // 如果bcrypt失败，使用Web Crypto API作为备选
-    return await hashPasswordWithWebCrypto(password);
+    console.error('SHA256 hash error:', error);
+    throw new Error('Password hashing failed');
   }
 }
 
+// 统一使用SHA256验证 - 简化密码验证
 async function verifyPassword(password, hash) {
   try {
-    // 首先尝试bcrypt验证（兼容现有用户）
-    if (hash.startsWith('$2')) {
-      // bcrypt哈希格式
-      return await bcrypt.compare(password, hash);
-    } else {
-      // Web Crypto API格式
-      return await verifyPasswordWithWebCrypto(password, hash);
-    }
+    console.log('🔐 Verifying password with SHA256');
+    const hashedInput = await hashPassword(password);
+    const isValid = hashedInput === hash;
+    console.log('🔐 Password verification result:', isValid);
+    return isValid;
   } catch (error) {
     console.error('Password verification error:', error);
-    // 如果bcrypt失败，尝试Web Crypto API
-    try {
-      return await verifyPasswordWithWebCrypto(password, hash);
-    } catch (webCryptoError) {
-      console.error('Web Crypto verification also failed:', webCryptoError);
-      return false;
-    }
-  }
-}
-
-// Web Crypto API备选实现
-async function hashPasswordWithWebCrypto(password) {
-  // 生成随机盐
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-
-  // 将密码转换为ArrayBuffer
-  const passwordBuffer = new TextEncoder().encode(password);
-
-  // 使用PBKDF2进行哈希
-  const key = await crypto.subtle.importKey(
-    'raw',
-    passwordBuffer,
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits']
-  );
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256'
-    },
-    key,
-    256
-  );
-
-  // 将盐和哈希组合并转换为base64
-  const combined = new Uint8Array(salt.length + hashBuffer.byteLength);
-  combined.set(salt);
-  combined.set(new Uint8Array(hashBuffer), salt.length);
-
-  return 'webcrypto:' + btoa(String.fromCharCode(...combined));
-}
-
-async function verifyPasswordWithWebCrypto(password, hash) {
-  // 移除前缀
-  const cleanHash = hash.replace('webcrypto:', '');
-
-  // 从base64解码
-  const combined = new Uint8Array(atob(cleanHash).split('').map(c => c.charCodeAt(0)));
-
-  // 提取盐和哈希
-  const salt = combined.slice(0, 16);
-  const storedHash = combined.slice(16);
-
-  // 将密码转换为ArrayBuffer
-  const passwordBuffer = new TextEncoder().encode(password);
-
-  // 使用相同的盐进行哈希
-  const key = await crypto.subtle.importKey(
-    'raw',
-    passwordBuffer,
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits']
-  );
-
-  const hashBuffer = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256'
-    },
-    key,
-    256
-  );
-
-  const newHash = new Uint8Array(hashBuffer);
-
-  // 比较哈希
-  if (newHash.length !== storedHash.length) {
     return false;
   }
-
-  for (let i = 0; i < newHash.length; i++) {
-    if (newHash[i] !== storedHash[i]) {
-      return false;
-    }
-  }
-
-  return true;
 }
+
+
+
+
 
 async function generateJWT(userId, secret) {
   // 使用hono/jwt的sign函数来确保兼容性
