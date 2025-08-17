@@ -599,6 +599,216 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   }
 });
 
+// 忘记密码 - 发送重置验证码
+app.post('/api/auth/forgot-password', async (c) => {
+  try {
+    console.log('🔄 Forgot password request received');
+
+    const { email } = await c.req.json();
+    console.log('📧 Email:', email);
+
+    if (!email) {
+      console.log('❌ Email is missing');
+      return c.json({ success: false, message: 'Email is required' }, 400);
+    }
+
+    // 验证邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('❌ Invalid email format');
+      return c.json({ success: false, message: 'Invalid email format' }, 400);
+    }
+
+    // 检查用户是否存在
+    console.log('🔍 Checking if user exists...');
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, name FROM users WHERE email = ?'
+    ).bind(email).first();
+
+    if (!user) {
+      console.log('❌ User not found');
+      // 为了安全，不透露用户是否存在
+      return c.json({
+        success: true,
+        message: 'If this email is registered, you will receive a password reset code shortly.'
+      });
+    }
+
+    console.log('✅ User found:', user.email);
+
+    // 检查是否在短时间内重复发送（60秒限制）
+    console.log('⏰ Checking for recent password reset codes...');
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+
+    const recentCode = await c.env.DB.prepare(`
+      SELECT created_at FROM verification_codes
+      WHERE email = ? AND type = 'PASSWORD_RESET' AND created_at > ?
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(email, oneMinuteAgo).first();
+
+    if (recentCode) {
+      console.log('❌ Recent password reset code found, rate limiting');
+      const timeDiff = Date.now() - new Date(recentCode.created_at).getTime();
+      const remainingSeconds = Math.ceil((60 * 1000 - timeDiff) / 1000);
+
+      return c.json({
+        success: false,
+        message: `Please wait ${remainingSeconds} seconds before requesting another password reset code`,
+        remainingSeconds: remainingSeconds
+      }, 429);
+    }
+
+    // 生成6位数验证码
+    console.log('🎲 Generating password reset code...');
+    const randomBuffer = new Uint32Array(1);
+    crypto.getRandomValues(randomBuffer);
+    const verificationCode = (randomBuffer[0] % 900000 + 100000).toString();
+    console.log('🎲 Generated code:', verificationCode);
+
+    // 设置过期时间（10分钟）
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    console.log('⏰ Code expires at:', expiresAt);
+
+    // 保存验证码到数据库
+    console.log('💾 Saving password reset code to database...');
+    const insertResult = await c.env.DB.prepare(`
+      INSERT INTO verification_codes (email, code, type, expires_at, is_used, created_at)
+      VALUES (?, ?, 'PASSWORD_RESET', ?, 0, ?)
+    `).bind(email, verificationCode, expiresAt, new Date().toISOString()).run();
+
+    console.log('💾 Insert result:', insertResult);
+
+    // 发送邮件
+    console.log('📧 Sending password reset email...');
+    const emailResult = await sendPasswordResetEmail(c.env, email, verificationCode, user.name);
+    console.log('📧 Email send result:', emailResult);
+
+    if (!emailResult.success) {
+      console.log('❌ Failed to send email:', emailResult.error);
+      return c.json({
+        success: false,
+        message: 'Failed to send password reset email. Please try again later.'
+      }, 500);
+    }
+
+    console.log('✅ Password reset code sent successfully');
+    return c.json({
+      success: true,
+      message: 'Password reset code sent to your email. Please check your inbox.'
+    });
+
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Failed to process password reset request. Please try again later.'
+    }, 500);
+  }
+});
+
+// 重置密码 - 验证码验证并设置新密码
+app.post('/api/auth/reset-password', async (c) => {
+  try {
+    console.log('🔄 Reset password request received');
+
+    const { email, code, newPassword } = await c.req.json();
+    console.log('📧 Email:', email, 'Code:', code, 'New password length:', newPassword?.length);
+
+    if (!email || !code || !newPassword) {
+      console.log('❌ Missing required fields');
+      return c.json({
+        success: false,
+        message: 'Email, verification code, and new password are required'
+      }, 400);
+    }
+
+    if (newPassword.length < 6) {
+      console.log('❌ New password too short');
+      return c.json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      }, 400);
+    }
+
+    // 验证验证码
+    console.log('🔍 Verifying password reset code...');
+    const verificationRecord = await c.env.DB.prepare(`
+      SELECT email, code, expires_at, is_used, created_at
+      FROM verification_codes
+      WHERE email = ? AND code = ? AND type = 'PASSWORD_RESET' AND is_used = 0
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(email, code).first();
+
+    if (!verificationRecord) {
+      console.log('❌ Invalid or expired verification code');
+      return c.json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      }, 400);
+    }
+
+    // 检查验证码是否过期
+    const now = new Date();
+    const expiresAt = new Date(verificationRecord.expires_at);
+    if (now > expiresAt) {
+      console.log('❌ Verification code expired');
+      return c.json({
+        success: false,
+        message: 'Verification code has expired. Please request a new one.'
+      }, 400);
+    }
+
+    console.log('✅ Verification code is valid');
+
+    // 检查用户是否存在
+    console.log('🔍 Checking if user exists...');
+    const user = await c.env.DB.prepare(
+      'SELECT id, email FROM users WHERE email = ?'
+    ).bind(email).first();
+
+    if (!user) {
+      console.log('❌ User not found');
+      return c.json({
+        success: false,
+        message: 'User not found'
+      }, 404);
+    }
+
+    // 加密新密码
+    console.log('🔐 Hashing new password...');
+    const newPasswordHash = await hashPassword(newPassword);
+    console.log('✅ New password hashed');
+
+    // 更新密码
+    console.log('💾 Updating password in database...');
+    const updateResult = await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?'
+    ).bind(newPasswordHash, new Date().toISOString(), user.id).run();
+    console.log('💾 Password update result:', updateResult);
+
+    // 标记验证码为已使用
+    console.log('✅ Marking verification code as used...');
+    await c.env.DB.prepare(
+      'UPDATE verification_codes SET is_used = 1 WHERE email = ? AND code = ? AND type = \'PASSWORD_RESET\''
+    ).bind(email, code).run();
+
+    console.log('✅ Password reset successfully');
+    return c.json({
+      success: true,
+      message: 'Password reset successfully. You can now login with your new password.'
+    });
+
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Failed to reset password. Please try again later.'
+    }, 500);
+  }
+});
+
 // 更改密码API
 app.put('/api/user/change-password', jwtMiddleware, async (c) => {
   try {
@@ -749,28 +959,26 @@ function getFallbackEmailHtml(code: string): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Destiny - Email Verification</title>
+    <title>Indicate.Top - Email Verification</title>
 </head>
-<body style="margin: 0; padding: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial, sans-serif; min-height: 100vh;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: rgba(255, 255, 255, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); backdrop-filter: blur(10px);">
-
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
         <!-- Header -->
-        <div style="text-align: center; padding: 40px 20px 20px 20px; background: transparent;">
-            <div style="display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-                <div style="position: relative; width: 64px; height: 64px; background: linear-gradient(135deg, #facc15 0%, #f97316 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
-                    <svg style="width: 32px; height: 32px; color: white;" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                </div>
+        <div style="text-align: center; margin-bottom: 40px;">
+            <div style="background: rgba(255,255,255,0.95); display: inline-block; padding: 20px 40px; border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                <h1 style="color: #2d3748; margin: 0; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Indicate.Top</h1>
+                <p style="color: #718096; margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">Ancient Divination Arts</p>
+                <p style="color: #a0aec0; margin: 5px 0 0 0; font-size: 14px; font-style: italic;">Illuminating paths through celestial wisdom</p>
             </div>
-            <h1 style="color: #1f2937; margin: 0; font-size: 32px; font-weight: 800; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Destiny</h1>
-            <p style="color: #6b7280; margin: 8px 0 0 0; font-size: 16px; font-weight: 500;">Ancient Divination Arts</p>
         </div>
 
-        <!-- Content -->
-        <div style="padding: 0 40px;">
-            <h2 style="color: #1f2937; text-align: center; margin: 0 0 20px 0; font-size: 28px; font-weight: 700;">Email Verification</h2>
-            <p style="color: #4b5563; text-align: center; margin: 0 0 30px 0; font-size: 18px; line-height: 1.6;">Please use the verification code below to complete your email verification:</p>
+        <!-- Main Content -->
+        <div style="background: rgba(255,255,255,0.95); border-radius: 20px; padding: 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); backdrop-filter: blur(10px);">
+            <h2 style="color: #2d3748; margin: 0 0 20px 0; font-size: 28px; font-weight: 600; text-align: center;">Email Verification Code</h2>
+
+            <p style="color: #4a5568; font-size: 18px; line-height: 1.6; margin-bottom: 30px; text-align: center;">
+                Please use the following verification code to complete your email verification:
+            </p>
 
             <!-- Verification Code -->
             <div style="background: rgba(255,255,255,0.8); padding: 40px; border-radius: 20px; margin: 40px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;">
@@ -785,12 +993,18 @@ function getFallbackEmailHtml(code: string): string {
                     <strong>Security Notice:</strong> If you didn't request this verification code, please ignore this email and secure your account.
                 </p>
             </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; font-size: 14px; margin: 0;">
+                    This code will expire in 10 minutes for your security.
+                </p>
+            </div>
         </div>
 
         <!-- Footer -->
-        <div style="text-align: center; padding: 40px 20px; background: transparent;">
-            <p style="color: #9ca3af; margin: 0; font-size: 14px;">
-                © 2024 Destiny. All rights reserved.<br>
+        <div style="text-align: center; margin-top: 40px;">
+            <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 0;">
+                © 2025 Indicate.Top. All rights reserved.<br>
                 Ancient wisdom meets modern technology.
             </p>
         </div>
@@ -863,6 +1077,126 @@ async function sendVerificationEmail(email: string, code: string, env: Env['Bind
     console.error('❌ Email sending failed:', error);
     throw new Error(`Failed to send verification email: ${error.message}`);
   }
+}
+
+// 发送密码重置邮件函数
+async function sendPasswordResetEmail(env: Env['Bindings'], email: string, code: string, userName: string) {
+  console.log('🔐 Starting password reset email sending process...');
+  console.log('📧 Target email:', email);
+  console.log('📧 Reset code:', code);
+  console.log('👤 User name:', userName);
+
+  // 检查环境变量
+  if (!env.RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY is missing');
+    return { success: false, error: 'Email service configuration error: Missing API key' };
+  }
+
+  if (!env.RESEND_FROM_EMAIL) {
+    console.error('❌ RESEND_FROM_EMAIL is missing');
+    return { success: false, error: 'Email service configuration error: Missing from email' };
+  }
+
+  const subject = 'Password Reset Code - Destiny';
+  const htmlBody = getPasswordResetEmailHtml(code, userName);
+
+  const emailPayload = {
+    from: env.RESEND_FROM_NAME ? `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>` : env.RESEND_FROM_EMAIL,
+    to: [email],
+    subject: subject,
+    html: htmlBody,
+  };
+
+  console.log('📧 Password reset email payload prepared');
+
+  try {
+    console.log('🚀 Sending password reset email to Resend API...');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    console.log('📧 Resend API response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Resend API error response:', errorData);
+      return { success: false, error: `Resend API error: ${response.status} - ${JSON.stringify(errorData)}` };
+    }
+
+    const result = await response.json();
+    console.log('✅ Password reset email sent successfully:', result);
+    return { success: true, result };
+  } catch (error) {
+    console.error('❌ Password reset email sending failed:', error);
+    return { success: false, error: `Failed to send password reset email: ${error.message}` };
+  }
+}
+
+// 密码重置邮件HTML模板
+function getPasswordResetEmailHtml(code: string, userName: string) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset - Destiny</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 40px;">
+            <div style="background: rgba(255,255,255,0.95); display: inline-block; padding: 20px 40px; border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                <h1 style="color: #2d3748; margin: 0; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Indicate.Top</h1>
+                <p style="color: #718096; margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">Ancient Divination Arts</p>
+                <p style="color: #a0aec0; margin: 5px 0 0 0; font-size: 14px; font-style: italic;">Password Reset Request</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div style="background: rgba(255,255,255,0.95); border-radius: 20px; padding: 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); backdrop-filter: blur(10px);">
+            <h2 style="color: #2d3748; margin: 0 0 20px 0; font-size: 28px; font-weight: 600; text-align: center;">Reset Your Password</h2>
+
+            <p style="color: #4a5568; font-size: 18px; line-height: 1.6; margin-bottom: 30px; text-align: center;">
+                Hello <strong>${userName}</strong>,<br><br>
+                We received a request to reset your password. Use the verification code below to set a new password for your account.
+            </p>
+
+            <!-- Verification Code -->
+            <div style="background: rgba(255,255,255,0.8); padding: 40px; border-radius: 20px; margin: 40px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;">
+                <div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); color: #1f2937; display: inline-block; padding: 24px 40px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 2px solid rgba(239, 68, 68, 0.2);">
+                    <span style="font-size: 42px; font-weight: 800; letter-spacing: 12px; font-family: 'Courier New', monospace; background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${code}</span>
+                </div>
+                <p style="color: #6b7280; margin: 0; font-size: 16px; font-weight: 500;">Reset code expires in 10 minutes</p>
+            </div>
+
+            <div style="background: rgba(254, 226, 226, 0.8); border-left: 4px solid #ef4444; padding: 20px; border-radius: 8px; margin: 30px 0;">
+                <p style="color: #991b1b; margin: 0; font-size: 16px; font-weight: 500;">
+                    <strong>Security Notice:</strong> If you didn't request this password reset, please ignore this email and secure your account immediately.
+                </p>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; font-size: 14px; margin: 0;">
+                    This code will expire in 10 minutes for your security.
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 40px;">
+            <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 0;">
+                © 2025 Indicate.Top. All rights reserved.<br>
+                Ancient wisdom meets modern technology.
+            </p>
+        </div>
+    </div>
+</body>
+</html>`;
 }
 
 app.post('/api/email/send-verification-code', async (c) => {
