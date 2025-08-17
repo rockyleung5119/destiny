@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
+import bcrypt from 'bcryptjs';
 import { HTTPException } from 'hono/http-exception';
 import verificationTemplate from './templates/exported/verification-email-indicate-top.html';
 
@@ -444,6 +445,101 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   }
 });
 
+// 更改密码API
+app.put('/api/user/change-password', jwtMiddleware, async (c) => {
+  try {
+    console.log('🔄 Change password request received');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+    console.log('👤 User ID:', userId);
+
+    const { currentPassword, newPassword } = await c.req.json();
+    console.log('📝 Request data received, currentPassword length:', currentPassword?.length, 'newPassword length:', newPassword?.length);
+
+    // 验证输入
+    if (!currentPassword || !newPassword) {
+      console.log('❌ Missing password fields');
+      return c.json({
+        success: false,
+        message: 'Current password and new password are required'
+      }, 400);
+    }
+
+    if (newPassword.length < 6) {
+      console.log('❌ New password too short');
+      return c.json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      }, 400);
+    }
+
+    // 获取用户当前密码哈希
+    console.log('🔍 Fetching user from database...');
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (!user) {
+      console.log('❌ User not found in database');
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    console.log('✅ User found, password hash length:', user.password_hash?.length);
+    console.log('🔐 Password hash format:', user.password_hash?.substring(0, 10) + '...');
+
+    // 验证当前密码
+    console.log('🔐 Verifying current password...');
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, user.password_hash);
+    console.log('🔐 Current password valid:', isCurrentPasswordValid);
+
+    if (!isCurrentPasswordValid) {
+      console.log('❌ Current password verification failed');
+      return c.json({
+        success: false,
+        message: 'Current password is incorrect'
+      }, 400);
+    }
+
+    // 检查新密码是否与当前密码相同
+    console.log('🔐 Checking if new password is different...');
+    const isSamePassword = await verifyPassword(newPassword, user.password_hash);
+    if (isSamePassword) {
+      console.log('❌ New password is same as current password');
+      return c.json({
+        success: false,
+        message: 'New password must be different from current password'
+      }, 400);
+    }
+
+    // 加密新密码
+    console.log('🔐 Hashing new password...');
+    const newPasswordHash = await hashPassword(newPassword);
+    console.log('✅ New password hashed, length:', newPasswordHash?.length);
+
+    // 更新密码
+    console.log('💾 Updating password in database...');
+    const updateResult = await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?'
+    ).bind(newPasswordHash, new Date().toISOString(), userId).run();
+
+    console.log('💾 Update result:', updateResult);
+
+    console.log('✅ Password changed successfully');
+    return c.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('❌ Change password error:', error);
+    console.error('❌ Error stack:', error.stack);
+    return c.json({
+      success: false,
+      message: 'Failed to change password',
+      error: error.message
+    }, 500);
+  }
+});
+
 // 算命功能路由
 app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   try {
@@ -584,6 +680,157 @@ const verifyEmailHandler = async (c: any) => {
 app.post('/api/email/verify-code', verifyEmailHandler);
 app.post('/api/auth/verify-email', verifyEmailHandler);
 
+// 发送删除账号验证码
+app.post('/api/auth/send-delete-verification', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    // 获取用户邮箱
+    const user = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first();
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    // 检查是否在短时间内重复发送
+    const recentCode = await c.env.DB.prepare(`
+      SELECT created_at FROM verification_codes
+      WHERE email = ? AND type = 'DELETE_ACCOUNT' AND created_at > datetime('now', '-1 minute')
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(user.email).first();
+
+    if (recentCode) {
+      return c.json({
+        success: false,
+        message: 'Please wait 60 seconds before sending another verification code'
+      }, 429);
+    }
+
+    // 生成6位数验证码
+    const randomBuffer = new Uint32Array(1);
+    crypto.getRandomValues(randomBuffer);
+    const verificationCode = (randomBuffer[0] % 900000 + 100000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5分钟过期
+    const type = 'DELETE_ACCOUNT';
+
+    // 使之前的验证码失效
+    await c.env.DB.prepare(
+      'UPDATE verification_codes SET is_used = 1 WHERE email = ? AND type = ? AND is_used = 0'
+    ).bind(user.email, type).run();
+
+    // 保存新验证码
+    await c.env.DB.prepare(
+      'INSERT INTO verification_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)'
+    ).bind(user.email, verificationCode, type, expiresAt).run();
+
+    // 发送邮件
+    const subject = 'Account Deletion Verification Code - Destiny';
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Account Deletion Verification</h2>
+        <p>You have requested to delete your account. To confirm this action, please use the verification code below:</p>
+        <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0;">
+          <h1 style="color: #dc2626; font-size: 32px; margin: 0; letter-spacing: 5px;">${verificationCode}</h1>
+        </div>
+        <p><strong>This code will expire in 5 minutes.</strong></p>
+        <p style="color: #dc2626;"><strong>Warning:</strong> This action cannot be undone. All your data will be permanently deleted.</p>
+        <p>If you did not request this, please ignore this email and secure your account.</p>
+      </div>
+    `;
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: c.env.RESEND_FROM_NAME ? `${c.env.RESEND_FROM_NAME} <${c.env.RESEND_FROM_EMAIL}>` : c.env.RESEND_FROM_EMAIL,
+        to: [user.email],
+        subject: subject,
+        html: htmlBody,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Failed to send delete verification email:', errorData);
+      return c.json({
+        success: false,
+        message: 'Email service is temporarily unavailable, please try again later'
+      }, 500);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Verification code sent to your email'
+    });
+  } catch (error) {
+    console.error('Send delete verification code error:', error);
+    return c.json({ success: false, message: 'Failed to send verification code' }, 500);
+  }
+});
+
+// 删除账号
+app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+    const { verificationCode } = await c.req.json();
+
+    // 验证输入
+    if (!verificationCode || verificationCode.length !== 6) {
+      return c.json({
+        success: false,
+        message: 'Valid verification code is required'
+      }, 400);
+    }
+
+    // 获取用户信息
+    const user = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first();
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    // 验证验证码
+    const storedCode = await c.env.DB.prepare(
+      'SELECT id, expires_at FROM verification_codes WHERE email = ? AND type = ? AND code = ? AND is_used = 0'
+    ).bind(user.email, 'DELETE_ACCOUNT', verificationCode).first();
+
+    if (!storedCode) {
+      return c.json({
+        success: false,
+        message: 'Invalid verification code'
+      }, 400);
+    }
+
+    // 检查验证码是否过期
+    const now = new Date().toISOString();
+    if (now > storedCode.expires_at) {
+      // 标记验证码为已使用
+      await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
+      return c.json({
+        success: false,
+        message: 'Verification code has expired'
+      }, 400);
+    }
+
+    // 标记验证码为已使用
+    await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
+
+    // 删除用户相关的所有数据（由于外键约束，会级联删除）
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+
+    return c.json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    return c.json({ success: false, message: 'Failed to delete account' }, 500);
+  }
+});
+
 // 错误处理
 app.onError((err, c) => {
   console.error('Application error:', err);
@@ -595,19 +842,125 @@ app.notFound((c) => {
   return c.json({ success: false, message: 'API endpoint not found' }, 404);
 });
 
-// 辅助函数
+// 辅助函数 - 兼容bcrypt和Web Crypto API
 async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  try {
+    // 优先使用bcrypt（与现有数据兼容）
+    const saltRounds = 10;
+    return await bcrypt.hash(password, saltRounds);
+  } catch (error) {
+    console.error('bcrypt hash error, falling back to Web Crypto API:', error);
+    // 如果bcrypt失败，使用Web Crypto API作为备选
+    return await hashPasswordWithWebCrypto(password);
+  }
 }
 
 async function verifyPassword(password, hash) {
-  const hashedInput = await hashPassword(password);
-  return hashedInput === hash;
+  try {
+    // 首先尝试bcrypt验证（兼容现有用户）
+    if (hash.startsWith('$2')) {
+      // bcrypt哈希格式
+      return await bcrypt.compare(password, hash);
+    } else {
+      // Web Crypto API格式
+      return await verifyPasswordWithWebCrypto(password, hash);
+    }
+  } catch (error) {
+    console.error('Password verification error:', error);
+    // 如果bcrypt失败，尝试Web Crypto API
+    try {
+      return await verifyPasswordWithWebCrypto(password, hash);
+    } catch (webCryptoError) {
+      console.error('Web Crypto verification also failed:', webCryptoError);
+      return false;
+    }
+  }
+}
+
+// Web Crypto API备选实现
+async function hashPasswordWithWebCrypto(password) {
+  // 生成随机盐
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  // 将密码转换为ArrayBuffer
+  const passwordBuffer = new TextEncoder().encode(password);
+
+  // 使用PBKDF2进行哈希
+  const key = await crypto.subtle.importKey(
+    'raw',
+    passwordBuffer,
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    key,
+    256
+  );
+
+  // 将盐和哈希组合并转换为base64
+  const combined = new Uint8Array(salt.length + hashBuffer.byteLength);
+  combined.set(salt);
+  combined.set(new Uint8Array(hashBuffer), salt.length);
+
+  return 'webcrypto:' + btoa(String.fromCharCode(...combined));
+}
+
+async function verifyPasswordWithWebCrypto(password, hash) {
+  // 移除前缀
+  const cleanHash = hash.replace('webcrypto:', '');
+
+  // 从base64解码
+  const combined = new Uint8Array(atob(cleanHash).split('').map(c => c.charCodeAt(0)));
+
+  // 提取盐和哈希
+  const salt = combined.slice(0, 16);
+  const storedHash = combined.slice(16);
+
+  // 将密码转换为ArrayBuffer
+  const passwordBuffer = new TextEncoder().encode(password);
+
+  // 使用相同的盐进行哈希
+  const key = await crypto.subtle.importKey(
+    'raw',
+    passwordBuffer,
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    key,
+    256
+  );
+
+  const newHash = new Uint8Array(hashBuffer);
+
+  // 比较哈希
+  if (newHash.length !== storedHash.length) {
+    return false;
+  }
+
+  for (let i = 0; i < newHash.length; i++) {
+    if (newHash[i] !== storedHash[i]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 async function generateJWT(userId, secret) {
