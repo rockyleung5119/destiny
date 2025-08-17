@@ -187,7 +187,7 @@ export const ERROR_MESSAGES = {
 
 // 默认配置
 export const DEFAULT_CONFIG = {
-  timezone: 'UTC',
+  timezone: 'UTC+8',
   language: 'en',
   currency: 'USD',
   dateFormat: 'YYYY-MM-DD',

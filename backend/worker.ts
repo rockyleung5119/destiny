@@ -521,11 +521,29 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
     const userId = payload.userId;
     const profileData = await c.req.json();
 
+    console.log('🔄 Profile update request:', { userId, profileData });
+
+    // 检查用户是否已经更新过资料
+    const currentUser = await c.env.DB.prepare(
+      'SELECT profile_updated_count FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (!currentUser) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    if (currentUser.profile_updated_count >= 1) {
+      return c.json({
+        success: false,
+        message: 'Profile can only be updated once for fortune telling accuracy'
+      }, 403);
+    }
+
     const fieldsToUpdate = [
-      'name', 'gender', 'birth_year', 'birth_month', 'birth_day', 
-      'birth_hour', 'birth_place', 'timezone'
+      'name', 'gender', 'birth_year', 'birth_month', 'birth_day',
+      'birth_hour', 'birth_minute', 'birth_place', 'timezone'
     ];
-    
+
     const setClauses = [];
     const bindings = [];
 
@@ -540,15 +558,46 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'No fields to update' }, 400);
     }
 
+    // 添加 updated_at 和 profile_updated_count
     setClauses.push('updated_at = ?');
+    setClauses.push('profile_updated_count = profile_updated_count + 1');
     bindings.push(new Date().toISOString());
     bindings.push(userId);
 
     const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
-    
+
+    console.log('🔍 Update query:', query);
+    console.log('🔍 Bindings:', bindings);
+
     await c.env.DB.prepare(query).bind(...bindings).run();
 
-    return c.json({ success: true, message: 'Profile updated successfully.' });
+    // 获取更新后的用户信息
+    const updatedUser = await c.env.DB.prepare(
+      'SELECT id, email, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place, timezone, is_email_verified, profile_updated_count, updated_at FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    console.log('✅ Profile updated successfully:', updatedUser);
+
+    return c.json({
+      success: true,
+      message: 'Profile updated successfully.',
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        gender: updatedUser.gender,
+        birthYear: updatedUser.birth_year,
+        birthMonth: updatedUser.birth_month,
+        birthDay: updatedUser.birth_day,
+        birthHour: updatedUser.birth_hour,
+        birthMinute: updatedUser.birth_minute,
+        birthPlace: updatedUser.birth_place,
+        timezone: updatedUser.timezone,
+        isEmailVerified: updatedUser.is_email_verified,
+        profileUpdatedCount: updatedUser.profile_updated_count,
+        updatedAt: updatedUser.updated_at
+      }
+    });
 
   } catch (error) {
     console.error('Update profile error:', error);

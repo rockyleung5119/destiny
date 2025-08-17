@@ -95,7 +95,7 @@ router.post('/register', registerRateLimit, asyncHandler(async (req, res) => {
     birthHour,
     birthMinute,
     birthPlace,
-    timezone: timezone || 'Asia/Shanghai', // 使用用户选择的时区，如果没有则使用默认时区
+    timezone: timezone || 'UTC+8', // 使用用户选择的时区，如果没有则使用默认时区
     isEmailVerified: false
   };
 
