@@ -852,13 +852,15 @@ app.post('/api/email/send-verification-code', async (c) => {
       return c.json({ success: false, message: 'Invalid email format' }, 400);
     }
 
-    console.log('🔍 Checking if email is already verified...');
+    console.log('🔍 Checking email verification status...');
     const user = await c.env.DB.prepare('SELECT is_email_verified FROM users WHERE email = ?').bind(email).first();
     console.log('🔍 User query result:', user);
 
+    // 如果邮箱已验证，给出提示但仍允许重新发送验证码
+    let isAlreadyVerified = false;
     if (user && user.is_email_verified) {
-      console.log('❌ Email is already verified');
-      return c.json({ success: false, message: 'Email is already verified' }, 400);
+      console.log('⚠️ Email is already verified, but allowing re-verification');
+      isAlreadyVerified = true;
     }
 
     // 检查是否在短时间内重复发送
@@ -905,7 +907,13 @@ app.post('/api/email/send-verification-code', async (c) => {
     await sendVerificationEmail(email, verificationCode, c.env);
 
     console.log('✅ Verification code sent successfully');
-    return c.json({ success: true, message: 'Verification code sent successfully.' });
+
+    // 根据邮箱验证状态返回不同的消息
+    const message = isAlreadyVerified
+      ? 'Verification code sent successfully. Note: This email is already verified, but you can verify again if needed.'
+      : 'Verification code sent successfully.';
+
+    return c.json({ success: true, message });
   } catch (error) {
     console.error('❌ Send verification email error:', error);
     console.error('❌ Error stack:', error.stack);
