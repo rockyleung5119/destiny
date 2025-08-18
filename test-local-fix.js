@@ -48,34 +48,43 @@ async function testLocalFix() {
     const taskId = baziData.data.taskId;
     console.log(`✅ Task created: ${taskId}`);
     
-    // 步骤3: 检查任务状态（只检查几次）
-    console.log('\n🔄 Step 3: Monitor task status...');
-    for (let i = 0; i < 5; i++) {
-      console.log(`📊 Check ${i + 1}/5...`);
-      
+    // 步骤3: 检查任务状态（增加检查次数，等待AI完成）
+    console.log('\n🔄 Step 3: Monitor task status (up to 5 minutes)...');
+    const maxChecks = 50; // 50次检查 x 6秒 = 5分钟
+    let completed = false;
+
+    for (let i = 0; i < maxChecks; i++) {
+      console.log(`📊 Check ${i + 1}/${maxChecks} (${(i * 6)}s elapsed)...`);
+
       const statusResponse = await fetch(`${API_BASE_URL}/api/fortune/task/${taskId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       const statusData = await statusResponse.json();
       console.log(`📈 Status: ${statusData.data.status}`);
-      
+
       if (statusData.data.status === 'completed') {
         console.log('🎉 Task completed successfully!');
-        console.log('📝 Result preview:', statusData.data.analysis?.substring(0, 100) + '...');
+        console.log('📝 Result preview:', statusData.data.analysis?.substring(0, 200) + '...');
+        completed = true;
         break;
       } else if (statusData.data.status === 'failed') {
         console.log('❌ Task failed:', statusData.data.error);
+        completed = true;
         break;
       }
-      
-      if (i < 4) {
-        console.log('⏳ Waiting 10 seconds...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+
+      if (i < maxChecks - 1) {
+        console.log('⏳ Waiting 6 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 6000));
       }
+    }
+
+    if (!completed) {
+      console.log('⏰ Task still processing after 5 minutes - this may indicate an issue');
     }
     
     console.log('\n✅ Test completed - async task system is working!');

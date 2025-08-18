@@ -195,11 +195,15 @@ export const fortuneAPI = {
 
   // 轮询任务状态直到完成
   async pollTaskUntilComplete(taskId: string): Promise<FortuneResponse> {
-    const maxAttempts = 60; // 最多轮询5分钟 (60次 * 5秒)
+    const maxAttempts = 50; // 最多轮询5分钟 (50次 * 6秒)
     let attempts = 0;
+
+    console.log(`🔄 Starting task polling for ${taskId}, max attempts: ${maxAttempts}`);
 
     while (attempts < maxAttempts) {
       try {
+        console.log(`📊 Polling attempt ${attempts + 1}/${maxAttempts} (${attempts * 6}s elapsed)`);
+
         const statusResponse = await apiRequest<{
           success: boolean;
           data: {
@@ -219,9 +223,11 @@ export const fortuneAPI = {
         }
 
         const { status, analysis, error, type } = statusResponse.data;
+        console.log(`📈 Task status: ${status}`);
 
         if (status === 'completed' && analysis) {
           // 任务完成，返回结果
+          console.log(`✅ Task ${taskId} completed successfully`);
           return {
             success: true,
             message: statusResponse.message,
@@ -233,11 +239,15 @@ export const fortuneAPI = {
           };
         } else if (status === 'failed') {
           // 任务失败
+          console.log(`❌ Task ${taskId} failed: ${error}`);
           throw new Error(error || 'Analysis failed');
         }
 
-        // 任务仍在进行中，等待5秒后重试
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // 任务仍在进行中，等待6秒后重试
+        if (attempts < maxAttempts - 1) {
+          console.log(`⏳ Task still ${status}, waiting 6 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 6000));
+        }
         attempts++;
 
       } catch (error) {
@@ -245,13 +255,15 @@ export const fortuneAPI = {
         if (attempts >= maxAttempts - 1) {
           throw error;
         }
-        // 等待5秒后重试
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // 等待6秒后重试
+        console.log(`⚠️ Error occurred, retrying in 6 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 6000));
         attempts++;
       }
     }
 
     // 超时
+    console.log(`⏰ Task ${taskId} timeout after ${maxAttempts} attempts (5 minutes)`);
     throw new Error('Analysis timeout. Please try again later.');
   },
 
