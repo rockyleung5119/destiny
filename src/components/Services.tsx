@@ -95,7 +95,7 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
 
     try {
       let response;
-      const language = 'zh'; // 可以从语言上下文获取
+      const language = localStorage.getItem('language') || 'en'; // 从localStorage获取用户选择的语言
 
       switch (serviceId) {
         case 'bazi':

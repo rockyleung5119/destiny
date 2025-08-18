@@ -9,17 +9,17 @@ interface UserProfile {
   name: string;
   email: string;
   gender?: string;
-  birthYear?: number;
-  birthMonth?: number;
-  birthDay?: number;
-  birthHour?: number;
-  birthMinute?: number;
-  birthPlace?: string;
+  birth_year?: number;
+  birth_month?: number;
+  birth_day?: number;
+  birth_hour?: number;
+  birth_minute?: number;
+  birth_place?: string;
   timezone?: string;
-  isEmailVerified: boolean;
-  profileUpdatedCount: number;
-  createdAt: string;
-  updatedAt?: string;
+  is_email_verified: boolean;
+  profile_updated_count: number;
+  created_at: string;
+  updated_at?: string;
   membership?: {
     planId: string;
     isActive: boolean;
@@ -53,12 +53,12 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
   const [profileForm, setProfileForm] = useState({
     name: '',
     gender: '',
-    birthYear: '',
-    birthMonth: '',
-    birthDay: '',
-    birthHour: '',
-    birthMinute: '',
-    birthPlace: '',
+    birth_year: '',
+    birth_month: '',
+    birth_day: '',
+    birth_hour: '',
+    birth_minute: '',
+    birth_place: '',
     timezone: ''
   });
 
@@ -109,12 +109,12 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
         setProfileForm({
           name: user.name || '',
           gender: user.gender || '',
-          birthYear: user.birthYear?.toString() || '',
-          birthMonth: user.birthMonth?.toString() || '',
-          birthDay: user.birthDay?.toString() || '',
-          birthHour: user.birthHour?.toString() || '',
-          birthMinute: user.birthMinute?.toString() || '',
-          birthPlace: user.birthPlace || '',
+          birth_year: user.birth_year?.toString() || '',
+          birth_month: user.birth_month?.toString() || '',
+          birth_day: user.birth_day?.toString() || '',
+          birth_hour: user.birth_hour?.toString() || '',
+          birth_minute: user.birth_minute?.toString() || '',
+          birth_place: user.birth_place || '',
           timezone: user.timezone || 'UTC+8'
         });
 
@@ -163,12 +163,12 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
       const updateData = {
         name: profileForm.name,
         gender: profileForm.gender,
-        birthYear: profileForm.birthYear ? parseInt(profileForm.birthYear) : undefined,
-        birthMonth: profileForm.birthMonth ? parseInt(profileForm.birthMonth) : undefined,
-        birthDay: profileForm.birthDay ? parseInt(profileForm.birthDay) : undefined,
-        birthHour: profileForm.birthHour ? parseInt(profileForm.birthHour) : undefined,
-        birthMinute: profileForm.birthMinute ? parseInt(profileForm.birthMinute) : undefined,
-        birthPlace: profileForm.birthPlace,
+        birth_year: profileForm.birth_year ? parseInt(profileForm.birth_year) : undefined,
+        birth_month: profileForm.birth_month ? parseInt(profileForm.birth_month) : undefined,
+        birth_day: profileForm.birth_day ? parseInt(profileForm.birth_day) : undefined,
+        birth_hour: profileForm.birth_hour ? parseInt(profileForm.birth_hour) : undefined,
+        birth_minute: profileForm.birth_minute ? parseInt(profileForm.birth_minute) : undefined,
+        birth_place: profileForm.birth_place,
         timezone: profileForm.timezone
       };
 
@@ -523,9 +523,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     <input
                       type="number"
                       placeholder={t('year')}
-                      value={profileForm.birthYear}
-                      onChange={(e) => setProfileForm({...profileForm, birthYear: e.target.value})}
-                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      value={profileForm.birth_year}
+                      onChange={(e) => setProfileForm({...profileForm, birth_year: e.target.value})}
+                      disabled={userProfile?.profile_updated_count >= 1}
                       min="1900"
                       max={new Date().getFullYear()}
                       className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
@@ -533,9 +533,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     <input
                       type="number"
                       placeholder={t('month')}
-                      value={profileForm.birthMonth}
-                      onChange={(e) => setProfileForm({...profileForm, birthMonth: e.target.value})}
-                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      value={profileForm.birth_month}
+                      onChange={(e) => setProfileForm({...profileForm, birth_month: e.target.value})}
+                      disabled={userProfile?.profile_updated_count >= 1}
                       min="1"
                       max="12"
                       className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
@@ -543,9 +543,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     <input
                       type="number"
                       placeholder={t('day')}
-                      value={profileForm.birthDay}
-                      onChange={(e) => setProfileForm({...profileForm, birthDay: e.target.value})}
-                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      value={profileForm.birth_day}
+                      onChange={(e) => setProfileForm({...profileForm, birth_day: e.target.value})}
+                      disabled={userProfile?.profile_updated_count >= 1}
                       min="1"
                       max="31"
                       className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
@@ -553,9 +553,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     <input
                       type="number"
                       placeholder={t('hourFormat')}
-                      value={profileForm.birthHour}
-                      onChange={(e) => setProfileForm({...profileForm, birthHour: e.target.value})}
-                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      value={profileForm.birth_hour}
+                      onChange={(e) => setProfileForm({...profileForm, birth_hour: e.target.value})}
+                      disabled={userProfile?.profile_updated_count >= 1}
                       min="0"
                       max="23"
                       className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
@@ -563,9 +563,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     <input
                       type="number"
                       placeholder={t('minute')}
-                      value={profileForm.birthMinute}
-                      onChange={(e) => setProfileForm({...profileForm, birthMinute: e.target.value})}
-                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      value={profileForm.birth_minute}
+                      onChange={(e) => setProfileForm({...profileForm, birth_minute: e.target.value})}
+                      disabled={userProfile?.profile_updated_count >= 1}
                       min="0"
                       max="59"
                       className="px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
@@ -581,9 +581,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   </label>
                   <input
                     type="text"
-                    value={profileForm.birthPlace}
-                    onChange={(e) => setProfileForm({...profileForm, birthPlace: e.target.value})}
-                    disabled={userProfile?.profileUpdatedCount >= 1}
+                    value={profileForm.birth_place}
+                    onChange={(e) => setProfileForm({...profileForm, birth_place: e.target.value})}
+                    disabled={userProfile?.profile_updated_count >= 1}
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     placeholder={t('cityCountry')}
                   />

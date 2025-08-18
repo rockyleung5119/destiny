@@ -28,23 +28,23 @@ export interface User {
   name: string;
   email: string;
   gender?: string;
-  birthYear?: number;
-  birthMonth?: number;
-  birthDay?: number;
-  birthHour?: number;
-  birthMinute?: number;
-  birthPlace?: string;
+  birth_year?: number;
+  birth_month?: number;
+  birth_day?: number;
+  birth_hour?: number;
+  birth_minute?: number;
+  birth_place?: string;
   timezone?: string;
-  isEmailVerified?: boolean;
-  profileUpdatedCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
+  is_email_verified?: boolean;
+  profile_updated_count?: number;
+  created_at?: string;
+  updated_at?: string;
   membership?: {
-    planId: string;
-    isActive: boolean;
-    expiresAt: string;
-    remainingCredits?: number;
-    createdAt: string;
+    plan_id: string;
+    is_active: boolean;
+    expires_at: string;
+    remaining_credits?: number;
+    created_at: string;
   } | null;
 }
 

@@ -293,12 +293,12 @@ app.post('/api/auth/register', async (c) => {
       password,
       name,
       gender,
-      birthYear,
-      birthMonth,
-      birthDay,
-      birthHour,
-      birthMinute,
-      birthPlace,
+      birth_year,
+      birth_month,
+      birth_day,
+      birth_hour,
+      birth_minute,
+      birth_place,
       timezone
     } = requestBody;
 
@@ -339,12 +339,12 @@ app.post('/api/auth/register', async (c) => {
       hashedPassword,
       name,
       gender || null,
-      birthYear || null,
-      birthMonth || null,
-      birthDay || null,
-      birthHour || null,
-      birthMinute || null,
-      birthPlace || null,
+      birth_year || null,
+      birth_month || null,
+      birth_day || null,
+      birth_hour || null,
+      birth_minute || null,
+      birth_place || null,
       timezone || 'Asia/Shanghai',
       currentTime,
       currentTime
@@ -365,12 +365,12 @@ app.post('/api/auth/register', async (c) => {
         email,
         name,
         gender,
-        birthYear,
-        birthMonth,
-        birthDay,
-        birthHour,
-        birthMinute,
-        birthPlace,
+        birth_year,
+        birth_month,
+        birth_day,
+        birth_hour,
+        birth_minute,
+        birth_place,
         timezone: timezone || 'Asia/Shanghai'
       }
     });
@@ -594,27 +594,20 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
       }, 403);
     }
 
-    // 字段映射：前端驼峰格式 -> 数据库下划线格式
-    const fieldMapping = {
-      'name': 'name',
-      'gender': 'gender',
-      'birthYear': 'birth_year',
-      'birthMonth': 'birth_month',
-      'birthDay': 'birth_day',
-      'birthHour': 'birth_hour',
-      'birthMinute': 'birth_minute',
-      'birthPlace': 'birth_place',
-      'timezone': 'timezone'
-    };
+    // 直接使用数据库字段名（前后端已统一使用下划线命名）
+    const allowedFields = [
+      'name', 'gender', 'birth_year', 'birth_month', 'birth_day',
+      'birth_hour', 'birth_minute', 'birth_place', 'timezone'
+    ];
 
     const setClauses = [];
     const bindings = [];
 
-    // 遍历前端发送的字段，转换为数据库字段名
-    for (const [frontendField, dbField] of Object.entries(fieldMapping)) {
-      if (profileData[frontendField] !== undefined) {
-        setClauses.push(`${dbField} = ?`);
-        bindings.push(profileData[frontendField]);
+    // 直接使用数据库字段名
+    for (const field of allowedFields) {
+      if (profileData[field] !== undefined) {
+        setClauses.push(`${field} = ?`);
+        bindings.push(profileData[field]);
       }
     }
 
@@ -1097,10 +1090,29 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     });
   } catch (error) {
     console.error('❌ BaZi analysis error:', error);
+    console.error('❌ Error stack:', error.stack);
+
+    // 提供更详细的错误信息
+    let errorMessage = 'BaZi analysis failed';
+    if (error.message.includes('AI analysis returned empty')) {
+      errorMessage = 'AI service returned empty response. Please try again.';
+    } else if (error.message.includes('API request failed')) {
+      errorMessage = 'AI service is temporarily unavailable. Please try again later.';
+    } else if (error.message.includes('User not found')) {
+      errorMessage = 'User authentication failed. Please login again.';
+    } else if (error.message.includes('Missing required birth information')) {
+      errorMessage = 'Please complete your birth information in profile settings first.';
+    }
+
     return c.json({
       success: false,
-      message: 'Fortune reading failed',
-      error: error.message
+      message: errorMessage,
+      error: error.message,
+      debug: {
+        timestamp: new Date().toISOString(),
+        service: 'bazi',
+        userId: c.get('jwtPayload')?.userId
+      }
     }, 500);
   }
 });
@@ -1215,10 +1227,29 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     });
   } catch (error) {
     console.error('❌ Tarot reading error:', error);
+    console.error('❌ Error stack:', error.stack);
+
+    // 提供更详细的错误信息
+    let errorMessage = 'Tarot reading failed';
+    if (error.message.includes('AI analysis returned empty')) {
+      errorMessage = 'AI service returned empty response. Please try again.';
+    } else if (error.message.includes('API request failed')) {
+      errorMessage = 'AI service is temporarily unavailable. Please try again later.';
+    } else if (error.message.includes('User not found')) {
+      errorMessage = 'User authentication failed. Please login again.';
+    } else if (error.message.includes('Missing required birth information')) {
+      errorMessage = 'Please complete your birth information in profile settings first.';
+    }
+
     return c.json({
       success: false,
-      message: 'Fortune reading failed',
-      error: error.message
+      message: errorMessage,
+      error: error.message,
+      debug: {
+        timestamp: new Date().toISOString(),
+        service: 'tarot',
+        userId: c.get('jwtPayload')?.userId
+      }
     }, 500);
   }
 });
@@ -2011,19 +2042,19 @@ class CloudflareDeepSeekService {
       'fr': '法语',
       'ja': '日语'
     };
-    return languageNames[language] || 'English';
+    return languageNames[language] || '英语';
   }
 
   // 构建用户档案
   buildUserProfile(user, userTimezone = null, language = 'zh') {
     const name = user.name;
     const gender = user.gender;
-    const birthYear = user.birth_year || user.birthYear;
-    const birthMonth = user.birth_month || user.birthMonth;
-    const birthDay = user.birth_day || user.birthDay;
-    const birthHour = user.birth_hour || user.birthHour;
-    const birthMinute = user.birth_minute || user.birthMinute || 0;
-    const birthPlace = user.birth_place || user.birthPlace;
+    const birthYear = user.birth_year;
+    const birthMonth = user.birth_month;
+    const birthDay = user.birth_day;
+    const birthHour = user.birth_hour;
+    const birthMinute = user.birth_minute || 0;
+    const birthPlace = user.birth_place;
 
     const timezone = userTimezone || user.timezone || 'Asia/Shanghai';
 
@@ -2261,7 +2292,15 @@ ${userProfile}
 - 需要注意的人生阶段
 - 如何趋吉避凶
 
-要求：使用传统八字术语，分析要专业准确，建议要实用可行。请务必用${targetLanguage}回复，不要使用其他语言。`;
+要求：使用传统八字术语，分析要专业准确，建议要实用可行。
+
+**重要：请严格按照以下语言要求回复：**
+- 必须使用${targetLanguage}进行回复
+- 禁止使用中文以外的任何语言（当目标语言不是中文时）
+- 禁止混合使用多种语言
+- 整个回复内容必须完全使用${targetLanguage}
+
+请确保你的回复完全符合${targetLanguage}的语言要求。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
@@ -2314,7 +2353,15 @@ ${userProfile}
 ## 🌟 开运建议
 具体的开运方法和建议。
 
-要求：分析要结合传统命理学原理，给出实用的生活指导。请务必用${targetLanguage}回复，不要使用其他语言。`;
+要求：分析要结合传统命理学原理，给出实用的生活指导。
+
+**重要：请严格按照以下语言要求回复：**
+- 必须使用${targetLanguage}进行回复
+- 禁止使用中文以外的任何语言（当目标语言不是中文时）
+- 禁止混合使用多种语言
+- 整个回复内容必须完全使用${targetLanguage}
+
+请确保你的回复完全符合${targetLanguage}的语言要求。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
@@ -2369,14 +2416,22 @@ ${userProfile}
 ## ⚠️ 注意事项
 需要特别注意的事项和警示。
 
-要求：占卜要有神秘感和专业性，结合东西方智慧。请务必用${targetLanguage}回复，不要使用其他语言。`;
+要求：占卜要有神秘感和专业性，结合东西方智慧。
+
+**重要：请严格按照以下语言要求回复：**
+- 必须使用${targetLanguage}进行回复
+- 禁止使用中文以外的任何语言（当目标语言不是中文时）
+- 禁止混合使用多种语言
+- 整个回复内容必须完全使用${targetLanguage}
+
+请确保你的回复完全符合${targetLanguage}的语言要求。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
       { role: 'user', content: userMessage }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default', 6000);
   }
 
   // 幸运物品（专业版）
@@ -2425,7 +2480,15 @@ ${userProfile}
 ## 🌟 生活建议
 在日常生活中如何运用这些幸运元素。
 
-要求：建议要实用可行，基于传统五行理论。请务必用${targetLanguage}回复，不要使用其他语言。`;
+要求：建议要实用可行，基于传统五行理论。
+
+**重要：请严格按照以下语言要求回复：**
+- 必须使用${targetLanguage}进行回复
+- 禁止使用中文以外的任何语言（当目标语言不是中文时）
+- 禁止混合使用多种语言
+- 整个回复内容必须完全使用${targetLanguage}
+
+请确保你的回复完全符合${targetLanguage}的语言要求。`;
 
     const messages = [
       { role: 'system', content: systemMessage },

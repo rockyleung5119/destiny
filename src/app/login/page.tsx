@@ -18,10 +18,10 @@ export default function LoginPage() {
     confirmPassword: '',
     name: '',
     gender: '',
-    birthYear: '',
-    birthMonth: '',
-    birthDay: '',
-    birthHour: '',
+    birth_year: '',
+    birth_month: '',
+    birth_day: '',
+    birth_hour: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,8 +200,8 @@ export default function LoginPage() {
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <select
-                    name="birthYear"
-                    value={formData.birthYear}
+                    name="birth_year"
+                    value={formData.birth_year}
                     onChange={handleChange}
                     required={!isLogin}
                     className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors text-sm"
@@ -213,8 +213,8 @@ export default function LoginPage() {
                   </select>
                   
                   <select
-                    name="birthMonth"
-                    value={formData.birthMonth}
+                    name="birth_month"
+                    value={formData.birth_month}
                     onChange={handleChange}
                     required={!isLogin}
                     className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors text-sm"
@@ -226,8 +226,8 @@ export default function LoginPage() {
                   </select>
                   
                   <select
-                    name="birthDay"
-                    value={formData.birthDay}
+                    name="birth_day"
+                    value={formData.birth_day}
                     onChange={handleChange}
                     required={!isLogin}
                     className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors text-sm"
@@ -239,8 +239,8 @@ export default function LoginPage() {
                   </select>
                   
                   <select
-                    name="birthHour"
-                    value={formData.birthHour}
+                    name="birth_hour"
+                    value={formData.birth_hour}
                     onChange={handleChange}
                     required={!isLogin}
                     className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-colors text-sm"
