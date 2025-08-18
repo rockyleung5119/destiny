@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { Mail, ArrowLeft, Lock, Eye, EyeOff, CheckCircle, Star, Moon, Sun } from 'lucide-react';
-import { sendVerificationCode, verifyCode } from '../services/emailVerification';
 import { authAPI } from '../services/api';
 
 interface ForgotPasswordProps {
@@ -51,17 +50,19 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSuccess }) =>
     setMessage('');
 
     try {
-      const result = await sendVerificationCode(email, currentLanguage);
-      if (result.success) {
+      // 调用忘记密码API发送重置验证码
+      const response = await authAPI.forgotPassword({ email });
+      if (response.success) {
         setStep('verify');
-        setMessage(result.message);
+        setMessage(response.message || t('verificationCodeSent'));
         setMessageType('success');
         setCountdown(60);
       } else {
-        setMessage(result.message);
+        setMessage(response.message || t('sendCodeFailed'));
         setMessageType('error');
       }
     } catch (error) {
+      console.error('Send reset code error:', error);
       setMessage(t('sendCodeFailed'));
       setMessageType('error');
     } finally {

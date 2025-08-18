@@ -222,6 +222,14 @@ export const authAPI = {
     });
   },
 
+  // 忘记密码 - 发送重置验证码
+  async forgotPassword(data: { email: string }): Promise<ApiResponse> {
+    return await apiRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // 重置密码
   async resetPassword(data: ResetPasswordData): Promise<ApiResponse> {
     return await apiRequest('/auth/reset-password', {
