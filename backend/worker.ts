@@ -108,6 +108,29 @@ app.get('/api/health', async (c) => {
   });
 });
 
+// AI服务状态检查
+app.get('/api/ai-status', async (c) => {
+  try {
+    const deepSeekService = new CloudflareDeepSeekService(c.env);
+    const isHealthy = await deepSeekService.checkAPIHealth();
+
+    return c.json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      service: 'DeepSeek API',
+      timestamp: new Date().toISOString(),
+      endpoint: deepSeekService.baseURL,
+      model: deepSeekService.model
+    });
+  } catch (error) {
+    return c.json({
+      status: 'error',
+      service: 'DeepSeek API',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
+});
+
 // 环境变量检查端点（仅用于调试）
 app.get('/api/debug/env-check', (c) => {
   const envCheck = {
@@ -428,15 +451,15 @@ app.post('/api/auth/login', async (c) => {
         email: user.email,
         name: user.name,
         gender: user.gender,
-        birthYear: user.birth_year,
-        birthMonth: user.birth_month,
-        birthDay: user.birth_day,
-        birthHour: user.birth_hour,
-        birthMinute: user.birth_minute,
-        birthPlace: user.birth_place,
+        birth_year: user.birth_year,
+        birth_month: user.birth_month,
+        birth_day: user.birth_day,
+        birth_hour: user.birth_hour,
+        birth_minute: user.birth_minute,
+        birth_place: user.birth_place,
         timezone: user.timezone,
-        isEmailVerified: user.is_email_verified,
-        profileUpdatedCount: user.profile_updated_count
+        is_email_verified: user.is_email_verified,
+        profile_updated_count: user.profile_updated_count
       }
     });
   } catch (error) {
@@ -464,17 +487,17 @@ app.post('/api/auth/verify', jwtMiddleware, async (c) => {
       name: user.name,
       email: user.email,
       gender: user.gender,
-      birthYear: user.birth_year,
-      birthMonth: user.birth_month,
-      birthDay: user.birth_day,
-      birthHour: user.birth_hour,
-      birthMinute: user.birth_minute,
-      birthPlace: user.birth_place,
+      birth_year: user.birth_year,
+      birth_month: user.birth_month,
+      birth_day: user.birth_day,
+      birth_hour: user.birth_hour,
+      birth_minute: user.birth_minute,
+      birth_place: user.birth_place,
       timezone: user.timezone,
-      isEmailVerified: user.is_email_verified,
-      profileUpdatedCount: user.profile_updated_count,
-      createdAt: user.created_at,
-      updatedAt: user.updated_at
+      is_email_verified: user.is_email_verified,
+      profile_updated_count: user.profile_updated_count,
+      created_at: user.created_at,
+      updated_at: user.updated_at
     };
 
     return c.json({
@@ -534,23 +557,23 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
       name: user.name,
       email: user.email,
       gender: user.gender,
-      birthYear: user.birth_year,
-      birthMonth: user.birth_month,
-      birthDay: user.birth_day,
-      birthHour: user.birth_hour,
-      birthMinute: user.birth_minute,
-      birthPlace: user.birth_place,
+      birth_year: user.birth_year,
+      birth_month: user.birth_month,
+      birth_day: user.birth_day,
+      birth_hour: user.birth_hour,
+      birth_minute: user.birth_minute,
+      birth_place: user.birth_place,
       timezone: user.timezone,
-      isEmailVerified: user.is_email_verified,
-      profileUpdatedCount: user.profile_updated_count,
-      createdAt: user.created_at,
-      updatedAt: user.updated_at,
+      is_email_verified: user.is_email_verified,
+      profile_updated_count: user.profile_updated_count,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
       membership: membership ? {
-        planId: membership.plan_id,
-        isActive: membership.is_active,
-        expiresAt: membership.expires_at,
-        remainingCredits: membership.remaining_credits,
-        createdAt: membership.created_at
+        plan_id: membership.plan_id,
+        is_active: membership.is_active,
+        expires_at: membership.expires_at,
+        remaining_credits: membership.remaining_credits,
+        created_at: membership.created_at
       } : null
     };
 
@@ -643,16 +666,16 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
         name: updatedUser.name,
         email: updatedUser.email,
         gender: updatedUser.gender,
-        birthYear: updatedUser.birth_year,
-        birthMonth: updatedUser.birth_month,
-        birthDay: updatedUser.birth_day,
-        birthHour: updatedUser.birth_hour,
-        birthMinute: updatedUser.birth_minute,
-        birthPlace: updatedUser.birth_place,
+        birth_year: updatedUser.birth_year,
+        birth_month: updatedUser.birth_month,
+        birth_day: updatedUser.birth_day,
+        birth_hour: updatedUser.birth_hour,
+        birth_minute: updatedUser.birth_minute,
+        birth_place: updatedUser.birth_place,
         timezone: updatedUser.timezone,
-        isEmailVerified: updatedUser.is_email_verified,
-        profileUpdatedCount: updatedUser.profile_updated_count,
-        updatedAt: updatedUser.updated_at
+        is_email_verified: updatedUser.is_email_verified,
+        profile_updated_count: updatedUser.profile_updated_count,
+        updated_at: updatedUser.updated_at
       }
     });
 
@@ -2154,12 +2177,13 @@ Current Time: ${currentTime}
 
   // 调用DeepSeek API（带重试机制）
   async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000) {
-    const maxRetries = 1;
+    const maxRetries = 1; // 只重试一次，但增加超时时间
 
     try {
       console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}`);
       console.log(`🌐 API URL: ${this.baseURL}`);
       console.log(`🤖 Model: ${this.model}`);
+      console.log(`⏱️ Timeout: 300 seconds`);
 
       const requestData = {
         model: this.model,
@@ -2169,19 +2193,34 @@ Current Time: ${currentTime}
         stream: false
       };
 
+      // 创建带超时的fetch请求（300秒）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 300秒超时
+
       const response = await fetch(this.baseURL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`❌ API Error ${response.status}:`, errorText);
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        console.error(`❌ Request details:`, {
+          url: this.baseURL,
+          model: this.model,
+          messageCount: messages.length,
+          temperature,
+          maxTokens,
+          retryCount
+        });
+        throw new Error(`API request failed: ${response.status}`);
       }
 
       const data = await response.json();
@@ -2206,9 +2245,18 @@ Current Time: ${currentTime}
     } catch (error) {
       console.error(`❌ API call failed (attempt ${retryCount + 1}):`, error);
 
+      // 检查是否是超时错误
+      if (error.name === 'AbortError') {
+        console.error('❌ Request timeout after 300 seconds');
+      } else if (error.message.includes('524') || error.message.includes('timeout')) {
+        console.error('❌ API timeout detected, service may be overloaded');
+      }
+
       if (retryCount < maxRetries) {
-        console.log(`🔄 Retrying in 2 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 重试前等待10秒，给AI服务恢复时间
+        const delay = 10000; // 10秒
+        console.log(`🔄 Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens);
       }
 
@@ -2225,6 +2273,42 @@ Current Time: ${currentTime}
       'en': 'Sorry, AI service is temporarily unavailable. Please try again later.'
     };
     return errorMessages[language] || errorMessages['zh'];
+  }
+
+  // 检查API健康状态
+  async checkAPIHealth() {
+    try {
+      const testMessages = [
+        { role: 'system', content: '你是一个测试助手。' },
+        { role: 'user', content: '请回复"健康"' }
+      ];
+
+      // 健康检查使用较短的超时时间（30秒）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(this.baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: testMessages,
+          temperature: 0.1,
+          max_tokens: 10,
+          stream: false
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.error('❌ API health check failed:', error);
+      return false;
+    }
   }
 
   // 八字精算（专业版）
@@ -2296,7 +2380,6 @@ ${userProfile}
 
 **重要：请严格按照以下语言要求回复：**
 - 必须使用${targetLanguage}进行回复
-- 禁止使用中文以外的任何语言（当目标语言不是中文时）
 - 禁止混合使用多种语言
 - 整个回复内容必须完全使用${targetLanguage}
 
@@ -2357,7 +2440,6 @@ ${userProfile}
 
 **重要：请严格按照以下语言要求回复：**
 - 必须使用${targetLanguage}进行回复
-- 禁止使用中文以外的任何语言（当目标语言不是中文时）
 - 禁止混合使用多种语言
 - 整个回复内容必须完全使用${targetLanguage}
 
@@ -2420,7 +2502,6 @@ ${userProfile}
 
 **重要：请严格按照以下语言要求回复：**
 - 必须使用${targetLanguage}进行回复
-- 禁止使用中文以外的任何语言（当目标语言不是中文时）
 - 禁止混合使用多种语言
 - 整个回复内容必须完全使用${targetLanguage}
 
@@ -2484,7 +2565,6 @@ ${userProfile}
 
 **重要：请严格按照以下语言要求回复：**
 - 必须使用${targetLanguage}进行回复
-- 禁止使用中文以外的任何语言（当目标语言不是中文时）
 - 禁止混合使用多种语言
 - 整个回复内容必须完全使用${targetLanguage}
 
