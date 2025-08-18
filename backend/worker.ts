@@ -47,6 +47,22 @@ app.use('*', cors({
 // 数据库初始化和demo用户确保
 async function ensureDemoUser(db: D1Database) {
   try {
+    // 确保异步任务表存在
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS async_tasks (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        task_type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        input_data TEXT,
+        result TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT
+      )
+    `).run();
+
     // 检查demo用户是否存在
     const demoUser = await db.prepare(
       'SELECT id FROM users WHERE email = ?'
@@ -89,6 +105,11 @@ async function ensureDemoUser(db: D1Database) {
   } catch (error) {
     console.error('Error ensuring demo user:', error);
   }
+}
+
+// 生成任务ID
+function generateTaskId() {
+  return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 // 健康检查端点
@@ -1066,6 +1087,55 @@ app.put('/api/user/change-password', jwtMiddleware, async (c) => {
 
 // 算命功能路由
 
+// 查询异步任务状态
+app.get('/api/fortune/task/:taskId', jwtMiddleware, async (c) => {
+  try {
+    const taskId = c.req.param('taskId');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    const task = await c.env.DB.prepare(`
+      SELECT id, task_type, status, result, error_message, created_at, completed_at
+      FROM async_tasks WHERE id = ? AND user_id = ?
+    `).bind(taskId, userId).first();
+
+    if (!task) {
+      return c.json({ success: false, message: 'Task not found' }, 404);
+    }
+
+    const response: any = {
+      success: true,
+      data: {
+        taskId: task.id,
+        type: task.task_type,
+        status: task.status,
+        createdAt: task.created_at,
+        completedAt: task.completed_at
+      }
+    };
+
+    if (task.status === 'completed' && task.result) {
+      response.data.analysis = task.result;
+      response.data.aiAnalysis = task.result;
+      response.data.analysisType = task.task_type;
+      response.data.timestamp = task.completed_at;
+      response.message = `${task.task_type} analysis completed successfully`;
+    } else if (task.status === 'failed') {
+      response.data.error = task.error_message;
+      response.message = 'Analysis failed';
+    } else if (task.status === 'processing') {
+      response.message = 'Analysis in progress';
+    } else {
+      response.message = 'Analysis pending';
+    }
+
+    return c.json(response);
+  } catch (error) {
+    console.error('❌ Task status error:', error);
+    return c.json({ success: false, message: 'Failed to get task status' }, 500);
+  }
+});
+
 // 八字精算
 app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   try {
@@ -1106,38 +1176,32 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       }, 400);
     }
 
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    console.log('🔧 Calling DeepSeek API for BaZi analysis...');
-    const analysis = await deepSeekService.getBaziAnalysis(user, language);
+    // 创建异步任务
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, language });
 
-    // 验证分析结果
-    if (!analysis || typeof analysis !== 'string' || analysis.trim().length === 0) {
-      console.error('❌ Invalid analysis result:', { analysis, type: typeof analysis, length: analysis?.length });
-      throw new Error('AI analysis returned empty or invalid content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'bazi', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`✅ BaZi analysis completed, length: ${analysis.length} characters`);
+    // 立即返回任务ID，不等待AI处理
+    console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 保存分析记录
-    try {
-      await c.env.DB.prepare(
-        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(userId, 'bazi', '', analysis, language, new Date().toISOString()).run();
-    } catch (dbError) {
-      console.warn('Failed to save fortune reading:', dbError);
-    }
+    // 在后台异步处理AI调用
+    c.executionCtx.waitUntil(processAsyncTask(c.env, taskId, 'bazi', user, language));
 
     return c.json({
       success: true,
-      message: 'BaZi analysis completed successfully',
+      message: 'BaZi analysis started',
       data: {
-        type: 'bazi',
-        analysis: analysis,
-        aiAnalysis: analysis,
-        analysisType: 'bazi',
-        timestamp: new Date().toISOString()
+        taskId: taskId,
+        status: 'pending',
+        estimatedTime: '2-3 minutes'
       }
     });
+
+
   } catch (error) {
     console.error('❌ BaZi analysis error:', error);
     console.error('❌ Error stack:', error.stack);
@@ -1185,37 +1249,32 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    console.log('🔧 Calling DeepSeek API for Daily Fortune...');
-    const fortune = await deepSeekService.getDailyFortune(user, language);
+    // 创建异步任务
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, language });
 
-    // 验证分析结果
-    if (!fortune || typeof fortune !== 'string' || fortune.trim().length === 0) {
-      console.error('❌ Invalid fortune result:', { fortune, type: typeof fortune, length: fortune?.length });
-      throw new Error('AI analysis returned empty or invalid content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'daily', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`✅ Daily Fortune completed, length: ${fortune.length} characters`);
+    // 立即返回任务ID，不等待AI处理
+    console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    try {
-      await c.env.DB.prepare(
-        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(userId, 'daily', '', fortune, language, new Date().toISOString()).run();
-    } catch (dbError) {
-      console.warn('Failed to save fortune reading:', dbError);
-    }
+    // 在后台异步处理AI调用
+    c.executionCtx.waitUntil(processAsyncTask(c.env, taskId, 'daily', user, language));
 
     return c.json({
       success: true,
-      message: 'Daily fortune completed successfully',
+      message: 'Daily fortune analysis started',
       data: {
-        type: 'daily',
-        analysis: fortune,
-        aiAnalysis: fortune,
-        analysisType: 'daily',
-        timestamp: new Date().toISOString()
+        taskId: taskId,
+        status: 'pending',
+        estimatedTime: '2-3 minutes'
       }
     });
+
+
   } catch (error) {
     console.error('❌ Daily fortune error:', error);
     return c.json({
@@ -1244,37 +1303,32 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    console.log('🔧 Calling DeepSeek API for Tarot Reading...');
-    const reading = await deepSeekService.getCelestialTarotReading(user, question, language);
+    // 创建异步任务
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, question, language });
 
-    // 验证分析结果
-    if (!reading || typeof reading !== 'string' || reading.trim().length === 0) {
-      console.error('❌ Invalid reading result:', { reading, type: typeof reading, length: reading?.length });
-      throw new Error('AI analysis returned empty or invalid content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'tarot', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`✅ Tarot Reading completed, length: ${reading.length} characters`);
+    // 立即返回任务ID，不等待AI处理
+    console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    try {
-      await c.env.DB.prepare(
-        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(userId, 'tarot', question, reading, language, new Date().toISOString()).run();
-    } catch (dbError) {
-      console.warn('Failed to save fortune reading:', dbError);
-    }
+    // 在后台异步处理AI调用
+    c.executionCtx.waitUntil(processAsyncTask(c.env, taskId, 'tarot', user, language, question));
 
     return c.json({
       success: true,
-      message: 'Tarot reading completed successfully',
+      message: 'Tarot reading started',
       data: {
-        type: 'tarot',
-        analysis: reading,
-        aiAnalysis: reading,
-        analysisType: 'tarot',
-        timestamp: new Date().toISOString()
+        taskId: taskId,
+        status: 'pending',
+        estimatedTime: '2-3 minutes'
       }
     });
+
+
   } catch (error) {
     console.error('❌ Tarot reading error:', error);
     console.error('❌ Error stack:', error.stack);
@@ -1322,37 +1376,32 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    console.log('🔧 Calling DeepSeek API for Lucky Items...');
-    const items = await deepSeekService.getLuckyItems(user, language);
+    // 创建异步任务
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, language });
 
-    // 验证分析结果
-    if (!items || typeof items !== 'string' || items.trim().length === 0) {
-      console.error('❌ Invalid items result:', { items, type: typeof items, length: items?.length });
-      throw new Error('AI analysis returned empty or invalid content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'lucky', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`✅ Lucky Items completed, length: ${items.length} characters`);
+    // 立即返回任务ID，不等待AI处理
+    console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    try {
-      await c.env.DB.prepare(
-        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(userId, 'lucky', '', items, language, new Date().toISOString()).run();
-    } catch (dbError) {
-      console.warn('Failed to save fortune reading:', dbError);
-    }
+    // 在后台异步处理AI调用
+    c.executionCtx.waitUntil(processAsyncTask(c.env, taskId, 'lucky', user, language));
 
     return c.json({
       success: true,
-      message: 'Lucky items analysis completed successfully',
+      message: 'Lucky items analysis started',
       data: {
-        type: 'lucky',
-        analysis: items,
-        aiAnalysis: items,
-        analysisType: 'lucky',
-        timestamp: new Date().toISOString()
+        taskId: taskId,
+        status: 'pending',
+        estimatedTime: '2-3 minutes'
       }
     });
+
+
   } catch (error) {
     console.error('❌ Lucky items error:', error);
     return c.json({
@@ -2081,6 +2130,12 @@ class CloudflareDeepSeekService {
     this.apiKey = env.DEEPSEEK_API_KEY || 'sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn';
     this.baseURL = env.DEEPSEEK_BASE_URL || 'https://api.siliconflow.cn/v1/chat/completions';
     this.model = env.DEEPSEEK_MODEL || 'Pro/deepseek-ai/DeepSeek-R1';
+
+    console.log('🔧 DeepSeek Service initialized:', {
+      hasApiKey: !!this.apiKey,
+      baseURL: this.baseURL,
+      model: this.model
+    });
   }
 
   // 获取语言名称
@@ -2204,13 +2259,28 @@ Current Time: ${currentTime}
 
   // 调用DeepSeek API（带重试机制）
   async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000) {
-    const maxRetries = 1; // 只重试一次，但增加超时时间
+    const maxRetries = 2; // 增加重试次数，但使用更短的超时时间
+
+    // 快速验证基本配置
+    if (!this.apiKey || !this.baseURL || !this.model) {
+      console.error('❌ Missing API configuration:', {
+        hasApiKey: !!this.apiKey,
+        hasBaseURL: !!this.baseURL,
+        hasModel: !!this.model
+      });
+      throw new Error('AI service configuration error');
+    }
 
     try {
       console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}`);
       console.log(`🌐 API URL: ${this.baseURL}`);
       console.log(`🤖 Model: ${this.model}`);
-      console.log(`⏱️ Timeout: 300 seconds`);
+      // 根据Cloudflare Worker的实际限制调整超时时间
+      // 考虑到Worker的CPU时间限制，使用更保守的超时设置
+      // 如果是重试，使用更短的超时时间
+      const baseTimeout = retryCount > 0 ? 60000 : 90000; // 重试时60秒，首次90秒
+      const timeoutMs = Math.min(baseTimeout, 90000); // 最大90秒
+      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (retry: ${retryCount})`);
 
       const requestData = {
         model: this.model,
@@ -2220,9 +2290,9 @@ Current Time: ${currentTime}
         stream: false
       };
 
-      // 创建带超时的fetch请求（300秒）
+      // 创建带超时的fetch请求
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 300秒超时
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(this.baseURL, {
         method: 'POST',
@@ -2274,15 +2344,15 @@ Current Time: ${currentTime}
 
       // 检查是否是超时错误
       if (error.name === 'AbortError') {
-        console.error('❌ Request timeout after 300 seconds');
+        console.error('❌ Request timeout after 120 seconds');
       } else if (error.message.includes('524') || error.message.includes('timeout')) {
         console.error('❌ API timeout detected, service may be overloaded');
       }
 
       if (retryCount < maxRetries) {
-        // 重试前等待10秒，给AI服务恢复时间
-        const delay = 10000; // 10秒
-        console.log(`🔄 Retrying in ${delay/1000} seconds...`);
+        // 使用更短的重试延迟，避免超过Worker执行时间限制
+        const delay = retryCount === 0 ? 3000 : 5000; // 首次重试3秒，后续5秒
+        console.log(`🔄 Retrying in ${delay/1000} seconds... (attempt ${retryCount + 2}/${maxRetries + 1})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens);
       }
@@ -2607,5 +2677,66 @@ ${userProfile}
 }
 
 
+
+// 异步任务处理函数
+async function processAsyncTask(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  try {
+    console.log(`🔄 Processing async task: ${taskId}, type: ${taskType}`);
+
+    // 更新任务状态为处理中
+    await env.DB.prepare(`
+      UPDATE async_tasks SET status = 'processing', updated_at = ? WHERE id = ?
+    `).bind(new Date().toISOString(), taskId).run();
+
+    const deepSeekService = new CloudflareDeepSeekService(env);
+    let result = '';
+
+    // 根据任务类型调用相应的AI服务
+    switch (taskType) {
+      case 'bazi':
+        result = await deepSeekService.getBaziAnalysis(user, language);
+        break;
+      case 'daily':
+        result = await deepSeekService.getDailyFortune(user, language);
+        break;
+      case 'tarot':
+        result = await deepSeekService.getCelestialTarotReading(user, question || '', language);
+        break;
+      case 'lucky':
+        result = await deepSeekService.getLuckyItems(user, language);
+        break;
+      default:
+        throw new Error(`Unknown task type: ${taskType}`);
+    }
+
+    // 验证结果
+    if (!result || typeof result !== 'string' || result.trim().length === 0) {
+      throw new Error('AI analysis returned empty or invalid content');
+    }
+
+    // 保存结果到数据库
+    await env.DB.prepare(`
+      UPDATE async_tasks SET status = 'completed', result = ?, completed_at = ?, updated_at = ? WHERE id = ?
+    `).bind(result, new Date().toISOString(), new Date().toISOString(), taskId).run();
+
+    // 保存到fortune_readings表
+    try {
+      await env.DB.prepare(
+        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(user.id, taskType, question || '', result, language, new Date().toISOString()).run();
+    } catch (dbError) {
+      console.warn('Failed to save fortune reading:', dbError);
+    }
+
+    console.log(`✅ Task ${taskId} completed successfully`);
+  } catch (error) {
+    console.error(`❌ Task ${taskId} failed:`, error);
+
+    // 更新任务状态为失败
+    await env.DB.prepare(`
+      UPDATE async_tasks SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?
+    `).bind(error.message, new Date().toISOString(), taskId).run();
+  }
+}
 
 export default app;
