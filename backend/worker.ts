@@ -2772,6 +2772,8 @@ ${userProfile}
 
 // 异步任务处理函数
 async function processAsyncTask(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  let taskStartTime = Date.now();
+
   try {
     console.log(`🔄 Processing async task: ${taskId}, type: ${taskType}`);
 
@@ -2783,28 +2785,36 @@ async function processAsyncTask(env: any, taskId: string, taskType: string, user
     const deepSeekService = new CloudflareDeepSeekService(env);
     let result = '';
 
-    // 根据任务类型调用相应的AI服务
-    switch (taskType) {
-      case 'bazi':
-        result = await deepSeekService.getBaziAnalysis(user, language);
-        break;
-      case 'daily':
-        result = await deepSeekService.getDailyFortune(user, language);
-        break;
-      case 'tarot':
-        result = await deepSeekService.getCelestialTarotReading(user, question || '', language);
-        break;
-      case 'lucky':
-        result = await deepSeekService.getLuckyItems(user, language);
-        break;
-      default:
-        throw new Error(`Unknown task type: ${taskType}`);
-    }
+    // 添加超时保护 - 最多处理4分钟
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Task processing timeout after 4 minutes')), 240000);
+    });
+
+    // 根据任务类型调用相应的AI服务，带超时保护
+    const aiCallPromise = (async () => {
+      switch (taskType) {
+        case 'bazi':
+          return await deepSeekService.getBaziAnalysis(user, language);
+        case 'daily':
+          return await deepSeekService.getDailyFortune(user, language);
+        case 'tarot':
+          return await deepSeekService.getCelestialTarotReading(user, question || '', language);
+        case 'lucky':
+          return await deepSeekService.getLuckyItems(user, language);
+        default:
+          throw new Error(`Unknown task type: ${taskType}`);
+      }
+    })();
+
+    // 等待AI调用完成或超时
+    result = await Promise.race([aiCallPromise, timeoutPromise]);
 
     // 验证结果
     if (!result || typeof result !== 'string' || result.trim().length === 0) {
       throw new Error('AI analysis returned empty or invalid content');
     }
+
+    console.log(`✅ AI call completed for task ${taskId}, processing time: ${Date.now() - taskStartTime}ms`);
 
     // 保存结果到数据库
     await env.DB.prepare(`
@@ -2822,12 +2832,27 @@ async function processAsyncTask(env: any, taskId: string, taskType: string, user
 
     console.log(`✅ Task ${taskId} completed successfully`);
   } catch (error) {
-    console.error(`❌ Task ${taskId} failed:`, error);
+    const processingTime = Date.now() - taskStartTime;
+    console.error(`❌ Task ${taskId} failed after ${processingTime}ms:`, error);
+    console.error(`❌ Error stack:`, error.stack);
 
-    // 更新任务状态为失败
-    await env.DB.prepare(`
-      UPDATE async_tasks SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?
-    `).bind(error.message, new Date().toISOString(), taskId).run();
+    // 确定错误消息
+    let errorMessage = 'Unknown error occurred';
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+
+    // 更新任务状态为失败，确保数据库操作不会失败
+    try {
+      await env.DB.prepare(`
+        UPDATE async_tasks SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?
+      `).bind(errorMessage, new Date().toISOString(), taskId).run();
+      console.log(`📝 Task ${taskId} marked as failed in database`);
+    } catch (dbError) {
+      console.error(`❌ Failed to update task ${taskId} status in database:`, dbError);
+    }
   }
 }
 
