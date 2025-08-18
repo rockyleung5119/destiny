@@ -770,7 +770,11 @@ app.post('/api/auth/reset-password', async (c) => {
   try {
     console.log('🔄 Reset password request received');
 
-    const { email, code, newPassword } = await c.req.json();
+    const requestData = await c.req.json();
+    const { email, newPassword } = requestData;
+    // 支持前端发送的 verificationCode 或 code 字段
+    const code = requestData.verificationCode || requestData.code;
+
     console.log('📧 Email:', email, 'Code:', code, 'New password length:', newPassword?.length);
 
     if (!email || !code || !newPassword) {
