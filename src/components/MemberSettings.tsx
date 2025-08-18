@@ -115,7 +115,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           birth_hour: user.birth_hour?.toString() || '',
           birth_minute: user.birth_minute?.toString() || '',
           birth_place: user.birth_place || '',
-          timezone: user.timezone || 'UTC+8'
+          timezone: user.timezone || '' // 不设置默认值，让用户选择
         });
 
         console.log('✅ 用户资料加载完成');
@@ -150,7 +150,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
     if (!userProfile) return;
 
     // Check if profile has been updated before
-    if (userProfile.profileUpdatedCount >= 1) {
+    if (userProfile.profile_updated_count >= 1) {
       setMessage(t('profileCanOnlyBeUpdated'));
       setMessageType('warning');
       return;
@@ -395,7 +395,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                       <p className="font-medium mb-1">{t('importantNotice')}</p>
                       <p className="text-sm">
                         {t('importantNoticeDesc')}
-                        {userProfile?.profileUpdatedCount >= 1 && (
+                        {userProfile?.profile_updated_count >= 1 && (
                           <span className="block mt-2 text-yellow-700 font-medium">
                             ⚠️ {t('alreadyUsedUpdate')}
                           </span>
@@ -476,7 +476,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                       type="text"
                       value={profileForm.name}
                       onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
-                      disabled={userProfile?.profileUpdatedCount >= 1}
+                      disabled={userProfile?.profile_updated_count >= 1}
                       className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                       placeholder={t('enterFullName')}
                       required
@@ -504,7 +504,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   <select
                     value={profileForm.gender}
                     onChange={(e) => setProfileForm({...profileForm, gender: e.target.value})}
-                    disabled={userProfile?.profileUpdatedCount >= 1}
+                    disabled={userProfile?.profile_updated_count >= 1}
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <option value="">{t('selectGender')}</option>
@@ -598,7 +598,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   <select
                     value={profileForm.timezone}
                     onChange={(e) => setProfileForm({...profileForm, timezone: e.target.value})}
-                    disabled={userProfile?.profileUpdatedCount >= 1}
+                    disabled={userProfile?.profile_updated_count >= 1}
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <option value="">{t('selectTimezone')}</option>
@@ -618,11 +618,11 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isSaving || userProfile?.profileUpdatedCount >= 1}
+                  disabled={isSaving || userProfile?.profile_updated_count >= 1}
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 px-6 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                 >
                   {isSaving ? t('updating') :
-                   userProfile?.profileUpdatedCount >= 1 ? t('profileAlreadyUpdated') :
+                   userProfile?.profile_updated_count >= 1 ? t('profileAlreadyUpdated') :
                    t('updateProfileOneTime')}
                 </button>
               </form>
