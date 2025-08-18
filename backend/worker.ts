@@ -56,7 +56,7 @@ async function ensureDemoUser(db: D1Database) {
       // 创建demo用户
       const hashedPassword = await hashPassword('password123');
       const result = await db.prepare(
-        'INSERT INTO users (email, password_hash, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_place, timezone, is_email_verified, profile_updated_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO users (email, password_hash, name, gender, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place, timezone, is_email_verified, profile_updated_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(
         'demo@example.com',
         hashedPassword,
@@ -66,6 +66,7 @@ async function ensureDemoUser(db: D1Database) {
         9,
         15,
         9,
+        30,
         '中国广州',
         'Asia/Shanghai',
         1,
@@ -1041,8 +1042,21 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
+    // 调试：打印用户信息
+    console.log('🔍 User data for BaZi analysis:', {
+      id: user.id,
+      name: user.name,
+      birth_year: user.birth_year,
+      birth_month: user.birth_month,
+      birth_day: user.birth_day,
+      birth_hour: user.birth_hour,
+      birth_minute: user.birth_minute,
+      birth_place: user.birth_place
+    });
+
     // 检查用户是否有完整的出生信息
     if (!user.birth_year || !user.birth_month || !user.birth_day) {
+      console.log('❌ Missing required birth information');
       return c.json({
         success: false,
         message: 'Please complete your birth information in profile settings first'
@@ -1050,7 +1064,16 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     }
 
     const deepSeekService = new CloudflareDeepSeekService(c.env);
+    console.log('🔧 Calling DeepSeek API for BaZi analysis...');
     const analysis = await deepSeekService.getBaziAnalysis(user, language);
+
+    // 验证分析结果
+    if (!analysis || typeof analysis !== 'string' || analysis.trim().length === 0) {
+      console.error('❌ Invalid analysis result:', { analysis, type: typeof analysis, length: analysis?.length });
+      throw new Error('AI analysis returned empty or invalid content');
+    }
+
+    console.log(`✅ BaZi analysis completed, length: ${analysis.length} characters`);
 
     // 保存分析记录
     try {
@@ -1101,7 +1124,16 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     }
 
     const deepSeekService = new CloudflareDeepSeekService(c.env);
+    console.log('🔧 Calling DeepSeek API for Daily Fortune...');
     const fortune = await deepSeekService.getDailyFortune(user, language);
+
+    // 验证分析结果
+    if (!fortune || typeof fortune !== 'string' || fortune.trim().length === 0) {
+      console.error('❌ Invalid fortune result:', { fortune, type: typeof fortune, length: fortune?.length });
+      throw new Error('AI analysis returned empty or invalid content');
+    }
+
+    console.log(`✅ Daily Fortune completed, length: ${fortune.length} characters`);
 
     try {
       await c.env.DB.prepare(
@@ -1151,7 +1183,16 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     }
 
     const deepSeekService = new CloudflareDeepSeekService(c.env);
+    console.log('🔧 Calling DeepSeek API for Tarot Reading...');
     const reading = await deepSeekService.getCelestialTarotReading(user, question, language);
+
+    // 验证分析结果
+    if (!reading || typeof reading !== 'string' || reading.trim().length === 0) {
+      console.error('❌ Invalid reading result:', { reading, type: typeof reading, length: reading?.length });
+      throw new Error('AI analysis returned empty or invalid content');
+    }
+
+    console.log(`✅ Tarot Reading completed, length: ${reading.length} characters`);
 
     try {
       await c.env.DB.prepare(
@@ -1201,7 +1242,16 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     }
 
     const deepSeekService = new CloudflareDeepSeekService(c.env);
+    console.log('🔧 Calling DeepSeek API for Lucky Items...');
     const items = await deepSeekService.getLuckyItems(user, language);
+
+    // 验证分析结果
+    if (!items || typeof items !== 'string' || items.trim().length === 0) {
+      console.error('❌ Invalid items result:', { items, type: typeof items, length: items?.length });
+      throw new Error('AI analysis returned empty or invalid content');
+    }
+
+    console.log(`✅ Lucky Items completed, length: ${items.length} characters`);
 
     try {
       await c.env.DB.prepare(
