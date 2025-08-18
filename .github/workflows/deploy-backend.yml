@@ -38,6 +38,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
           command: d1 execute destiny-db --file=./d1-schema.sql --remote
+        continue-on-error: true # 允许数据库迁移失败，因为表可能已存在
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3

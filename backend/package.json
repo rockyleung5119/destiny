@@ -17,7 +17,7 @@
     "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
-    "wrangler": "^3.78.0",
+    "wrangler": "^4.29.0",
     "@cloudflare/workers-types": "^4.20241218.0"
   },
   "keywords": [

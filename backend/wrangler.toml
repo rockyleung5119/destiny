@@ -7,14 +7,18 @@ name = "destiny-backend"
 main = "worker.ts"
 compatibility_date = "2024-08-01"
 
+# TypeScript配置
+[build]
+command = ""
+
 # Cloudflare Worker限制配置
 # 注意：这些限制需要付费计划才能生效
 # 免费计划有固定的30秒CPU时间限制
 [limits]
 cpu_ms = 300000
 
-# 兼容性标志，启用更长的执行时间支持
-compatibility_flags = ["nodejs_compat"]
+# 兼容性标志 - 移除nodejs_compat以避免部署问题
+# compatibility_flags = ["nodejs_compat"]
 
 # D1数据库绑定
 # 这是唯一的数据库配置，将用于所有部署。

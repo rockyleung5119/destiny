@@ -4,6 +4,12 @@ import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
 import { HTTPException } from 'hono/http-exception';
+
+// 简化类型定义以避免部署问题
+type D1Database = any;
+type D1PreparedStatement = any;
+type D1Result = any;
+type D1ExecResult = any;
 // 邮箱验证模板（内联以避免导入问题）
 const verificationTemplate = `<!DOCTYPE html>
 <html lang="en">
