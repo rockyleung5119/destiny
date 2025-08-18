@@ -1280,14 +1280,39 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 在后台异步处理AI调用 - 使用双重保障
+    // 在后台异步处理AI调用 - 使用多重保障机制
     const asyncTaskPromise = processAsyncTask(c.env, taskId, 'bazi', user, language);
+
+    // 方法1: 使用executionCtx.waitUntil
     c.executionCtx.waitUntil(asyncTaskPromise);
 
-    // 立即启动异步处理，不依赖waitUntil
+    // 方法2: 立即启动异步处理，不依赖waitUntil
     asyncTaskPromise.catch(error => {
-      console.error(`❌ Async task ${taskId} failed outside waitUntil:`, error);
+      console.error(`❌ [${taskId}] Async task failed outside waitUntil:`, error);
     });
+
+    // 方法3: 设置一个备用的延迟检查
+    c.executionCtx.waitUntil(
+      new Promise(async (resolve) => {
+        try {
+          // 等待30秒后检查任务状态
+          await new Promise(r => setTimeout(r, 30000));
+
+          const taskCheck = await c.env.DB.prepare(`
+            SELECT status FROM async_tasks WHERE id = ?
+          `).bind(taskId).first();
+
+          if (taskCheck && taskCheck.status === 'processing') {
+            console.log(`⚠️ [${taskId}] Task still processing after 30s, this is normal for AI tasks`);
+          }
+
+          resolve(undefined);
+        } catch (error) {
+          console.error(`❌ [${taskId}] Backup check failed:`, error);
+          resolve(undefined);
+        }
+      })
+    );
 
     return c.json({
       success: true,
@@ -1359,13 +1384,11 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    // 在后台异步处理AI调用 - 使用双重保障
+    // 在后台异步处理AI调用 - 使用多重保障机制
     const asyncTaskPromise = processAsyncTask(c.env, taskId, 'daily', user, language);
     c.executionCtx.waitUntil(asyncTaskPromise);
-
-    // 立即启动异步处理，不依赖waitUntil
     asyncTaskPromise.catch(error => {
-      console.error(`❌ Async task ${taskId} failed outside waitUntil:`, error);
+      console.error(`❌ [${taskId}] Async task failed outside waitUntil:`, error);
     });
 
     return c.json({
@@ -1419,13 +1442,11 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    // 在后台异步处理AI调用 - 使用双重保障
+    // 在后台异步处理AI调用 - 使用多重保障机制
     const asyncTaskPromise = processAsyncTask(c.env, taskId, 'tarot', user, language, question);
     c.executionCtx.waitUntil(asyncTaskPromise);
-
-    // 立即启动异步处理，不依赖waitUntil
     asyncTaskPromise.catch(error => {
-      console.error(`❌ Async task ${taskId} failed outside waitUntil:`, error);
+      console.error(`❌ [${taskId}] Async task failed outside waitUntil:`, error);
     });
 
     return c.json({
@@ -1498,13 +1519,11 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    // 在后台异步处理AI调用 - 使用双重保障
+    // 在后台异步处理AI调用 - 使用多重保障机制
     const asyncTaskPromise = processAsyncTask(c.env, taskId, 'lucky', user, language);
     c.executionCtx.waitUntil(asyncTaskPromise);
-
-    // 立即启动异步处理，不依赖waitUntil
     asyncTaskPromise.catch(error => {
-      console.error(`❌ Async task ${taskId} failed outside waitUntil:`, error);
+      console.error(`❌ [${taskId}] Async task failed outside waitUntil:`, error);
     });
 
     return c.json({
@@ -2794,117 +2813,322 @@ ${userProfile}
 
 
 
-// 异步任务处理函数
+// 智能异步任务处理函数 - 使用分段处理绕过Cloudflare限制
 async function processAsyncTask(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   let taskStartTime = Date.now();
 
   try {
-    console.log(`🔄 [${taskId}] Starting async task processing, type: ${taskType}`);
-    console.log(`🔄 [${taskId}] User data:`, JSON.stringify(user, null, 2));
-    console.log(`🔄 [${taskId}] Language: ${language}, Question: ${question || 'N/A'}`);
+    console.log(`🔄 [${taskId}] Starting smart async task processing, type: ${taskType}`);
 
     // 更新任务状态为处理中
-    console.log(`🔄 [${taskId}] Updating task status to processing...`);
-    const updateResult = await env.DB.prepare(`
+    await env.DB.prepare(`
       UPDATE async_tasks SET status = 'processing', updated_at = ? WHERE id = ?
     `).bind(new Date().toISOString(), taskId).run();
-    console.log(`✅ [${taskId}] Task status updated:`, updateResult);
 
-    console.log(`🤖 [${taskId}] Initializing DeepSeek service...`);
-    const deepSeekService = new CloudflareDeepSeekService(env);
-    let result = '';
+    // 启动智能AI处理
+    await processAIWithSmartRetry(env, taskId, taskType, user, language, question);
 
-    // 添加超时保护 - 最多处理4分钟
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        console.log(`⏰ [${taskId}] Task timeout after 4 minutes`);
-        reject(new Error('Task processing timeout after 4 minutes'));
-      }, 240000);
-    });
-
-    // 根据任务类型调用相应的AI服务，带超时保护
-    console.log(`🚀 [${taskId}] Starting AI service call...`);
-    const aiCallPromise = (async () => {
-      try {
-        switch (taskType) {
-          case 'bazi':
-            console.log(`🔮 [${taskId}] Calling getBaziAnalysis...`);
-            return await deepSeekService.getBaziAnalysis(user, language);
-          case 'daily':
-            console.log(`🌅 [${taskId}] Calling getDailyFortune...`);
-            return await deepSeekService.getDailyFortune(user, language);
-          case 'tarot':
-            console.log(`🃏 [${taskId}] Calling getCelestialTarotReading...`);
-            return await deepSeekService.getCelestialTarotReading(user, question || '', language);
-          case 'lucky':
-            console.log(`🍀 [${taskId}] Calling getLuckyItems...`);
-            return await deepSeekService.getLuckyItems(user, language);
-          default:
-            throw new Error(`Unknown task type: ${taskType}`);
-        }
-      } catch (aiError) {
-        console.error(`❌ [${taskId}] AI service call failed:`, aiError);
-        throw aiError;
-      }
-    })();
-
-    // 等待AI调用完成或超时
-    console.log(`⏳ [${taskId}] Waiting for AI response...`);
-    result = await Promise.race([aiCallPromise, timeoutPromise]);
-    console.log(`✅ [${taskId}] AI response received, length: ${result?.length || 0} characters`);
-
-    // 验证结果
-    if (!result || typeof result !== 'string' || result.trim().length === 0) {
-      throw new Error('AI analysis returned empty or invalid content');
-    }
-
-    console.log(`✅ [${taskId}] AI call completed, processing time: ${Date.now() - taskStartTime}ms`);
-
-    // 保存结果到数据库
-    await env.DB.prepare(`
-      UPDATE async_tasks SET status = 'completed', result = ?, completed_at = ?, updated_at = ? WHERE id = ?
-    `).bind(result, new Date().toISOString(), new Date().toISOString(), taskId).run();
-
-    // 保存到fortune_readings表
-    try {
-      await env.DB.prepare(
-        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(user.id, taskType, question || '', result, language, new Date().toISOString()).run();
-    } catch (dbError) {
-      console.warn('Failed to save fortune reading:', dbError);
-    }
-
-    console.log(`🎉 [${taskId}] Task completed successfully`);
   } catch (error) {
     const processingTime = Date.now() - taskStartTime;
     console.error(`❌ [${taskId}] Task failed after ${processingTime}ms:`, error);
-    console.error(`❌ [${taskId}] Error stack:`, error.stack);
-    console.error(`❌ [${taskId}] Error type:`, typeof error);
-    console.error(`❌ [${taskId}] Error constructor:`, error.constructor?.name);
 
-    // 确定错误消息
-    let errorMessage = 'Unknown error occurred';
-    if (error && error.message) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error && error.toString) {
-      errorMessage = error.toString();
-    }
-
-    console.log(`📝 [${taskId}] Updating task status to failed with message: ${errorMessage}`);
-
-    // 更新任务状态为失败，确保数据库操作不会失败
+    // 更新任务状态为失败
     try {
-      const failResult = await env.DB.prepare(`
+      await env.DB.prepare(`
         UPDATE async_tasks SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?
-      `).bind(errorMessage, new Date().toISOString(), taskId).run();
-      console.log(`✅ [${taskId}] Task marked as failed in database:`, failResult);
+      `).bind(error.message || 'Unknown error', new Date().toISOString(), taskId).run();
     } catch (dbError) {
-      console.error(`❌ [${taskId}] Failed to update task status in database:`, dbError);
-      console.error(`❌ [${taskId}] DB Error stack:`, dbError.stack);
+      console.error(`❌ [${taskId}] Failed to update task status:`, dbError);
     }
   }
 }
 
-export default app;
+// 智能AI处理函数 - 分段处理，每10秒检查一次
+async function processAIWithSmartRetry(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  console.log(`🧠 [${taskId}] Starting smart AI processing...`);
+
+  const deepSeekService = new CloudflareDeepSeekService(env);
+  const maxAttempts = 30; // 30次 × 10秒 = 5分钟（与前端一致）
+  let attempt = 0;
+
+  // 启动AI调用
+  let aiPromise = startAICall(deepSeekService, taskType, user, language, question);
+  let aiResult = null;
+
+  while (attempt < maxAttempts && !aiResult) {
+    attempt++;
+    console.log(`🔍 [${taskId}] Check attempt ${attempt}/${maxAttempts} (${attempt * 10}s elapsed)`);
+
+    try {
+      // 检查AI调用是否完成（非阻塞）
+      const raceResult = await Promise.race([
+        aiPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Check timeout')), 100))
+      ]);
+
+      // AI调用完成
+      aiResult = raceResult;
+      console.log(`✅ [${taskId}] AI call completed, result length: ${aiResult?.length || 0}`);
+
+    } catch (error) {
+      if (error.message === 'Check timeout') {
+        // AI还在处理中，继续等待
+        console.log(`⏳ [${taskId}] AI still processing, waiting 10 seconds...`);
+
+        // 更新任务的updated_at时间戳，表明任务仍在活跃处理
+        try {
+          await env.DB.prepare(`
+            UPDATE async_tasks SET updated_at = ? WHERE id = ?
+          `).bind(new Date().toISOString(), taskId).run();
+        } catch (dbError) {
+          console.warn(`⚠️ [${taskId}] Failed to update timestamp:`, dbError);
+        }
+
+        // 等待10秒后继续检查
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      } else {
+        // AI调用真正失败
+        throw error;
+      }
+    }
+  }
+
+  if (!aiResult) {
+    throw new Error(`AI processing timeout after ${maxAttempts * 10} seconds (5 minutes)`);
+  }
+
+  // 验证结果
+  if (!aiResult || typeof aiResult !== 'string' || aiResult.trim().length === 0) {
+    throw new Error('AI analysis returned empty or invalid content');
+  }
+
+  // 保存结果到数据库
+  await saveAIResult(env, taskId, taskType, user, language, question, aiResult);
+}
+
+// 启动AI调用
+async function startAICall(deepSeekService: any, taskType: string, user: any, language: string, question?: string) {
+  switch (taskType) {
+    case 'bazi':
+      return await deepSeekService.getBaziAnalysis(user, language);
+    case 'daily':
+      return await deepSeekService.getDailyFortune(user, language);
+    case 'tarot':
+      return await deepSeekService.getCelestialTarotReading(user, question || '', language);
+    case 'lucky':
+      return await deepSeekService.getLuckyItems(user, language);
+    default:
+      throw new Error(`Unknown task type: ${taskType}`);
+  }
+}
+
+// 保存AI结果到数据库
+async function saveAIResult(env: any, taskId: string, taskType: string, user: any, language: string, question: string | undefined, result: string) {
+  console.log(`💾 [${taskId}] Saving AI result to database, length: ${result.length} characters`);
+
+  // 保存结果到async_tasks表，带重试机制
+  let dbSaveSuccess = false;
+  let dbRetries = 0;
+  const maxDbRetries = 3;
+
+  while (!dbSaveSuccess && dbRetries < maxDbRetries) {
+    try {
+      const updateResult = await env.DB.prepare(`
+        UPDATE async_tasks SET status = 'completed', result = ?, completed_at = ?, updated_at = ? WHERE id = ?
+      `).bind(result, new Date().toISOString(), new Date().toISOString(), taskId).run();
+
+      console.log(`✅ [${taskId}] Database update result:`, updateResult);
+
+      // 验证保存是否成功
+      const verification = await env.DB.prepare(`
+        SELECT status, LENGTH(result) as result_length FROM async_tasks WHERE id = ?
+      `).bind(taskId).first();
+
+      if (verification && verification.status === 'completed' && verification.result_length > 0) {
+        console.log(`✅ [${taskId}] Result successfully saved and verified`);
+        dbSaveSuccess = true;
+      } else {
+        throw new Error('Result save verification failed');
+      }
+
+    } catch (dbError) {
+      dbRetries++;
+      console.error(`❌ [${taskId}] Database save attempt ${dbRetries}/${maxDbRetries} failed:`, dbError);
+
+      if (dbRetries < maxDbRetries) {
+        console.log(`🔄 [${taskId}] Retrying database save in 2 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        throw new Error(`Failed to save result after ${maxDbRetries} attempts: ${dbError.message}`);
+      }
+    }
+  }
+
+  // 保存到fortune_readings表
+  try {
+    await env.DB.prepare(
+      'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(user.id, taskType, question || '', result, language, new Date().toISOString()).run();
+    console.log(`📚 [${taskId}] Fortune reading saved to history`);
+  } catch (dbError) {
+    console.warn(`⚠️ [${taskId}] Failed to save fortune reading:`, dbError);
+  }
+
+  console.log(`🎉 [${taskId}] Task completed successfully`);
+}
+
+// 定时任务处理器 - 处理卡住的异步任务
+app.get('/api/admin/process-stuck-tasks', async (c) => {
+  try {
+    console.log('🔧 Processing stuck tasks...');
+
+    // 查找超过5分钟仍在processing状态的任务
+    const stuckTasks = await c.env.DB.prepare(`
+      SELECT id, user_id, task_type, input_data, created_at, updated_at
+      FROM async_tasks
+      WHERE status = 'processing'
+      AND datetime(updated_at) < datetime('now', '-5 minutes')
+      ORDER BY created_at ASC
+      LIMIT 10
+    `).all();
+
+    if (!stuckTasks.results || stuckTasks.results.length === 0) {
+      console.log('✅ No stuck tasks found');
+      return c.json({ success: true, message: 'No stuck tasks found', processed: 0 });
+    }
+
+    console.log(`🔧 Found ${stuckTasks.results.length} stuck tasks`);
+    let processed = 0;
+
+    for (const task of stuckTasks.results) {
+      try {
+        console.log(`🔧 Processing stuck task: ${task.id}`);
+
+        // 获取用户信息
+        const user = await c.env.DB.prepare(`
+          SELECT id, name, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place
+          FROM users WHERE id = ?
+        `).bind(task.user_id).first();
+
+        if (!user) {
+          console.error(`❌ User not found for task ${task.id}`);
+          continue;
+        }
+
+        // 解析输入数据
+        let inputData: any = {};
+        try {
+          inputData = JSON.parse(task.input_data || '{}');
+        } catch (e) {
+          console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
+        }
+
+        // 重新处理任务
+        await processAsyncTask(
+          c.env,
+          task.id,
+          task.task_type,
+          user,
+          inputData.language || 'zh',
+          inputData.question
+        );
+
+        processed++;
+        console.log(`✅ Successfully reprocessed task: ${task.id}`);
+
+      } catch (error) {
+        console.error(`❌ Failed to reprocess task ${task.id}:`, error);
+      }
+    }
+
+    return c.json({
+      success: true,
+      message: `Processed ${processed} stuck tasks`,
+      processed: processed,
+      total: stuckTasks.results.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error processing stuck tasks:', error);
+    return c.json({ success: false, message: 'Failed to process stuck tasks' }, 500);
+  }
+});
+
+// Cloudflare Workers Scheduled Event - 自动处理卡住的任务
+export default {
+  fetch: app.fetch,
+
+  // 每3分钟自动检查并处理卡住的任务
+  async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
+    console.log('🕐 Scheduled task: Processing stuck tasks...');
+
+    try {
+      // 查找超过5分钟仍在processing状态的任务
+      const stuckTasks = await env.DB.prepare(`
+        SELECT id, user_id, task_type, input_data, created_at, updated_at
+        FROM async_tasks
+        WHERE status = 'processing'
+        AND datetime(updated_at) < datetime('now', '-5 minutes')
+        ORDER BY created_at ASC
+        LIMIT 5
+      `).all();
+
+      if (!stuckTasks.results || stuckTasks.results.length === 0) {
+        console.log('✅ No stuck tasks found in scheduled check');
+        return;
+      }
+
+      console.log(`🔧 Found ${stuckTasks.results.length} stuck tasks in scheduled check`);
+      let processed = 0;
+
+      for (const task of stuckTasks.results) {
+        try {
+          console.log(`🔧 Scheduled processing of stuck task: ${task.id}`);
+
+          // 获取用户信息
+          const user = await env.DB.prepare(`
+            SELECT id, name, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place
+            FROM users WHERE id = ?
+          `).bind(task.user_id).first();
+
+          if (!user) {
+            console.error(`❌ User not found for task ${task.id}`);
+            continue;
+          }
+
+          // 解析输入数据
+          let inputData: any = {};
+          try {
+            inputData = JSON.parse(task.input_data || '{}');
+          } catch (e) {
+            console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
+          }
+
+          // 重新处理任务
+          const taskPromise = processAsyncTask(
+            env,
+            task.id,
+            task.task_type,
+            user,
+            inputData.language || 'zh',
+            inputData.question
+          );
+
+          // 使用waitUntil确保任务完成
+          ctx.waitUntil(taskPromise);
+
+          processed++;
+          console.log(`✅ Scheduled reprocessing started for task: ${task.id}`);
+
+        } catch (error) {
+          console.error(`❌ Failed to reprocess task ${task.id} in scheduled event:`, error);
+        }
+      }
+
+      console.log(`🎉 Scheduled task completed: Started reprocessing ${processed} stuck tasks (runs every 3 minutes)`);
+
+    } catch (error) {
+      console.error('❌ Scheduled task error:', error);
+    }
+  }
+};
