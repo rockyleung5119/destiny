@@ -1,20 +1,21 @@
 // 测试账户设置页面字段显示修复
+const LOCAL_API_URL = 'http://127.0.0.1:8787';
 const PROD_API_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
 
 // demo用户登录信息
 const demoUser = {
   email: 'demo@example.com',
-  password: 'password123'
+  password: 'demo123'
 };
 
 async function testProfileFields() {
   console.log('🔧 Testing Profile Fields Display Fix');
-  console.log('🌐 Testing Production Environment:', PROD_API_URL);
+  console.log('🌐 Testing Local Environment:', LOCAL_API_URL);
   
   try {
     // 步骤1: 登录demo用户
     console.log('\n🔐 Step 1: Login demo user...');
-    const loginResponse = await fetch(`${PROD_API_URL}/api/auth/login`, {
+    const loginResponse = await fetch(`${LOCAL_API_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -34,7 +35,7 @@ async function testProfileFields() {
 
     // 步骤2: 获取用户资料
     console.log('\n👤 Step 2: Get user profile...');
-    const profileResponse = await fetch(`${PROD_API_URL}/api/user/profile`, {
+    const profileResponse = await fetch(`${LOCAL_API_URL}/api/user/profile`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

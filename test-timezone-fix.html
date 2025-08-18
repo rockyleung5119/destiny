@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时区字段显示测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        select { padding: 8px; margin: 10px 0; width: 400px; }
+    </style>
+</head>
+<body>
+    <h1>🌍 时区字段显示修复测试</h1>
+    
+    <div class="test-case">
+        <h3>测试场景1: 用户有Asia/Shanghai时区</h3>
+        <p>模拟数据库值: <code>timezone = "Asia/Shanghai"</code></p>
+        <select id="timezone1">
+            <option value="">选择时区</option>
+            <option value="Asia/Shanghai">Asia/Shanghai (北京, 上海, 香港, 台北, 新加坡) - 中国标准时间</option>
+            <option value="Asia/Tokyo">Asia/Tokyo (东京) - 日本标准时间</option>
+            <option value="Europe/London">Europe/London (伦敦, 都柏林) - 格林威治时间</option>
+        </select>
+        <div id="result1"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>测试场景2: 用户时区为空</h3>
+        <p>模拟数据库值: <code>timezone = null 或 ""</code></p>
+        <select id="timezone2">
+            <option value="">选择时区</option>
+            <option value="Asia/Shanghai">Asia/Shanghai (北京, 上海, 香港, 台北, 新加坡) - 中国标准时间</option>
+            <option value="Asia/Tokyo">Asia/Tokyo (东京) - 日本标准时间</option>
+            <option value="Europe/London">Europe/London (伦敦, 都柏林) - 格林威治时间</option>
+        </select>
+        <div id="result2"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>测试场景3: 用户有UTC+8时区（旧格式）</h3>
+        <p>模拟数据库值: <code>timezone = "UTC+8"</code></p>
+        <select id="timezone3">
+            <option value="">选择时区</option>
+            <option value="Asia/Shanghai">Asia/Shanghai (北京, 上海, 香港, 台北, 新加坡) - 中国标准时间</option>
+            <option value="UTC+8">UTC+8 (Beijing, Shanghai) - 中国标准时间</option>
+            <option value="Asia/Tokyo">Asia/Tokyo (东京) - 日本标准时间</option>
+        </select>
+        <div id="result3"></div>
+    </div>
+
+    <script>
+        // 测试场景1: Asia/Shanghai
+        function testScenario1() {
+            const select1 = document.getElementById('timezone1');
+            const result1 = document.getElementById('result1');
+            
+            // 模拟从API获取的用户数据
+            const userData = { timezone: 'Asia/Shanghai' };
+            
+            // 设置选择框的值
+            select1.value = userData.timezone || '';
+            
+            if (select1.value === 'Asia/Shanghai') {
+                result1.innerHTML = '<span style="color: green;">✅ 正确显示: Asia/Shanghai</span>';
+                result1.parentElement.classList.add('success');
+            } else {
+                result1.innerHTML = '<span style="color: red;">❌ 显示错误: 应该显示Asia/Shanghai</span>';
+                result1.parentElement.classList.add('error');
+            }
+        }
+        
+        // 测试场景2: 空值
+        function testScenario2() {
+            const select2 = document.getElementById('timezone2');
+            const result2 = document.getElementById('result2');
+            
+            // 模拟从API获取的用户数据
+            const userData = { timezone: null };
+            
+            // 设置选择框的值
+            select2.value = userData.timezone || '';
+            
+            if (select2.value === '') {
+                result2.innerHTML = '<span style="color: green;">✅ 正确显示: 选择时区</span>';
+                result2.parentElement.classList.add('success');
+            } else {
+                result2.innerHTML = '<span style="color: red;">❌ 显示错误: 应该显示"选择时区"</span>';
+                result2.parentElement.classList.add('error');
+            }
+        }
+        
+        // 测试场景3: UTC+8
+        function testScenario3() {
+            const select3 = document.getElementById('timezone3');
+            const result3 = document.getElementById('result3');
+            
+            // 模拟从API获取的用户数据
+            const userData = { timezone: 'UTC+8' };
+            
+            // 设置选择框的值
+            select3.value = userData.timezone || '';
+            
+            if (select3.value === 'UTC+8') {
+                result3.innerHTML = '<span style="color: green;">✅ 正确显示: UTC+8</span>';
+                result3.parentElement.classList.add('success');
+            } else {
+                result3.innerHTML = '<span style="color: red;">❌ 显示错误: 应该显示UTC+8</span>';
+                result3.parentElement.classList.add('error');
+            }
+        }
+        
+        // 运行所有测试
+        window.onload = function() {
+            testScenario1();
+            testScenario2();
+            testScenario3();
+            
+            console.log('🎯 时区字段显示测试完成');
+        };
+    </script>
+</body>
+</html>

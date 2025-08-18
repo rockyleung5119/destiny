@@ -61,12 +61,12 @@ export interface RegisterData {
   password: string;
   confirmPassword: string;
   gender?: string;
-  birthYear?: number;
-  birthMonth?: number;
-  birthDay?: number;
-  birthHour?: number;
-  birthMinute?: number;
-  birthPlace?: string;
+  birth_year?: number;
+  birth_month?: number;
+  birth_day?: number;
+  birth_hour?: number;
+  birth_minute?: number;
+  birth_place?: string;
   timezone?: string;
 }
 

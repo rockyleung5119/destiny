@@ -66,7 +66,7 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
         const user = response.user;
 
         // 检查用户是否已填写完整的出生信息
-        if (!user.birthYear || !user.birthMonth || !user.birthDay) {
+        if (!user.birth_year || !user.birth_month || !user.birth_day) {
           const errorMsg = currentLanguage === 'zh' ?
             '请先在个人设置中完善您的出生信息（年、月、日），然后再进行分析。' :
             'Please complete your birth information (year, month, day) in profile settings before analysis.';
@@ -104,13 +104,13 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
       };
 
       // 构建出生日期字符串
-      const birthDate = `${user.birthYear}-${String(user.birthMonth).padStart(2, '0')}-${String(user.birthDay).padStart(2, '0')}`;
+      const birthDate = `${user.birth_year}-${String(user.birth_month).padStart(2, '0')}-${String(user.birth_day).padStart(2, '0')}`;
 
       const request = {
         name: user.name || (currentLanguage === 'zh' ? '用户' : 'User'),
         gender: user.gender || 'male',
         birthDate: birthDate,
-        birthPlace: user.birthPlace || (currentLanguage === 'zh' ? '中国' : 'China'),
+        birthPlace: user.birth_place || (currentLanguage === 'zh' ? '中国' : 'China'),
         analysisType: serviceTypeMap[serviceId] || serviceId,
         language: currentLanguage
       };
@@ -217,15 +217,15 @@ const AnalysisModal: React.FC<AnalysisModalProps> = ({ isOpen, onClose, serviceI
                     <span>{currentLanguage === 'zh' ? '出生日期:' : 'Birth Date:'}</span>
                     <span className="font-medium">
                       {currentLanguage === 'zh' ?
-                        `${userProfile.birthYear}年${userProfile.birthMonth}月${userProfile.birthDay}日` :
-                        `${userProfile.birthMonth}/${userProfile.birthDay}/${userProfile.birthYear}`
+                        `${userProfile.birth_year}年${userProfile.birth_month}月${userProfile.birth_day}日` :
+                        `${userProfile.birth_month}/${userProfile.birth_day}/${userProfile.birth_year}`
                       }
                     </span>
                   </div>
-                  {userProfile.birthPlace && (
+                  {userProfile.birth_place && (
                     <div className="flex justify-between">
                       <span>{currentLanguage === 'zh' ? '出生地:' : 'Birth Place:'}</span>
-                      <span className="font-medium">{userProfile.birthPlace}</span>
+                      <span className="font-medium">{userProfile.birth_place}</span>
                     </div>
                   )}
                 </div>

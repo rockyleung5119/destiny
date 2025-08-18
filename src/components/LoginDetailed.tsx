@@ -106,12 +106,12 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
           password: formData.password,
           confirmPassword: formData.confirmPassword,
           gender: formData.gender,
-          birthYear: formData.birthYear ? parseInt(formData.birthYear) : undefined,
-          birthMonth: formData.birthMonth ? parseInt(formData.birthMonth) : undefined,
-          birthDay: formData.birthDay ? parseInt(formData.birthDay) : undefined,
-          birthHour: formData.birthHour ? parseInt(formData.birthHour) : undefined,
-          birthMinute: formData.birthMinute ? parseInt(formData.birthMinute) : undefined,
-          birthPlace: formData.birthPlace || undefined,
+          birth_year: formData.birthYear ? parseInt(formData.birthYear) : undefined,
+          birth_month: formData.birthMonth ? parseInt(formData.birthMonth) : undefined,
+          birth_day: formData.birthDay ? parseInt(formData.birthDay) : undefined,
+          birth_hour: formData.birthHour ? parseInt(formData.birthHour) : undefined,
+          birth_minute: formData.birthMinute ? parseInt(formData.birthMinute) : undefined,
+          birth_place: formData.birthPlace || undefined,
           timezone: formData.timezone || undefined,
         };
 

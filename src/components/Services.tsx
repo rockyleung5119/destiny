@@ -69,7 +69,7 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
       // 从服务器获取最新的用户信息，而不是使用缓存的数据
       const currentUser = await authAPI.getProfile();
 
-      if (!currentUser || !currentUser.birthYear || !currentUser.birthMonth || !currentUser.birthDay) {
+      if (!currentUser || !currentUser.birth_year || !currentUser.birth_month || !currentUser.birth_day) {
         setPermissionModal({
           isOpen: true,
           serviceTitle,

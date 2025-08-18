@@ -224,7 +224,7 @@ export class SchedulerService {
             name: user.name,
             gender: (user.gender as 'male' | 'female') || 'male',
             birthDate: user.birthDate,
-            birthPlace: user.birthPlace || 'Unknown'
+            birthPlace: user.birth_place || 'Unknown'
           });
 
           const success = await emailService.sendDailyFortune(
