@@ -1404,10 +1404,26 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
 
   } catch (error) {
     console.error('❌ Daily fortune error:', error);
+
+    // 提供更具体的错误信息
+    let errorMessage = 'Failed to start daily fortune analysis';
+    if (error.message.includes('API key')) {
+      errorMessage = 'AI service configuration error. Please try again later.';
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'AI analysis timeout. Please try again later.';
+    } else if (error.message.includes('User not found')) {
+      errorMessage = 'User profile not found. Please complete your profile first.';
+    }
+
     return c.json({
       success: false,
-      message: 'Fortune reading failed',
-      error: error.message
+      message: errorMessage,
+      error: error.message,
+      debug: {
+        timestamp: new Date().toISOString(),
+        service: 'daily',
+        userId: c.get('jwtPayload')?.userId
+      }
     }, 500);
   }
 });
@@ -1539,10 +1555,28 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
 
   } catch (error) {
     console.error('❌ Lucky items error:', error);
+
+    // 提供更具体的错误信息
+    let errorMessage = 'Failed to start lucky items analysis';
+    if (error.message.includes('API key')) {
+      errorMessage = 'AI service configuration error. Please try again later.';
+    } else if (error.message.includes('timeout')) {
+      errorMessage = 'AI analysis timeout. Please try again later.';
+    } else if (error.message.includes('User not found')) {
+      errorMessage = 'User profile not found. Please complete your profile first.';
+    } else if (error.message.includes('Missing required birth information')) {
+      errorMessage = 'Please complete your birth information in profile settings first.';
+    }
+
     return c.json({
       success: false,
-      message: 'Fortune reading failed',
-      error: error.message
+      message: errorMessage,
+      error: error.message,
+      debug: {
+        timestamp: new Date().toISOString(),
+        service: 'lucky',
+        userId: c.get('jwtPayload')?.userId
+      }
     }, 500);
   }
 });
@@ -2262,22 +2296,33 @@ class CloudflareDeepSeekService {
   model: string;
 
   constructor(env: any) {
-    // 从Cloudflare环境变量/机密中读取配置
+    // 完全使用Cloudflare环境变量/机密，不使用任何硬编码默认值
     this.apiKey = env.DEEPSEEK_API_KEY;
-    this.baseURL = env.DEEPSEEK_BASE_URL || 'https://api.siliconflow.cn/v1/chat/completions';
-    this.model = env.DEEPSEEK_MODEL || 'Pro/deepseek-ai/DeepSeek-R1';
+    this.baseURL = env.DEEPSEEK_BASE_URL;
+    this.model = env.DEEPSEEK_MODEL;
 
-    // 验证必需的配置
+    // 验证所有必需的配置
     if (!this.apiKey) {
       console.error('❌ DEEPSEEK_API_KEY not found in environment variables');
       throw new Error('DEEPSEEK_API_KEY must be set in Cloudflare environment variables or secrets');
     }
 
+    if (!this.baseURL) {
+      console.error('❌ DEEPSEEK_BASE_URL not found in environment variables');
+      throw new Error('DEEPSEEK_BASE_URL must be set in Cloudflare environment variables or secrets');
+    }
+
+    if (!this.model) {
+      console.error('❌ DEEPSEEK_MODEL not found in environment variables');
+      throw new Error('DEEPSEEK_MODEL must be set in Cloudflare environment variables or secrets');
+    }
+
     console.log('🔧 DeepSeek Service initialized:', {
       hasApiKey: !!this.apiKey,
-      apiKeyPrefix: this.apiKey.substring(0, 10) + '...',
+      apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 10) + '...' : 'MISSING',
       baseURL: this.baseURL,
-      model: this.model
+      model: this.model,
+      envKeys: Object.keys(env).filter(k => k.includes('DEEPSEEK'))
     });
   }
 
@@ -3046,12 +3091,17 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
   try {
     console.log('🔧 Processing stuck tasks...');
 
-    // 查找超过5分钟仍在processing状态的任务
+    // 查找需要处理的任务：
+    // 1. 超过5分钟仍在processing状态的任务
+    // 2. 超过1分钟仍在pending状态的任务（可能异步处理没有启动）
     const stuckTasks = await c.env.DB.prepare(`
-      SELECT id, user_id, task_type, input_data, created_at, updated_at
+      SELECT id, user_id, task_type, input_data, created_at, updated_at, status
       FROM async_tasks
-      WHERE status = 'processing'
-      AND datetime(updated_at) < datetime('now', '-5 minutes')
+      WHERE (
+        (status = 'processing' AND datetime(updated_at) < datetime('now', '-5 minutes'))
+        OR
+        (status = 'pending' AND datetime(created_at) < datetime('now', '-1 minutes'))
+      )
       ORDER BY created_at ASC
       LIMIT 10
     `).all();
@@ -3127,12 +3177,17 @@ export default {
     console.log('🕐 Scheduled task: Processing stuck tasks...');
 
     try {
-      // 查找超过5分钟仍在processing状态的任务
+      // 查找需要处理的任务：
+      // 1. 超过5分钟仍在processing状态的任务
+      // 2. 超过1分钟仍在pending状态的任务（可能异步处理没有启动）
       const stuckTasks = await env.DB.prepare(`
-        SELECT id, user_id, task_type, input_data, created_at, updated_at
+        SELECT id, user_id, task_type, input_data, created_at, updated_at, status
         FROM async_tasks
-        WHERE status = 'processing'
-        AND datetime(updated_at) < datetime('now', '-5 minutes')
+        WHERE (
+          (status = 'processing' AND datetime(updated_at) < datetime('now', '-5 minutes'))
+          OR
+          (status = 'pending' AND datetime(created_at) < datetime('now', '-1 minutes'))
+        )
         ORDER BY created_at ASC
         LIMIT 5
       `).all();
