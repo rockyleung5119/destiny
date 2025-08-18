@@ -81,14 +81,15 @@ async function diagnoseAIService() {
     }
     
     console.log('\n🎯 Diagnosis Summary:');
-    console.log('1. Check the Worker logs for detailed error messages');
-    console.log('2. The improved error handling should now show specific issues');
-    console.log('3. Look for patterns in the error messages to identify root cause');
-    console.log('4. Common issues:');
-    console.log('   - API key problems');
-    console.log('   - Network timeouts');
-    console.log('   - Response format issues');
-    console.log('   - Content processing errors');
+    console.log('1. ✅ Timeout increased to 300 seconds for large model responses');
+    console.log('2. ✅ Segmented processing to bypass Cloudflare Workers CPU limits');
+    console.log('3. ✅ Improved error handling shows specific error messages');
+    console.log('4. ⚠️  API key must be set in Cloudflare secrets (not hardcoded)');
+    console.log('5. 🔧 Next steps:');
+    console.log('   - Run: wrangler secret put DEEPSEEK_API_KEY');
+    console.log('   - Push code to GitHub for auto-deployment');
+    console.log('   - Test AI services again');
+    console.log('   - Check Worker logs for detailed diagnostics');
     
   } catch (error) {
     console.error('❌ Diagnosis failed:', error.message);

@@ -2262,12 +2262,20 @@ class CloudflareDeepSeekService {
   model: string;
 
   constructor(env: any) {
-    this.apiKey = env.DEEPSEEK_API_KEY || 'sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn';
+    // 从Cloudflare环境变量/机密中读取配置
+    this.apiKey = env.DEEPSEEK_API_KEY;
     this.baseURL = env.DEEPSEEK_BASE_URL || 'https://api.siliconflow.cn/v1/chat/completions';
     this.model = env.DEEPSEEK_MODEL || 'Pro/deepseek-ai/DeepSeek-R1';
 
+    // 验证必需的配置
+    if (!this.apiKey) {
+      console.error('❌ DEEPSEEK_API_KEY not found in environment variables');
+      throw new Error('DEEPSEEK_API_KEY must be set in Cloudflare environment variables or secrets');
+    }
+
     console.log('🔧 DeepSeek Service initialized:', {
       hasApiKey: !!this.apiKey,
+      apiKeyPrefix: this.apiKey.substring(0, 10) + '...',
       baseURL: this.baseURL,
       model: this.model
     });
@@ -2404,7 +2412,7 @@ Current Time: ${currentTime}
 
   // 调用DeepSeek API（带重试机制）
   async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000) {
-    const maxRetries = 2; // 增加重试次数，但使用更短的超时时间
+    const maxRetries = 1; // 减少重试次数，依赖300秒长超时提高单次成功率
 
     // 快速验证基本配置
     if (!this.apiKey || !this.baseURL || !this.model) {
@@ -2420,11 +2428,9 @@ Current Time: ${currentTime}
       console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}`);
       console.log(`🌐 API URL: ${this.baseURL}`);
       console.log(`🤖 Model: ${this.model}`);
-      // 根据Cloudflare Worker的实际限制调整超时时间
-      // 考虑到Worker的CPU时间限制，使用更保守的超时设置
-      // 如果是重试，使用更短的超时时间
-      const baseTimeout = retryCount > 0 ? 60000 : 90000; // 重试时60秒，首次90秒
-      const timeoutMs = Math.min(baseTimeout, 90000); // 最大90秒
+      // 使用300秒超时适应大模型响应时间
+      // 通过分段处理绕过Cloudflare Workers的CPU时间限制
+      const timeoutMs = 300000; // 5分钟超时
       console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (retry: ${retryCount})`);
 
       const requestData = {
@@ -2518,8 +2524,8 @@ Current Time: ${currentTime}
       }
 
       if (retryCount < maxRetries) {
-        // 使用更短的重试延迟，避免超过Worker执行时间限制
-        const delay = retryCount === 0 ? 3000 : 5000; // 首次重试3秒，后续5秒
+        // 使用较长的重试延迟，适应300秒超时的大模型调用
+        const delay = 10000; // 10秒延迟，给API服务器恢复时间
         console.log(`🔄 Retrying in ${delay/1000} seconds... (attempt ${retryCount + 2}/${maxRetries + 1})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens);
@@ -2903,10 +2909,10 @@ async function processAsyncTask(env: any, taskId: string, taskType: string, user
 
 // 智能AI处理函数 - 分段处理，每10秒检查一次
 async function processAIWithSmartRetry(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  console.log(`🧠 [${taskId}] Starting smart AI processing...`);
+  console.log(`🧠 [${taskId}] Starting smart AI processing with 300s timeout...`);
 
   const deepSeekService = new CloudflareDeepSeekService(env);
-  const maxAttempts = 30; // 30次 × 10秒 = 5分钟（与前端一致）
+  const maxAttempts = 60; // 60次 × 10秒 = 10分钟（适应300秒AI超时 + 缓冲时间）
   let attempt = 0;
 
   // 启动AI调用
