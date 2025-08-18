@@ -1,8 +1,8 @@
-// 验证生产环境AI结果保存修复
+// 验证生产环境AI错误处理修复
 const PROD_API_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
 
 async function verifyProductionFix() {
-  console.log('🔍 Verifying Production AI Result Fix...\n');
+  console.log('🔍 Verifying Production AI Error Handling Fix...\n');
 
   try {
     // 步骤1: 检查当前卡住的任务
@@ -15,6 +15,11 @@ async function verifyProductionFix() {
 
     const data = await response.json();
     console.log('📋 Current stuck tasks:', JSON.stringify(data, null, 2));
+
+    // 步骤2: 测试新的错误处理
+    console.log('\n🧪 Step 2: Testing improved error handling...');
+    console.log('💡 The fix should now provide specific error messages instead of generic "AI service temporarily unavailable"');
+    console.log('💡 Check the Worker logs for detailed error information');
 
     if (data.success) {
       if (data.total > 0) {

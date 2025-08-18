@@ -2392,6 +2392,16 @@ Current Time: ${currentTime}
     return cleanedContent;
   }
 
+  // 八字专用 - 过滤AI标识，保留100%原始排盘信息
+  cleanBaziOutput(content) {
+    if (!content || typeof content !== 'string') {
+      return content;
+    }
+
+    // 使用通用清理函数，过滤AI标识但保留所有排盘信息
+    return this.cleanAIOutput(content);
+  }
+
   // 调用DeepSeek API（带重试机制）
   async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000) {
     const maxRetries = 2; // 增加重试次数，但使用更短的超时时间
@@ -2464,14 +2474,37 @@ Current Time: ${currentTime}
 
       let content = data.choices[0].message.content;
 
-      // 根据清理类型处理内容
-      if (cleaningType === 'bazi') {
-        content = this.cleanAIOutput(content);
-      } else if (cleaningType === 'default') {
-        content = this.cleanAIOutput(content);
+      // 验证内容不为空
+      if (!content || typeof content !== 'string') {
+        console.error('❌ AI returned empty or invalid content:', content);
+        throw new Error('AI service returned empty response');
       }
 
-      console.log(`✅ API call successful, content length: ${content.length}`);
+      console.log(`📝 Raw AI response length: ${content.length} characters`);
+      console.log(`📝 Raw AI response preview: ${content.substring(0, 200)}...`);
+
+      // 根据清理类型处理内容
+      try {
+        if (cleaningType === 'bazi') {
+          content = this.cleanBaziOutput(content);
+          console.log(`🔧 BaZi content cleaned, final length: ${content.length}`);
+        } else {
+          content = this.cleanAIOutput(content);
+          console.log(`🔧 Default content cleaned, final length: ${content.length}`);
+        }
+      } catch (cleanError) {
+        console.error('❌ Content cleaning failed:', cleanError);
+        // 如果清理失败，使用原始内容
+        console.log('⚠️ Using raw content due to cleaning failure');
+      }
+
+      // 最终验证
+      if (!content || content.trim().length === 0) {
+        console.error('❌ Content is empty after cleaning');
+        throw new Error('AI response became empty after processing');
+      }
+
+      console.log(`✅ API call successful, final content length: ${content.length}`);
       return content;
 
     } catch (error) {
@@ -2492,8 +2525,33 @@ Current Time: ${currentTime}
         return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens);
       }
 
-      // 返回友好的错误信息
-      const userFriendlyMessage = this.getUserFriendlyErrorMessage(error, language);
+      // 保留原始错误信息用于调试，同时提供用户友好的错误信息
+      console.error('❌ Final API call failure, original error:', error.message);
+      console.error('❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500)
+      });
+
+      // 根据具体错误类型提供更准确的错误信息
+      let userFriendlyMessage;
+      if (error.message.includes('Invalid response format')) {
+        userFriendlyMessage = language === 'en' ?
+          'AI service returned invalid response. Please try again.' :
+          'AI服务返回了无效响应，请重试。';
+      } else if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        userFriendlyMessage = language === 'en' ?
+          'AI analysis timeout. Please try again later.' :
+          'AI分析超时，请稍后重试。';
+      } else if (error.message.includes('fetch')) {
+        userFriendlyMessage = language === 'en' ?
+          'Network connection failed. Please check your connection.' :
+          '网络连接失败，请检查网络连接。';
+      } else {
+        // 对于未知错误，保留原始错误信息用于调试
+        userFriendlyMessage = `AI service error: ${error.message}`;
+      }
+
       throw new Error(userFriendlyMessage);
     }
   }
