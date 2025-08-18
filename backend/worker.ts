@@ -1021,33 +1021,210 @@ app.put('/api/user/change-password', jwtMiddleware, async (c) => {
 });
 
 // 算命功能路由
+
+// 八字精算
 app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   try {
+    console.log('🔮 BaZi Analysis Request');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
-    const { question, language = 'zh' } = await c.req.json();
+    const { language = 'zh' } = await c.req.json().catch(() => ({}));
 
-    const user = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE id = ?'
-    ).bind(userId).first();
+    // 获取用户完整信息
+    const user = await c.env.DB.prepare(`
+      SELECT id, name, email, gender, birth_year, birth_month, birth_day,
+             birth_hour, birth_minute, birth_place, timezone
+      FROM users WHERE id = ?
+    `).bind(userId).first();
 
     if (!user) {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    const fortuneResult = await callDeepSeekAPI(user, question, language, c.env);
+    // 检查用户是否有完整的出生信息
+    if (!user.birth_year || !user.birth_month || !user.birth_day) {
+      return c.json({
+        success: false,
+        message: 'Please complete your birth information in profile settings first'
+      }, 400);
+    }
 
-    await c.env.DB.prepare(
-      'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(userId, 'bazi', question, fortuneResult, language, new Date().toISOString()).run();
+    const analysis = await callDeepSeekAPI(user, 'bazi', '', language, c.env);
+
+    // 保存分析记录
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(userId, 'bazi', '', analysis, language, new Date().toISOString()).run();
+    } catch (dbError) {
+      console.warn('Failed to save fortune reading:', dbError);
+    }
 
     return c.json({
       success: true,
-      result: fortuneResult
+      message: 'BaZi analysis completed successfully',
+      data: {
+        type: 'bazi',
+        analysis: analysis,
+        aiAnalysis: analysis,
+        analysisType: 'bazi',
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
-    console.error('Fortune reading error:', error);
-    return c.json({ success: false, message: 'Fortune reading failed' }, 500);
+    console.error('❌ BaZi analysis error:', error);
+    return c.json({
+      success: false,
+      message: 'Fortune reading failed',
+      error: error.message
+    }, 500);
+  }
+});
+
+// 每日运势
+app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
+  try {
+    console.log('🔮 Daily Fortune Request');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+    const { language = 'zh' } = await c.req.json().catch(() => ({}));
+
+    const user = await c.env.DB.prepare(`
+      SELECT id, name, email, gender, birth_year, birth_month, birth_day,
+             birth_hour, birth_minute, birth_place, timezone
+      FROM users WHERE id = ?
+    `).bind(userId).first();
+
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    const fortune = await callDeepSeekAPI(user, 'daily', '', language, c.env);
+
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(userId, 'daily', '', fortune, language, new Date().toISOString()).run();
+    } catch (dbError) {
+      console.warn('Failed to save fortune reading:', dbError);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Daily fortune completed successfully',
+      data: {
+        type: 'daily',
+        analysis: fortune,
+        aiAnalysis: fortune,
+        analysisType: 'daily',
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Daily fortune error:', error);
+    return c.json({
+      success: false,
+      message: 'Fortune reading failed',
+      error: error.message
+    }, 500);
+  }
+});
+
+// 塔罗占卜
+app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
+  try {
+    console.log('🔮 Tarot Reading Request');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+    const { question = '', language = 'zh' } = await c.req.json().catch(() => ({}));
+
+    const user = await c.env.DB.prepare(`
+      SELECT id, name, email, gender, birth_year, birth_month, birth_day,
+             birth_hour, birth_minute, birth_place, timezone
+      FROM users WHERE id = ?
+    `).bind(userId).first();
+
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    const reading = await callDeepSeekAPI(user, 'tarot', question, language, c.env);
+
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(userId, 'tarot', question, reading, language, new Date().toISOString()).run();
+    } catch (dbError) {
+      console.warn('Failed to save fortune reading:', dbError);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Tarot reading completed successfully',
+      data: {
+        type: 'tarot',
+        analysis: reading,
+        aiAnalysis: reading,
+        analysisType: 'tarot',
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Tarot reading error:', error);
+    return c.json({
+      success: false,
+      message: 'Fortune reading failed',
+      error: error.message
+    }, 500);
+  }
+});
+
+// 幸运物品和颜色
+app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
+  try {
+    console.log('🔮 Lucky Items Request');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+    const { language = 'zh' } = await c.req.json().catch(() => ({}));
+
+    const user = await c.env.DB.prepare(`
+      SELECT id, name, email, gender, birth_year, birth_month, birth_day,
+             birth_hour, birth_minute, birth_place, timezone
+      FROM users WHERE id = ?
+    `).bind(userId).first();
+
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    const items = await callDeepSeekAPI(user, 'lucky', '', language, c.env);
+
+    try {
+      await c.env.DB.prepare(
+        'INSERT INTO fortune_readings (user_id, reading_type, question, result, language, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(userId, 'lucky', '', items, language, new Date().toISOString()).run();
+    } catch (dbError) {
+      console.warn('Failed to save fortune reading:', dbError);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Lucky items analysis completed successfully',
+      data: {
+        type: 'lucky',
+        analysis: items,
+        aiAnalysis: items,
+        analysisType: 'lucky',
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Lucky items error:', error);
+    return c.json({
+      success: false,
+      message: 'Fortune reading failed',
+      error: error.message
+    }, 500);
   }
 });
 
@@ -1759,33 +1936,179 @@ async function generateJWT(userId, secret) {
   return await sign(payload, secret);
 }
 
-async function callDeepSeekAPI(user, question, language, env) {
-  const prompt = `请为用户进行八字算命分析。
-用户信息：
-- 姓名：${user.name}
+async function callDeepSeekAPI(user, analysisType, question, language, env) {
+  const targetLanguage = getLanguageName(language);
+  const userProfile = buildUserProfile(user);
+
+  let prompt = '';
+  let systemMessage = '';
+
+  switch (analysisType) {
+    case 'bazi':
+      systemMessage = `你是有数十年经验资深八字命理大师，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析，用${targetLanguage}回复。`;
+      prompt = `请根据以下用户信息进行详细的八字命理分析：
+
+${userProfile}
+
+请从以下几个方面进行专业分析：
+1. 八字基本信息 - 分析用户的年柱、月柱、日柱、时柱
+2. 五行分析 - 分析五行强弱分布，找出用神和忌神
+3. 十神配置 - 分析十神的配置情况
+4. 性格特征 - 基于八字配置分析性格特点
+5. 事业财运 - 分析适合的职业方向、财运趋势
+6. 感情婚姻 - 分析感情模式、婚姻运势
+7. 健康状况 - 基于五行分析健康注意事项
+8. 人生建议 - 提供具体的开运建议
+
+要求：使用传统八字术语，提供实用建议。用${targetLanguage}回复。`;
+      break;
+
+    case 'daily':
+      systemMessage = `你是专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势，用${targetLanguage}回复。`;
+      prompt = `请根据以下用户信息分析今日运势：
+
+${userProfile}
+
+今日日期：${new Date().toLocaleDateString('zh-CN')}
+
+请从以下方面分析今日运势：
+1. 整体运势 - 今日的总体运势如何
+2. 事业工作 - 工作方面的运势和建议
+3. 财运状况 - 今日的财运如何
+4. 感情人际 - 感情运势，人际关系
+5. 健康状况 - 身体健康方面需要注意的事项
+6. 幸运提醒 - 今日的幸运颜色、数字、方位
+7. 注意事项 - 今日需要特别注意避免的事情
+8. 开运建议 - 具体的开运方法和建议
+
+要求：分析要结合传统命理学原理，给出实用的生活指导。用${targetLanguage}回复。`;
+      break;
+
+    case 'tarot':
+      systemMessage = `你是经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜，用${targetLanguage}回复。`;
+      prompt = `请为用户进行塔罗占卜：
+
+${userProfile}
+
+占卜问题：${question || '请为我进行综合运势占卜'}
+
+请按照以下步骤进行占卜：
+1. 牌阵选择 - 根据问题选择合适的牌阵
+2. 抽牌过程 - 描述抽牌的过程和抽到的牌
+3. 牌面解读 - 详细解读每张牌的含义
+4. 牌与牌的关系 - 分析各张牌之间的相互关系
+5. 综合分析 - 结合所有牌面给出综合的占卜结果
+6. 时间预测 - 如果适用，给出时间方面的预测
+7. 行动建议 - 基于占卜结果给出具体的行动建议
+8. 注意事项 - 需要特别注意的事项和警示
+
+要求：占卜要有神秘感和专业性，结合东西方智慧。用${targetLanguage}回复。`;
+      break;
+
+    case 'lucky':
+      systemMessage = `你是精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析，用${targetLanguage}回复。`;
+      prompt = `请根据以下用户信息推荐幸运物品和颜色：
+
+${userProfile}
+
+请从以下方面进行分析推荐：
+1. 五行分析 - 分析用户八字的五行属性和强弱
+2. 幸运颜色 - 基于五行理论推荐最适合的颜色
+3. 幸运数字 - 推荐幸运数字和需要避免的数字
+4. 幸运饰品 - 推荐适合佩戴的饰品材质和款式
+5. 幸运方位 - 推荐有利的方位和需要避免的方位
+6. 幸运时间 - 推荐有利的时辰和日期
+7. 开运物品 - 推荐具体的开运物品和摆放建议
+8. 生活建议 - 在日常生活中如何运用这些幸运元素
+
+要求：建议要实用可行，基于传统五行理论。用${targetLanguage}回复。`;
+      break;
+
+    default:
+      throw new Error(`Unsupported analysis type: ${analysisType}`);
+  }
+
+  try {
+    const response = await fetch(env.DEEPSEEK_BASE_URL || 'https://api.siliconflow.cn/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: env.DEEPSEEK_MODEL || 'Pro/deepseek-ai/DeepSeek-R1',
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response format from DeepSeek API');
+    }
+
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('DeepSeek API call failed:', error);
+    // 返回模拟响应作为后备
+    return getFallbackResponse(analysisType, language);
+  }
+}
+
+function getLanguageName(language) {
+  const languageMap = {
+    'zh': '中文',
+    'en': '英文',
+    'es': '西班牙语',
+    'fr': '法语',
+    'ja': '日语'
+  };
+  return languageMap[language] || '中文';
+}
+
+function buildUserProfile(user) {
+  const timezone = user.timezone || 'Asia/Shanghai';
+  return `用户基本信息：
+- 姓名：${user.name || '未知'}
 - 性别：${user.gender || '未知'}
-- 出生日期：${user.birth_year}-${user.birth_month}-${user.birth_day} ${user.birth_hour}:00
+- 出生年份：${user.birth_year || '未知'}
+- 出生月份：${user.birth_month || '未知'}
+- 出生日期：${user.birth_day || '未知'}
+- 出生时辰：${user.birth_hour || '未知'}时${user.birth_minute || '0'}分
 - 出生地点：${user.birth_place || '未知'}
-- ���题：${question || '请进行综合运势分析'}
+- 时区：${timezone}`;
+}
 
-请用${language === 'zh' ? '中文' : '英文'}回答，提供详细的八字分析。`;
-
-  const response = await fetch(env.DEEPSEEK_BASE_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`
+function getFallbackResponse(analysisType, language) {
+  const responses = {
+    'bazi': {
+      'zh': '抱歉，AI服务暂时不可用。请稍后再试。您的八字信息已记录，我们会尽快为您提供详细的命理分析。',
+      'en': 'Sorry, AI service is temporarily unavailable. Please try again later. Your birth information has been recorded, and we will provide detailed analysis soon.'
     },
-    body: JSON.stringify({
-      model: env.DEEPSEEK_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 2000
-    })
-  });
+    'daily': {
+      'zh': '抱歉，AI服务暂时不可用。请稍后再试。今日运势分析将在服务恢复后为您提供。',
+      'en': 'Sorry, AI service is temporarily unavailable. Please try again later. Daily fortune analysis will be provided once service is restored.'
+    },
+    'tarot': {
+      'zh': '抱歉，AI服务暂时不可用。请稍后再试。塔罗占卜将在服务恢复后为您提供。',
+      'en': 'Sorry, AI service is temporarily unavailable. Please try again later. Tarot reading will be provided once service is restored.'
+    },
+    'lucky': {
+      'zh': '抱歉，AI服务暂时不可用。请稍后再试。幸运物品推荐将在服务恢复后为您提供。',
+      'en': 'Sorry, AI service is temporarily unavailable. Please try again later. Lucky items recommendation will be provided once service is restored.'
+    }
+  };
 
-  const data = await response.json();
-  return data.choices[0].message.content;
+  return responses[analysisType]?.[language] || responses[analysisType]?.['zh'] || '服务暂时不可用，请稍后再试。';
 }
 
 export default app;
