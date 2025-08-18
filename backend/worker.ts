@@ -4,7 +4,41 @@ import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
 import bcrypt from 'bcryptjs';
 import { HTTPException } from 'hono/http-exception';
-import verificationTemplate from './templates/exported/verification-email-indicate-top.html';
+// 邮箱验证模板（内联以避免导入问题）
+const verificationTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indicate.Top - Email Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background: linear-gradient(135deg, #ffffff 0%, #fff5f5 8%, #fef3c7 16%, #ecfdf5 24%, #eff6ff 32%, #f3e8ff 40%, #fdf4ff 48%, #fff1f2 56%, #fffbeb 64%, #f0fdf4 72%, #f0f9ff 80%, #faf5ff 88%, #ffffff 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: rgba(255, 255, 255, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); backdrop-filter: blur(10px);">
+    <div style="text-align: center; padding: 40px 20px 20px 20px; background: transparent;">
+      <div style="background: rgba(255,255,255,0.95); display: inline-block; padding: 20px 40px; border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 16px;">
+        <h1 style="color: #2d3748; margin: 0; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Indicate.Top</h1>
+        <p style="color: #718096; margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">Ancient Divination Arts</p>
+        <p style="color: #a0aec0; margin: 5px 0 0 0; font-size: 14px; font-style: italic;">Illuminating paths through celestial wisdom</p>
+      </div>
+    </div>
+    <div style="background: rgba(255,255,255,0.95); border-radius: 20px; padding: 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); backdrop-filter: blur(10px); margin: 20px; text-align: center; color: #1f2937;">
+      <h2 style="color: #1f2937; margin: 0 0 24px 0; font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Email Verification Code</h2>
+      <p style="color: #4b5563; margin: 0 0 40px 0; font-size: 18px; line-height: 1.6;">Please use the following verification code to complete email verification:</p>
+      <div style="background: rgba(255,255,255,0.8); padding: 40px; border-radius: 20px; margin: 40px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; backdrop-filter: blur(10px);">
+        <div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); color: #1f2937; display: inline-block; padding: 24px 40px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 2px solid rgba(139, 92, 246, 0.2);">
+          <span style="font-size: 42px; font-weight: 800; letter-spacing: 12px; font-family: 'Courier New', monospace; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">{{verification_code}}</span>
+        </div>
+        <p style="color: #6b7280; margin: 0; font-size: 16px; font-weight: 500;">Verification code expires in 5 minutes</p>
+      </div>
+    </div>
+    <div style="text-align: center; padding: 30px; background: transparent; border-top: 1px solid rgba(229, 231, 235, 0.3);">
+      <div style="background: rgba(255,255,255,0.7); padding: 20px; border-radius: 12px; backdrop-filter: blur(10px);">
+        <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.6;">This email was sent automatically, please do not reply<br>© 2025 Indicate.Top. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
 
 // 为环境变量定义一个清晰的类型别名
 type Env = {

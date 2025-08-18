@@ -117,6 +117,21 @@ INSERT INTO users (
   '梁景乐', 'male', 1992, 9, 15, 9, 30, '中国广州', 'Asia/Shanghai', 1, 5
 );
 
+-- 异步任务表（用于AI处理的异步任务）
+CREATE TABLE IF NOT EXISTS async_tasks (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  task_type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  input_data TEXT,
+  result TEXT,
+  error_message TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  completed_at TEXT,
+  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
 -- 3. 重新插入测试会员数据
 INSERT INTO memberships (
   id, user_id, plan_id, is_active, expires_at, remaining_credits
