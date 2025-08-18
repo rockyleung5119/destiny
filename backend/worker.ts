@@ -777,11 +777,22 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
         success: true,
         data: {
           planId: null,
+          plan_id: null, // 兼容字段
           isActive: false,
+          is_active: false, // 兼容字段
           expiresAt: null,
+          expires_at: null, // 兼容字段
           remainingCredits: 0,
+          remaining_credits: 0, // 兼容字段
           createdAt: null,
           updatedAt: null,
+          hasMembership: false,
+          features: {
+            dailyFortune: false,
+            baziAnalysis: false,
+            tarotReading: false,
+            luckyItems: false
+          },
           plan: null
         }
       });
@@ -798,16 +809,57 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
       isActuallyActive
     });
 
+    // 定义会员计划的功能权限
+    const planFeatures = {
+      single: {
+        dailyFortune: true,
+        baziAnalysis: true,
+        tarotReading: true,
+        luckyItems: true
+      },
+      monthly: {
+        dailyFortune: true,
+        baziAnalysis: true,
+        tarotReading: true,
+        luckyItems: true
+      },
+      yearly: {
+        dailyFortune: true,
+        baziAnalysis: true,
+        tarotReading: true,
+        luckyItems: true
+      }
+    };
+
+    const features = planFeatures[membership.plan_id] || {
+      dailyFortune: false,
+      baziAnalysis: false,
+      tarotReading: false,
+      luckyItems: false
+    };
+
     return c.json({
       success: true,
       data: {
         planId: membership.plan_id,
+        plan_id: membership.plan_id, // 兼容字段
         isActive: isActuallyActive,
+        is_active: isActuallyActive, // 兼容字段
         expiresAt: membership.expires_at,
+        expires_at: membership.expires_at, // 兼容字段
         remainingCredits: membership.remaining_credits,
+        remaining_credits: membership.remaining_credits, // 兼容字段
         createdAt: membership.created_at,
         updatedAt: membership.updated_at,
-        plan: membership
+        hasMembership: true,
+        features: features,
+        plan: {
+          id: membership.plan_id,
+          name: membership.plan_id === 'monthly' ? 'Monthly Plan' :
+                membership.plan_id === 'yearly' ? 'Yearly Plan' : 'Single Reading',
+          level: membership.plan_id,
+          features: Object.keys(features).filter(key => features[key])
+        }
       }
     });
   } catch (error) {

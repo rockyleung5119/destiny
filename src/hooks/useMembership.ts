@@ -89,11 +89,22 @@ export const useMembership = () => {
 
         // 从后端API获取用户会员信息
         const response = await membershipAPI.getStatus();
+        console.log('🔍 Membership API response:', response);
+
         if (response.success && response.data) {
           const membershipData = response.data;
+          console.log('💳 Membership data:', membershipData);
 
           // 如果没有会员计划，设置为未激活状态
-          if (!membershipData.plan_id) {
+          // 兼容后端返回的字段名：planId 或 plan_id
+          const planId = membershipData.planId || membershipData.plan_id;
+          const isActive = membershipData.isActive !== undefined ? membershipData.isActive : membershipData.is_active;
+          const expiresAt = membershipData.expiresAt || membershipData.expires_at;
+          const remainingCredits = membershipData.remainingCredits !== undefined ? membershipData.remainingCredits : membershipData.remaining_credits;
+
+          console.log('🔍 Parsed membership fields:', { planId, isActive, expiresAt, remainingCredits });
+
+          if (!planId) {
             setMembership({
               plan: NO_MEMBERSHIP,
               isActive: false,
@@ -101,21 +112,24 @@ export const useMembership = () => {
           } else {
             // 根据后端返回的计划ID创建计划对象
             const plan = {
-              id: membershipData.plan_id,
+              id: planId,
               name: membershipData.plan?.name || 'Membership Plan',
-              level: membershipData.plan_id,
+              level: planId,
               features: membershipData.features || [],
               price: membershipData.plan?.price || 0,
-              hasCreditsLimit: membershipData.plan_id === 'single'
+              hasCreditsLimit: planId === 'single'
             };
 
-            setMembership({
+            const finalMembership = {
               plan,
-              isActive: membershipData.is_active || false,
-              expiresAt: membershipData.expires_at ? new Date(membershipData.expires_at) : undefined,
-              remainingCredits: membershipData.remaining_credits,
+              isActive: isActive || false,
+              expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+              remainingCredits: remainingCredits,
               hasUnlimitedAccess: !plan.hasCreditsLimit
-            });
+            };
+
+            console.log('✅ Setting membership:', finalMembership);
+            setMembership(finalMembership);
           }
         } else {
           // 默认无会员状态
@@ -167,33 +181,44 @@ export const useMembership = () => {
   };
 
   const canUseService = (serviceId: string): { allowed: boolean; reason?: string } => {
+    console.log(`🔍 Checking service access for ${serviceId}:`, { membership });
+
     if (!membership) {
+      console.log('❌ No membership found');
       return { allowed: false, reason: 'membership_loading' };
     }
 
     if (!membership.isActive) {
+      console.log('❌ Membership not active');
       return { allowed: false, reason: 'membership_expired' };
     }
 
-    if (!hasServiceAccess(serviceId)) {
+    // 没有会员的用户无法访问任何服务
+    if (membership.plan.id === 'none') {
+      console.log('❌ No membership plan');
       return { allowed: false, reason: 'requires_payment' };
     }
 
     // 月度和年度会员有无限使用权限
     if (membership.plan.level === 'monthly' || membership.plan.level === 'yearly') {
+      console.log('✅ Monthly/Yearly member - access granted');
       return { allowed: true };
     }
 
     // 检查是否有无限使用权限标识
     if (membership.hasUnlimitedAccess) {
+      console.log('✅ Unlimited access - access granted');
       return { allowed: true };
     }
 
     // 检查单次付费用户的剩余次数
     if (membership.plan.level === 'single' && (membership.remainingCredits || 0) <= 0) {
+      console.log('❌ Single plan with no credits');
       return { allowed: false, reason: 'no_credits' };
     }
 
+    // 其他付费用户可以访问服务
+    console.log('✅ Paid member - access granted');
     return { allowed: true };
   };
 
