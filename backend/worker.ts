@@ -1992,7 +1992,11 @@ async function generateJWT(userId, secret) {
 
 // Cloudflare Workers兼容的DeepSeek服务类
 class CloudflareDeepSeekService {
-  constructor(env) {
+  apiKey: string;
+  baseURL: string;
+  model: string;
+
+  constructor(env: any) {
     this.apiKey = env.DEEPSEEK_API_KEY || 'sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn';
     this.baseURL = env.DEEPSEEK_BASE_URL || 'https://api.siliconflow.cn/v1/chat/completions';
     this.model = env.DEEPSEEK_MODEL || 'Pro/deepseek-ai/DeepSeek-R1';
@@ -2018,13 +2022,15 @@ class CloudflareDeepSeekService {
     const birthMonth = user.birth_month || user.birthMonth;
     const birthDay = user.birth_day || user.birthDay;
     const birthHour = user.birth_hour || user.birthHour;
+    const birthMinute = user.birth_minute || user.birthMinute || 0;
     const birthPlace = user.birth_place || user.birthPlace;
 
     const timezone = userTimezone || user.timezone || 'Asia/Shanghai';
 
     if (language === 'en') {
       const genderText = gender === 'male' ? 'Male' : 'Female';
-      const birthTime = birthHour ? `${birthHour}:00` : 'Unknown';
+      const birthTime = birthHour !== null && birthHour !== undefined ?
+        `${String(birthHour).padStart(2, '0')}:${String(birthMinute).padStart(2, '0')}` : 'Unknown';
       const currentDate = new Date().toLocaleDateString('en-US', { timeZone: timezone });
       const currentTime = new Date().toLocaleTimeString('en-US', { timeZone: timezone });
 
@@ -2040,7 +2046,8 @@ Current Time: ${currentTime}
       `.trim();
     } else {
       const genderText = gender === 'male' ? '男' : '女';
-      const birthTime = birthHour ? `${birthHour}时` : '未知';
+      const birthTime = birthHour !== null && birthHour !== undefined ?
+        `${birthHour}时${birthMinute}分` : '未知';
       const currentDate = new Date().toLocaleDateString('zh-CN', { timeZone: timezone });
       const currentTime = new Date().toLocaleTimeString('zh-CN', { timeZone: timezone });
 

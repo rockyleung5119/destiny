@@ -124,6 +124,7 @@ export const fortuneAPI = {
       headers: {
         'Accept-Language': language,
       },
+      body: JSON.stringify({ language }),
     }, 300000); // 5分钟超时
   },
 
@@ -134,6 +135,7 @@ export const fortuneAPI = {
       headers: {
         'Accept-Language': language,
       },
+      body: JSON.stringify({ language }),
     }, 300000); // 5分钟超时
   },
 
@@ -144,7 +146,7 @@ export const fortuneAPI = {
       headers: {
         'Accept-Language': language,
       },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, language }),
     }, 300000); // 5分钟超时
   },
 
@@ -155,6 +157,7 @@ export const fortuneAPI = {
       headers: {
         'Accept-Language': language,
       },
+      body: JSON.stringify({ language }),
     }, 300000); // 5分钟超时
   },
 
