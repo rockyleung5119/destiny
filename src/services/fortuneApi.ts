@@ -117,48 +117,142 @@ export const fortuneAPI = {
     });
   },
 
-  // 八字精算
+  // 八字精算 - 异步任务模式
   async getBaziAnalysis(language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequestWithTimeout<FortuneResponse>('/fortune/bazi', {
+    // 1. 启动异步任务
+    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/bazi', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
       body: JSON.stringify({ language }),
-    }, 300000); // 5分钟超时
+    });
+
+    if (!startResponse.success || !startResponse.data.taskId) {
+      throw new Error('Failed to start BaZi analysis');
+    }
+
+    // 2. 轮询任务状态直到完成
+    return await this.pollTaskUntilComplete(startResponse.data.taskId);
   },
 
-  // 每日运势
+  // 每日运势 - 异步任务模式
   async getDailyFortune(language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequestWithTimeout<FortuneResponse>('/fortune/daily', {
+    // 1. 启动异步任务
+    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/daily', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
       body: JSON.stringify({ language }),
-    }, 300000); // 5分钟超时
+    });
+
+    if (!startResponse.success || !startResponse.data.taskId) {
+      throw new Error('Failed to start daily fortune analysis');
+    }
+
+    // 2. 轮询任务状态直到完成
+    return await this.pollTaskUntilComplete(startResponse.data.taskId);
   },
 
-  // 天体塔罗占卜
+  // 天体塔罗占卜 - 异步任务模式
   async getTarotReading(question: string = '', language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequestWithTimeout<FortuneResponse>('/fortune/tarot', {
+    // 1. 启动异步任务
+    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/tarot', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
       body: JSON.stringify({ question, language }),
-    }, 300000); // 5分钟超时
+    });
+
+    if (!startResponse.success || !startResponse.data.taskId) {
+      throw new Error('Failed to start tarot reading');
+    }
+
+    // 2. 轮询任务状态直到完成
+    return await this.pollTaskUntilComplete(startResponse.data.taskId);
   },
 
-  // 幸运物品和颜色
+  // 幸运物品和颜色 - 异步任务模式
   async getLuckyItems(language: string = 'zh'): Promise<FortuneResponse> {
-    return await apiRequestWithTimeout<FortuneResponse>('/fortune/lucky', {
+    // 1. 启动异步任务
+    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/lucky', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
       },
       body: JSON.stringify({ language }),
-    }, 300000); // 5分钟超时
+    });
+
+    if (!startResponse.success || !startResponse.data.taskId) {
+      throw new Error('Failed to start lucky items analysis');
+    }
+
+    // 2. 轮询任务状态直到完成
+    return await this.pollTaskUntilComplete(startResponse.data.taskId);
+  },
+
+  // 轮询任务状态直到完成
+  async pollTaskUntilComplete(taskId: string): Promise<FortuneResponse> {
+    const maxAttempts = 60; // 最多轮询5分钟 (60次 * 5秒)
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      try {
+        const statusResponse = await apiRequest<{
+          success: boolean;
+          data: {
+            taskId: string;
+            status: string;
+            analysis?: string;
+            error?: string;
+            type?: string;
+          };
+          message: string;
+        }>(`/fortune/task/${taskId}`, {
+          method: 'GET',
+        });
+
+        if (!statusResponse.success) {
+          throw new Error(statusResponse.message || 'Failed to check task status');
+        }
+
+        const { status, analysis, error, type } = statusResponse.data;
+
+        if (status === 'completed' && analysis) {
+          // 任务完成，返回结果
+          return {
+            success: true,
+            message: statusResponse.message,
+            data: {
+              type: type || 'analysis',
+              analysis: analysis,
+              timestamp: new Date().toISOString()
+            }
+          };
+        } else if (status === 'failed') {
+          // 任务失败
+          throw new Error(error || 'Analysis failed');
+        }
+
+        // 任务仍在进行中，等待5秒后重试
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        attempts++;
+
+      } catch (error) {
+        console.error('Error polling task status:', error);
+        if (attempts >= maxAttempts - 1) {
+          throw error;
+        }
+        // 等待5秒后重试
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        attempts++;
+      }
+    }
+
+    // 超时
+    throw new Error('Analysis timeout. Please try again later.');
   },
 
   // 获取算命历史记录

@@ -154,8 +154,8 @@ function generateTaskId() {
 
 // 健康检查端点
 app.get('/api/health', async (c) => {
-  // 确保demo用户存在（仅在生产环境的D1数据库中）
-  if (c.env.DB && c.env.NODE_ENV === 'production') {
+  // 确保demo用户存在（在所有环境中）
+  if (c.env.DB) {
     await ensureDemoUser(c.env.DB);
   }
 
