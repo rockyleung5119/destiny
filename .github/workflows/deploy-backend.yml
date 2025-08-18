@@ -31,14 +31,8 @@ jobs:
         run: npm install # 第三步：安装 npm 依赖
         working-directory: ./backend # 指定在 backend 目录下执行
 
-      - name: Apply Database Migrations
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: 'backend'
-          command: d1 execute destiny-db --file=./d1-schema.sql --remote
-        continue-on-error: true # 允许数据库迁移失败，因为表可能已存在
+      # 移除数据库迁移步骤，改为手动执行
+      # 数据库迁移请使用: wrangler d1 execute destiny-db --file=./d1-schema.sql --remote
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
@@ -46,5 +40,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 使用 --keep-vars 标志来保留在Cloudflare UI中设置的所有环境变量和密钥
-          command: deploy --keep-vars
+          # 简化部署命令，移除可能导致问题的标志
+          command: deploy
