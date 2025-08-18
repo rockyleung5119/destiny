@@ -2119,19 +2119,18 @@ class CloudflareDeepSeekService {
     };
     return errorMessages[language] || errorMessages['zh'];
   }
-}
 
-// 扩展CloudflareDeepSeekService类，添加专业占卜方法
-CloudflareDeepSeekService.prototype.getBaziAnalysis = async function(user, language = 'zh') {
-  const userTimezone = user.timezone || 'Asia/Shanghai';
-  const userProfile = this.buildUserProfile(user, userTimezone);
-  const targetLanguage = this.getLanguageName(language);
+  // 八字精算（专业版）
+  async getBaziAnalysis(user, language = 'zh') {
+    const userTimezone = user.timezone || 'Asia/Shanghai';
+    const userProfile = this.buildUserProfile(user, userTimezone);
+    const targetLanguage = this.getLanguageName(language);
 
-  console.log(`🌐 BaZi Analysis Language: ${language}, Timezone: ${userTimezone}`);
+    console.log(`🌐 BaZi Analysis Language: ${language}, Timezone: ${userTimezone}`);
 
-  const systemMessage = `你是资深的八字命理大师，拥有数十年的实战经验，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析，用${targetLanguage}回复。`;
+    const systemMessage = `你是资深的八字命理大师，拥有数十年的实战经验，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析，用${targetLanguage}回复。`;
 
-  const userMessage = `请为以下用户进行详细的八字命理分析：
+    const userMessage = `请为以下用户进行详细的八字命理分析：
 
 ${userProfile}
 
@@ -2188,24 +2187,25 @@ ${userProfile}
 
 要求：使用传统八字术语，分析要专业准确，建议要实用可行。`;
 
-  const messages = [
-    { role: 'system', content: systemMessage },
-    { role: 'user', content: userMessage }
-  ];
+    const messages = [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userMessage }
+    ];
 
-  return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'bazi', 6000);
-};
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'bazi', 6000);
+  }
 
-CloudflareDeepSeekService.prototype.getDailyFortune = async function(user, language = 'zh') {
-  const userTimezone = user.timezone || 'Asia/Shanghai';
-  const userProfile = this.buildUserProfile(user, userTimezone);
-  const targetLanguage = this.getLanguageName(language);
+  // 每日运势（专业版）
+  async getDailyFortune(user, language = 'zh') {
+    const userTimezone = user.timezone || 'Asia/Shanghai';
+    const userProfile = this.buildUserProfile(user, userTimezone);
+    const targetLanguage = this.getLanguageName(language);
 
-  console.log(`🌐 Daily Fortune Language: ${language}, Timezone: ${userTimezone}`);
+    console.log(`🌐 Daily Fortune Language: ${language}, Timezone: ${userTimezone}`);
 
-  const systemMessage = `你是专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势，用${targetLanguage}回复。`;
+    const systemMessage = `你是专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势，用${targetLanguage}回复。`;
 
-  const userMessage = `请为以下用户分析今日运势：
+    const userMessage = `请为以下用户分析今日运势：
 
 ${userProfile}
 
@@ -2240,24 +2240,25 @@ ${userProfile}
 
 要求：分析要结合传统命理学原理，给出实用的生活指导。`;
 
-  const messages = [
-    { role: 'system', content: systemMessage },
-    { role: 'user', content: userMessage }
-  ];
+    const messages = [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userMessage }
+    ];
 
-  return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
-};
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+  }
 
-CloudflareDeepSeekService.prototype.getCelestialTarotReading = async function(user, question = '', language = 'zh') {
-  const userTimezone = user.timezone || 'Asia/Shanghai';
-  const userProfile = this.buildUserProfile(user, userTimezone);
-  const targetLanguage = this.getLanguageName(language);
+  // 塔罗占卜（专业版）
+  async getCelestialTarotReading(user, question = '', language = 'zh') {
+    const userTimezone = user.timezone || 'Asia/Shanghai';
+    const userProfile = this.buildUserProfile(user, userTimezone);
+    const targetLanguage = this.getLanguageName(language);
 
-  console.log(`🌐 Tarot Reading Language: ${language}, Timezone: ${userTimezone}`);
+    console.log(`🌐 Tarot Reading Language: ${language}, Timezone: ${userTimezone}`);
 
-  const systemMessage = `你是经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜，用${targetLanguage}回复。`;
+    const systemMessage = `你是经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜，用${targetLanguage}回复。`;
 
-  const userMessage = `请为以下用户进行塔罗占卜：
+    const userMessage = `请为以下用户进行塔罗占卜：
 
 ${userProfile}
 
@@ -2294,24 +2295,25 @@ ${userProfile}
 
 要求：占卜要有神秘感和专业性，结合东西方智慧。`;
 
-  const messages = [
-    { role: 'system', content: systemMessage },
-    { role: 'user', content: userMessage }
-  ];
+    const messages = [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userMessage }
+    ];
 
-  return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
-};
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+  }
 
-CloudflareDeepSeekService.prototype.getLuckyItems = async function(user, language = 'zh') {
-  const userTimezone = user.timezone || 'Asia/Shanghai';
-  const userProfile = this.buildUserProfile(user, userTimezone);
-  const targetLanguage = this.getLanguageName(language);
+  // 幸运物品（专业版）
+  async getLuckyItems(user, language = 'zh') {
+    const userTimezone = user.timezone || 'Asia/Shanghai';
+    const userProfile = this.buildUserProfile(user, userTimezone);
+    const targetLanguage = this.getLanguageName(language);
 
-  console.log(`🌐 Lucky Items Language: ${language}, Timezone: ${userTimezone}`);
+    console.log(`🌐 Lucky Items Language: ${language}, Timezone: ${userTimezone}`);
 
-  const systemMessage = `你是精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析，用${targetLanguage}回复。`;
+    const systemMessage = `你是精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析，用${targetLanguage}回复。`;
 
-  const userMessage = `请根据以下用户信息推荐幸运物品和颜色：
+    const userMessage = `请根据以下用户信息推荐幸运物品和颜色：
 
 ${userProfile}
 
@@ -2349,12 +2351,15 @@ ${userProfile}
 
 要求：建议要实用可行，基于传统五行理论。`;
 
-  const messages = [
-    { role: 'system', content: systemMessage },
-    { role: 'user', content: userMessage }
-  ];
+    const messages = [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userMessage }
+    ];
 
-  return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
-};
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+  }
+}
+
+
 
 export default app;
