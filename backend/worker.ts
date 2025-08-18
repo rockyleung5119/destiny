@@ -539,18 +539,27 @@ app.put('/api/user/profile', jwtMiddleware, async (c) => {
       }, 403);
     }
 
-    const fieldsToUpdate = [
-      'name', 'gender', 'birth_year', 'birth_month', 'birth_day',
-      'birth_hour', 'birth_minute', 'birth_place', 'timezone'
-    ];
+    // 字段映射：前端驼峰格式 -> 数据库下划线格式
+    const fieldMapping = {
+      'name': 'name',
+      'gender': 'gender',
+      'birthYear': 'birth_year',
+      'birthMonth': 'birth_month',
+      'birthDay': 'birth_day',
+      'birthHour': 'birth_hour',
+      'birthMinute': 'birth_minute',
+      'birthPlace': 'birth_place',
+      'timezone': 'timezone'
+    };
 
     const setClauses = [];
     const bindings = [];
 
-    for (const field of fieldsToUpdate) {
-      if (profileData[field] !== undefined) {
-        setClauses.push(`${field} = ?`);
-        bindings.push(profileData[field]);
+    // 遍历前端发送的字段，转换为数据库字段名
+    for (const [frontendField, dbField] of Object.entries(fieldMapping)) {
+      if (profileData[frontendField] !== undefined) {
+        setClauses.push(`${dbField} = ?`);
+        bindings.push(profileData[frontendField]);
       }
     }
 
