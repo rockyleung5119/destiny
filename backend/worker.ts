@@ -552,6 +552,28 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
 
     console.log('💳 Membership query result:', membership);
 
+    // 检查会员是否真的有效（未过期）
+    let membershipData = null;
+    if (membership) {
+      const now = new Date();
+      const expiresAt = new Date(membership.expires_at);
+      const isActuallyActive = membership.is_active && expiresAt > now;
+
+      console.log('⏰ Membership expiry check:', {
+        now: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        isActuallyActive
+      });
+
+      membershipData = {
+        planId: membership.plan_id,
+        isActive: isActuallyActive,
+        expiresAt: membership.expires_at,
+        remainingCredits: membership.remaining_credits,
+        createdAt: membership.created_at
+      };
+    }
+
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -568,13 +590,7 @@ app.get('/api/user/profile', jwtMiddleware, async (c) => {
       profile_updated_count: user.profile_updated_count,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      membership: membership ? {
-        plan_id: membership.plan_id,
-        is_active: membership.is_active,
-        expires_at: membership.expires_at,
-        remaining_credits: membership.remaining_credits,
-        created_at: membership.created_at
-      } : null
+      membership: membershipData
     };
 
     console.log('✅ Returning user response:', userResponse);
@@ -699,26 +715,37 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
       return c.json({
         success: true,
         data: {
-          plan_id: null,
-          is_active: false,
-          expires_at: null,
-          remaining_credits: 0,
-          created_at: null,
-          updated_at: null,
+          planId: null,
+          isActive: false,
+          expiresAt: null,
+          remainingCredits: 0,
+          createdAt: null,
+          updatedAt: null,
           plan: null
         }
       });
     }
 
+    // 检查会员是否真的有效（未过期）
+    const now = new Date();
+    const expiresAt = new Date(membership.expires_at);
+    const isActuallyActive = membership.is_active && expiresAt > now;
+
+    console.log('⏰ Membership status expiry check:', {
+      now: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      isActuallyActive
+    });
+
     return c.json({
       success: true,
       data: {
-        plan_id: membership.plan_id,
-        is_active: membership.is_active,
-        expires_at: membership.expires_at,
-        remaining_credits: membership.remaining_credits,
-        created_at: membership.created_at,
-        updated_at: membership.updated_at,
+        planId: membership.plan_id,
+        isActive: isActuallyActive,
+        expiresAt: membership.expires_at,
+        remainingCredits: membership.remaining_credits,
+        createdAt: membership.created_at,
+        updatedAt: membership.updated_at,
         plan: membership
       }
     });
