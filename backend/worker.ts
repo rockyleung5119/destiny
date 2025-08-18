@@ -1957,11 +1957,11 @@ class CloudflareDeepSeekService {
       'fr': '法语',
       'ja': '日语'
     };
-    return languageNames[language] || '英语';
+    return languageNames[language] || 'English';
   }
 
   // 构建用户档案
-  buildUserProfile(user, userTimezone = null) {
+  buildUserProfile(user, userTimezone = null, language = 'zh') {
     const name = user.name;
     const gender = user.gender;
     const birthYear = user.birth_year || user.birthYear;
@@ -1970,13 +1970,31 @@ class CloudflareDeepSeekService {
     const birthHour = user.birth_hour || user.birthHour;
     const birthPlace = user.birth_place || user.birthPlace;
 
-    const genderText = gender === 'male' ? '男' : '女';
-    const birthTime = birthHour ? `${birthHour}时` : '未知';
     const timezone = userTimezone || user.timezone || 'Asia/Shanghai';
-    const currentDate = new Date().toLocaleDateString('zh-CN', { timeZone: timezone });
-    const currentTime = new Date().toLocaleTimeString('zh-CN', { timeZone: timezone });
 
-    return `
+    if (language === 'en') {
+      const genderText = gender === 'male' ? 'Male' : 'Female';
+      const birthTime = birthHour ? `${birthHour}:00` : 'Unknown';
+      const currentDate = new Date().toLocaleDateString('en-US', { timeZone: timezone });
+      const currentTime = new Date().toLocaleTimeString('en-US', { timeZone: timezone });
+
+      return `
+Name: ${name}
+Gender: ${genderText}
+Birth Date: ${birthMonth}/${birthDay}/${birthYear}
+Birth Time: ${birthTime}
+Birth Place: ${birthPlace}
+User Timezone: ${timezone}
+Current Date: ${currentDate}
+Current Time: ${currentTime}
+      `.trim();
+    } else {
+      const genderText = gender === 'male' ? '男' : '女';
+      const birthTime = birthHour ? `${birthHour}时` : '未知';
+      const currentDate = new Date().toLocaleDateString('zh-CN', { timeZone: timezone });
+      const currentTime = new Date().toLocaleTimeString('zh-CN', { timeZone: timezone });
+
+      return `
 姓名：${name}
 性别：${genderText}
 出生日期：${birthYear}年${birthMonth}月${birthDay}日
@@ -1985,7 +2003,8 @@ class CloudflareDeepSeekService {
 用户时区：${timezone}
 当前日期：${currentDate}
 当前时间：${currentTime}
-    `.trim();
+      `.trim();
+    }
   }
 
   // 过滤AI模型标识信息
@@ -2123,12 +2142,12 @@ class CloudflareDeepSeekService {
   // 八字精算（专业版）
   async getBaziAnalysis(user, language = 'zh') {
     const userTimezone = user.timezone || 'Asia/Shanghai';
-    const userProfile = this.buildUserProfile(user, userTimezone);
+    const userProfile = this.buildUserProfile(user, userTimezone, language);
     const targetLanguage = this.getLanguageName(language);
 
     console.log(`🌐 BaZi Analysis Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是资深的八字命理大师，拥有数十年的实战经验，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析，用${targetLanguage}回复。`;
+    const systemMessage = `你是资深的八字命理大师，拥有数十年的实战经验，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请为以下用户进行详细的八字命理分析：
 
@@ -2185,7 +2204,7 @@ ${userProfile}
 - 需要注意的人生阶段
 - 如何趋吉避凶
 
-要求：使用传统八字术语，分析要专业准确，建议要实用可行。`;
+要求：使用传统八字术语，分析要专业准确，建议要实用可行。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
@@ -2198,12 +2217,12 @@ ${userProfile}
   // 每日运势（专业版）
   async getDailyFortune(user, language = 'zh') {
     const userTimezone = user.timezone || 'Asia/Shanghai';
-    const userProfile = this.buildUserProfile(user, userTimezone);
+    const userProfile = this.buildUserProfile(user, userTimezone, language);
     const targetLanguage = this.getLanguageName(language);
 
     console.log(`🌐 Daily Fortune Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势，用${targetLanguage}回复。`;
+    const systemMessage = `你是专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请为以下用户分析今日运势：
 
@@ -2238,7 +2257,7 @@ ${userProfile}
 ## 🌟 开运建议
 具体的开运方法和建议。
 
-要求：分析要结合传统命理学原理，给出实用的生活指导。`;
+要求：分析要结合传统命理学原理，给出实用的生活指导。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
@@ -2251,12 +2270,12 @@ ${userProfile}
   // 塔罗占卜（专业版）
   async getCelestialTarotReading(user, question = '', language = 'zh') {
     const userTimezone = user.timezone || 'Asia/Shanghai';
-    const userProfile = this.buildUserProfile(user, userTimezone);
+    const userProfile = this.buildUserProfile(user, userTimezone, language);
     const targetLanguage = this.getLanguageName(language);
 
     console.log(`🌐 Tarot Reading Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜，用${targetLanguage}回复。`;
+    const systemMessage = `你是经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请为以下用户进行塔罗占卜：
 
@@ -2293,7 +2312,7 @@ ${userProfile}
 ## ⚠️ 注意事项
 需要特别注意的事项和警示。
 
-要求：占卜要有神秘感和专业性，结合东西方智慧。`;
+要求：占卜要有神秘感和专业性，结合东西方智慧。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
@@ -2306,12 +2325,12 @@ ${userProfile}
   // 幸运物品（专业版）
   async getLuckyItems(user, language = 'zh') {
     const userTimezone = user.timezone || 'Asia/Shanghai';
-    const userProfile = this.buildUserProfile(user, userTimezone);
+    const userProfile = this.buildUserProfile(user, userTimezone, language);
     const targetLanguage = this.getLanguageName(language);
 
     console.log(`🌐 Lucky Items Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析，用${targetLanguage}回复。`;
+    const systemMessage = `你是精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请根据以下用户信息推荐幸运物品和颜色：
 
@@ -2349,7 +2368,7 @@ ${userProfile}
 ## 🌟 生活建议
 在日常生活中如何运用这些幸运元素。
 
-要求：建议要实用可行，基于传统五行理论。`;
+要求：建议要实用可行，基于传统五行理论。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const messages = [
       { role: 'system', content: systemMessage },
