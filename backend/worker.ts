@@ -287,7 +287,19 @@ app.post('/api/auth/register', async (c) => {
     const requestBody = await c.req.json();
     console.log('📝 Request body:', JSON.stringify(requestBody, null, 2));
 
-    const { email, password, name } = requestBody;
+    const {
+      email,
+      password,
+      name,
+      gender,
+      birthYear,
+      birthMonth,
+      birthDay,
+      birthHour,
+      birthMinute,
+      birthPlace,
+      timezone
+    } = requestBody;
 
     if (!email || !password || !name) {
       console.log('❌ Missing required fields');
@@ -312,17 +324,37 @@ app.post('/api/auth/register', async (c) => {
     console.log('🔐 Hashing password...');
     const hashedPassword = await hashPassword(password);
 
-    console.log('💾 Creating new user...');
-    const result = await c.env.DB.prepare(
-      'INSERT INTO users (email, password_hash, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(email, hashedPassword, name, new Date().toISOString(), new Date().toISOString()).run();
+    console.log('💾 Creating new user with profile data...');
+    const currentTime = new Date().toISOString();
+
+    // 构建插入语句，包含所有个人资料字段
+    const result = await c.env.DB.prepare(`
+      INSERT INTO users (
+        email, password_hash, name, gender, birth_year, birth_month, birth_day,
+        birth_hour, birth_minute, birth_place, timezone, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      email,
+      hashedPassword,
+      name,
+      gender || null,
+      birthYear || null,
+      birthMonth || null,
+      birthDay || null,
+      birthHour || null,
+      birthMinute || null,
+      birthPlace || null,
+      timezone || 'Asia/Shanghai',
+      currentTime,
+      currentTime
+    ).run();
     console.log('💾 Database insert result:', result);
 
     const userId = result.meta.last_row_id;
     console.log('🎫 Generating JWT token for user ID:', userId);
     const token = await generateJWT(userId, c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA');
 
-    console.log('✅ Registration successful');
+    console.log('✅ Registration successful with profile data');
     return c.json({
       success: true,
       message: 'User registered successfully',
@@ -330,7 +362,15 @@ app.post('/api/auth/register', async (c) => {
       user: {
         id: userId,
         email,
-        name
+        name,
+        gender,
+        birthYear,
+        birthMonth,
+        birthDay,
+        birthHour,
+        birthMinute,
+        birthPlace,
+        timezone: timezone || 'Asia/Shanghai'
       }
     });
   } catch (error) {
@@ -364,9 +404,13 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ success: false, message: 'Email and password required' }, 400);
     }
 
-    const user = await c.env.DB.prepare(
-      'SELECT id, email, password_hash, name FROM users WHERE email = ?'
-    ).bind(email).first();
+    // 获取完整的用户信息，包括个人资料
+    const user = await c.env.DB.prepare(`
+      SELECT id, email, password_hash, name, gender, birth_year, birth_month, birth_day,
+             birth_hour, birth_minute, birth_place, timezone, is_email_verified,
+             profile_updated_count, created_at, updated_at
+      FROM users WHERE email = ?
+    `).bind(email).first();
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return c.json({ success: false, message: 'Invalid credentials' }, 401);
@@ -381,7 +425,17 @@ app.post('/api/auth/login', async (c) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        gender: user.gender,
+        birthYear: user.birth_year,
+        birthMonth: user.birth_month,
+        birthDay: user.birth_day,
+        birthHour: user.birth_hour,
+        birthMinute: user.birth_minute,
+        birthPlace: user.birth_place,
+        timezone: user.timezone,
+        isEmailVerified: user.is_email_verified,
+        profileUpdatedCount: user.profile_updated_count
       }
     });
   } catch (error) {
