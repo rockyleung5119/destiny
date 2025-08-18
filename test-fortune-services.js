@@ -1,4 +1,4 @@
-// 测试AI占卜服务API端点
+// 测试AI占卜服务API端点 - 修复后的专业版本
 const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
 
 async function testFortuneServices() {
