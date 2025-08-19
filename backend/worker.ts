@@ -2455,9 +2455,9 @@ Current Time: ${currentTime}
     return this.cleanAIOutput(content);
   }
 
-  // 调用DeepSeek API（带重试机制）
-  async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000) {
-    const maxRetries = 1; // 减少重试次数，依赖300秒长超时提高单次成功率
+  // 调用DeepSeek API（带重试机制和AbortSignal支持）
+  async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000, abortSignal = null) {
+    const maxRetries = 1; // 减少重试次数，依赖短超时提高响应速度
 
     // 快速验证基本配置
     if (!this.apiKey || !this.baseURL || !this.model) {
@@ -2470,13 +2470,15 @@ Current Time: ${currentTime}
     }
 
     try {
-      console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}`);
+      console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}, Phase: ${cleaningType}`);
       console.log(`🌐 API URL: ${this.baseURL}`);
       console.log(`🤖 Model: ${this.model}`);
-      // 使用300秒超时适应大模型响应时间
-      // 通过分段处理绕过Cloudflare Workers的CPU时间限制
-      const timeoutMs = 300000; // 5分钟超时
-      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (retry: ${retryCount})`);
+
+      // 使用较短的超时时间适应分段处理，绕过Cloudflare Workers限制
+      const timeoutMs = cleaningType === 'basic' ? 25000 :
+                       cleaningType === 'detailed' ? 25000 :
+                       cleaningType === 'final' ? 25000 : 30000; // 默认30秒，确保在CPU时间限制内
+      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (retry: ${retryCount}, phase: ${cleaningType})`);
 
       const requestData = {
         model: this.model,
@@ -2486,9 +2488,14 @@ Current Time: ${currentTime}
         stream: false
       };
 
-      // 创建带超时的fetch请求
+      // 创建带超时的fetch请求，支持外部AbortSignal
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      // 如果提供了外部AbortSignal，监听它的abort事件
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', () => controller.abort());
+      }
 
       const response = await fetch(this.baseURL, {
         method: 'POST',
@@ -2573,7 +2580,7 @@ Current Time: ${currentTime}
         const delay = 10000; // 10秒延迟，给API服务器恢复时间
         console.log(`🔄 Retrying in ${delay/1000} seconds... (attempt ${retryCount + 2}/${maxRetries + 1})`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens);
+        return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens, abortSignal);
       }
 
       // 保留原始错误信息用于调试，同时提供用户友好的错误信息
@@ -2922,20 +2929,20 @@ ${userProfile}
 
 
 
-// 智能异步任务处理函数 - 使用分段处理绕过Cloudflare限制
+// 优化的异步任务处理函数 - 使用短周期分段处理绕过Cloudflare限制
 async function processAsyncTask(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   let taskStartTime = Date.now();
 
   try {
-    console.log(`🔄 [${taskId}] Starting smart async task processing, type: ${taskType}`);
+    console.log(`🔄 [${taskId}] Starting optimized async task processing, type: ${taskType}`);
 
     // 更新任务状态为处理中
     await env.DB.prepare(`
       UPDATE async_tasks SET status = 'processing', updated_at = ? WHERE id = ?
     `).bind(new Date().toISOString(), taskId).run();
 
-    // 启动智能AI处理
-    await processAIWithSmartRetry(env, taskId, taskType, user, language, question);
+    // 使用新的分段AI处理方案
+    await processAIWithSegmentation(env, taskId, taskType, user, language, question);
 
   } catch (error) {
     const processingTime = Date.now() - taskStartTime;
@@ -2952,83 +2959,193 @@ async function processAsyncTask(env: any, taskId: string, taskType: string, user
   }
 }
 
-// 智能AI处理函数 - 分段处理，每10秒检查一次
-async function processAIWithSmartRetry(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  console.log(`🧠 [${taskId}] Starting smart AI processing with 300s timeout...`);
+// 新的分段AI处理函数 - 使用短周期调用绕过Cloudflare限制
+async function processAIWithSegmentation(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  console.log(`🧠 [${taskId}] Starting segmented AI processing...`);
 
   const deepSeekService = new CloudflareDeepSeekService(env);
-  const maxAttempts = 60; // 60次 × 10秒 = 10分钟（适应300秒AI超时 + 缓冲时间）
-  let attempt = 0;
 
-  // 启动AI调用
-  let aiPromise = startAICall(deepSeekService, taskType, user, language, question);
-  let aiResult = null;
+  try {
+    // 第一阶段：快速生成基础分析（25秒内完成）
+    console.log(`📝 [${taskId}] Phase 1: Generating basic analysis...`);
+    const basicAnalysis = await callAIWithTimeout(deepSeekService, taskType, user, language, question, 'basic', 25000);
 
-  while (attempt < maxAttempts && !aiResult) {
-    attempt++;
-    console.log(`🔍 [${taskId}] Check attempt ${attempt}/${maxAttempts} (${attempt * 10}s elapsed)`);
+    // 立即保存基础分析作为中间结果
+    await updateTaskProgress(env, taskId, 'processing', `Phase 1 completed: ${basicAnalysis.substring(0, 100)}...`);
 
-    try {
-      // 检查AI调用是否完成（非阻塞）
-      const raceResult = await Promise.race([
-        aiPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Check timeout')), 100))
-      ]);
+    // 第二阶段：详细分析（25秒内完成）
+    console.log(`🔍 [${taskId}] Phase 2: Generating detailed analysis...`);
+    const detailedAnalysis = await callAIWithTimeout(deepSeekService, taskType, user, language, question, 'detailed', 25000, basicAnalysis);
 
-      // AI调用完成
-      aiResult = raceResult;
-      console.log(`✅ [${taskId}] AI call completed, result length: ${aiResult?.length || 0}`);
+    // 更新进度
+    await updateTaskProgress(env, taskId, 'processing', `Phase 2 completed: ${detailedAnalysis.substring(0, 100)}...`);
 
-    } catch (error) {
-      if (error.message === 'Check timeout') {
-        // AI还在处理中，继续等待
-        console.log(`⏳ [${taskId}] AI still processing, waiting 10 seconds...`);
+    // 第三阶段：最终整合和优化（25秒内完成）
+    console.log(`✨ [${taskId}] Phase 3: Final integration and optimization...`);
+    const finalResult = await callAIWithTimeout(deepSeekService, taskType, user, language, question, 'final', 25000, basicAnalysis, detailedAnalysis);
 
-        // 更新任务的updated_at时间戳，表明任务仍在活跃处理
-        try {
-          await env.DB.prepare(`
-            UPDATE async_tasks SET updated_at = ? WHERE id = ?
-          `).bind(new Date().toISOString(), taskId).run();
-        } catch (dbError) {
-          console.warn(`⚠️ [${taskId}] Failed to update timestamp:`, dbError);
-        }
-
-        // 等待10秒后继续检查
-        await new Promise(resolve => setTimeout(resolve, 10000));
-      } else {
-        // AI调用真正失败
-        throw error;
-      }
+    // 验证最终结果
+    if (!finalResult || typeof finalResult !== 'string' || finalResult.trim().length === 0) {
+      throw new Error('AI analysis returned empty or invalid content');
     }
-  }
 
-  if (!aiResult) {
-    throw new Error(`AI processing timeout after ${maxAttempts * 10} seconds (5 minutes)`);
-  }
+    // 保存最终结果到数据库
+    await saveAIResult(env, taskId, taskType, user, language, question, finalResult);
 
-  // 验证结果
-  if (!aiResult || typeof aiResult !== 'string' || aiResult.trim().length === 0) {
-    throw new Error('AI analysis returned empty or invalid content');
-  }
+    console.log(`✅ [${taskId}] Segmented AI processing completed successfully`);
 
-  // 保存结果到数据库
-  await saveAIResult(env, taskId, taskType, user, language, question, aiResult);
+  } catch (error) {
+    console.error(`❌ [${taskId}] Segmented AI processing failed:`, error);
+    throw error;
+  }
 }
 
-// 启动AI调用
-async function startAICall(deepSeekService: any, taskType: string, user: any, language: string, question?: string) {
-  switch (taskType) {
-    case 'bazi':
-      return await deepSeekService.getBaziAnalysis(user, language);
-    case 'daily':
-      return await deepSeekService.getDailyFortune(user, language);
-    case 'tarot':
-      return await deepSeekService.getCelestialTarotReading(user, question || '', language);
-    case 'lucky':
-      return await deepSeekService.getLuckyItems(user, language);
-    default:
-      throw new Error(`Unknown task type: ${taskType}`);
+// 更新任务进度
+async function updateTaskProgress(env: any, taskId: string, status: string, progressMessage: string) {
+  try {
+    await env.DB.prepare(`
+      UPDATE async_tasks SET status = ?, error_message = ?, updated_at = ? WHERE id = ?
+    `).bind(status, progressMessage, new Date().toISOString(), taskId).run();
+    console.log(`📊 [${taskId}] Progress updated: ${progressMessage.substring(0, 50)}...`);
+  } catch (error) {
+    console.warn(`⚠️ [${taskId}] Failed to update progress:`, error);
   }
+}
+
+// 带超时的AI调用函数
+async function callAIWithTimeout(
+  deepSeekService: any,
+  taskType: string,
+  user: any,
+  language: string,
+  question: string | undefined,
+  phase: 'basic' | 'detailed' | 'final',
+  timeoutMs: number,
+  previousBasic?: string,
+  previousDetailed?: string
+): Promise<string> {
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    let result: string;
+
+    switch (phase) {
+      case 'basic':
+        result = await callBasicAI(deepSeekService, taskType, user, language, question, controller.signal);
+        break;
+      case 'detailed':
+        result = await callDetailedAI(deepSeekService, taskType, user, language, question, previousBasic!, controller.signal);
+        break;
+      case 'final':
+        result = await callFinalAI(deepSeekService, taskType, user, language, question, previousBasic!, previousDetailed!, controller.signal);
+        break;
+      default:
+        throw new Error(`Unknown phase: ${phase}`);
+    }
+
+    clearTimeout(timeoutId);
+    return result;
+
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error(`AI ${phase} phase timeout after ${timeoutMs/1000} seconds`);
+    }
+    throw error;
+  }
+}
+
+// 基础AI调用 - 生成简要分析
+async function callBasicAI(deepSeekService: any, taskType: string, user: any, language: string, question: string | undefined, signal: AbortSignal): Promise<string> {
+  const basicPrompts = {
+    bazi: language === 'en' ?
+      `Generate a brief BaZi analysis for ${user.name} (${user.gender}, born ${user.birth_year}-${user.birth_month}-${user.birth_day} ${user.birth_hour}:${user.birth_minute || 0} in ${user.birth_place}). Focus on basic personality traits and life tendencies. Keep it concise (300-500 words).` :
+      `为${user.name}（${user.gender === 'male' ? '男' : '女'}，${user.birth_year}年${user.birth_month}月${user.birth_day}日${user.birth_hour}时${user.birth_minute || 0}分生于${user.birth_place}）生成简要八字分析。重点分析基本性格特征和人生趋势。保持简洁（300-500字）。`,
+
+    daily: language === 'en' ?
+      `Generate today's brief fortune reading for ${user.name}. Include basic luck, career, and relationship insights. Keep it concise (200-400 words).` :
+      `为${user.name}生成今日简要运势。包括基本运势、事业和感情洞察。保持简洁（200-400字）。`,
+
+    tarot: language === 'en' ?
+      `Generate a brief tarot reading for the question: "${question || 'General guidance'}". Draw 3 cards and provide basic interpretation. Keep it concise (300-500 words).` :
+      `为问题"${question || '一般指导'}"生成简要塔罗占卜。抽取3张牌并提供基本解读。保持简洁（300-500字）。`,
+
+    lucky: language === 'en' ?
+      `Generate basic lucky items and colors for ${user.name} based on their birth information. Keep it concise (200-400 words).` :
+      `根据${user.name}的出生信息生成基本幸运物品和颜色。保持简洁（200-400字）。`
+  };
+
+  const prompt = basicPrompts[taskType as keyof typeof basicPrompts];
+  if (!prompt) {
+    throw new Error(`Unknown task type for basic AI: ${taskType}`);
+  }
+
+  return await deepSeekService.callDeepSeekAPI([
+    { role: 'user', content: prompt }
+  ], 0.7, language, 0, 'basic', 1000, signal);
+}
+
+// 详细AI调用 - 基于基础分析生成详细内容
+async function callDetailedAI(deepSeekService: any, taskType: string, user: any, language: string, question: string | undefined, basicAnalysis: string, signal: AbortSignal): Promise<string> {
+  const detailedPrompts = {
+    bazi: language === 'en' ?
+      `Based on this basic BaZi analysis: "${basicAnalysis.substring(0, 200)}...", provide detailed insights about career prospects, relationship compatibility, health tendencies, and specific life advice. Expand to 800-1200 words.` :
+      `基于这个基础八字分析："${basicAnalysis.substring(0, 200)}..."，提供关于事业前景、感情匹配、健康趋势和具体人生建议的详细洞察。扩展到800-1200字。`,
+
+    daily: language === 'en' ?
+      `Based on this basic daily fortune: "${basicAnalysis.substring(0, 200)}...", provide detailed guidance for different life areas including work, relationships, health, and finances. Include specific timing and actionable advice. Expand to 600-1000 words.` :
+      `基于这个基础每日运势："${basicAnalysis.substring(0, 200)}..."，为工作、感情、健康、财运等不同生活领域提供详细指导。包括具体时机和可行建议。扩展到600-1000字。`,
+
+    tarot: language === 'en' ?
+      `Based on this basic tarot reading: "${basicAnalysis.substring(0, 200)}...", provide deeper interpretation of each card's meaning, their relationships, and detailed guidance for the querent's situation. Expand to 800-1200 words.` :
+      `基于这个基础塔罗占卜："${basicAnalysis.substring(0, 200)}..."，提供每张牌含义的深层解读、它们之间的关系，以及对询问者情况的详细指导。扩展到800-1200字。`,
+
+    lucky: language === 'en' ?
+      `Based on these basic lucky items: "${basicAnalysis.substring(0, 200)}...", provide detailed explanations of why these items are beneficial, how to use them effectively, and additional feng shui recommendations. Expand to 600-1000 words.` :
+      `基于这些基础幸运物品："${basicAnalysis.substring(0, 200)}..."，详细解释为什么这些物品有益，如何有效使用它们，以及额外的风水建议。扩展到600-1000字。`
+  };
+
+  const prompt = detailedPrompts[taskType as keyof typeof detailedPrompts];
+  if (!prompt) {
+    throw new Error(`Unknown task type for detailed AI: ${taskType}`);
+  }
+
+  return await deepSeekService.callDeepSeekAPI([
+    { role: 'user', content: prompt }
+  ], 0.8, language, 0, 'detailed', 1500, signal);
+}
+
+// 最终AI调用 - 整合和优化
+async function callFinalAI(deepSeekService: any, taskType: string, user: any, language: string, question: string | undefined, basicAnalysis: string, detailedAnalysis: string, signal: AbortSignal): Promise<string> {
+  const finalPrompts = {
+    bazi: language === 'en' ?
+      `Integrate and optimize these BaZi analyses:\n\nBasic: ${basicAnalysis.substring(0, 300)}...\n\nDetailed: ${detailedAnalysis.substring(0, 500)}...\n\nCreate a comprehensive, well-structured final report with clear sections, actionable insights, and personalized recommendations. Format professionally with proper headings and bullet points.` :
+      `整合并优化这些八字分析：\n\n基础分析：${basicAnalysis.substring(0, 300)}...\n\n详细分析：${detailedAnalysis.substring(0, 500)}...\n\n创建一个全面、结构良好的最终报告，包含清晰的章节、可行的洞察和个性化建议。使用专业格式，包含适当的标题和要点。`,
+
+    daily: language === 'en' ?
+      `Integrate and optimize these daily fortune analyses:\n\nBasic: ${basicAnalysis.substring(0, 300)}...\n\nDetailed: ${detailedAnalysis.substring(0, 500)}...\n\nCreate a comprehensive daily guidance with clear time-based recommendations and practical action steps.` :
+      `整合并优化这些每日运势分析：\n\n基础分析：${basicAnalysis.substring(0, 300)}...\n\n详细分析：${detailedAnalysis.substring(0, 500)}...\n\n创建全面的每日指导，包含清晰的时间建议和实用行动步骤。`,
+
+    tarot: language === 'en' ?
+      `Integrate and optimize these tarot readings:\n\nBasic: ${basicAnalysis.substring(0, 300)}...\n\nDetailed: ${detailedAnalysis.substring(0, 500)}...\n\nCreate a comprehensive tarot interpretation with clear card meanings, their interconnections, and practical guidance for the querent.` :
+      `整合并优化这些塔罗占卜：\n\n基础占卜：${basicAnalysis.substring(0, 300)}...\n\n详细占卜：${detailedAnalysis.substring(0, 500)}...\n\n创建全面的塔罗解读，包含清晰的牌意、它们的相互关系，以及对询问者的实用指导。`,
+
+    lucky: language === 'en' ?
+      `Integrate and optimize these lucky item analyses:\n\nBasic: ${basicAnalysis.substring(0, 300)}...\n\nDetailed: ${detailedAnalysis.substring(0, 500)}...\n\nCreate a comprehensive guide with organized categories, practical usage instructions, and additional feng shui tips.` :
+      `整合并优化这些幸运物品分析：\n\n基础分析：${basicAnalysis.substring(0, 300)}...\n\n详细分析：${detailedAnalysis.substring(0, 500)}...\n\n创建全面的指南，包含有序的分类、实用的使用说明和额外的风水建议。`
+  };
+
+  const prompt = finalPrompts[taskType as keyof typeof finalPrompts];
+  if (!prompt) {
+    throw new Error(`Unknown task type for final AI: ${taskType}`);
+  }
+
+  return await deepSeekService.callDeepSeekAPI([
+    { role: 'user', content: prompt }
+  ], 0.9, language, 0, 'final', 2000, signal);
 }
 
 // 保存AI结果到数据库
@@ -3092,15 +3209,15 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
     console.log('🔧 Processing stuck tasks...');
 
     // 查找需要处理的任务：
-    // 1. 超过5分钟仍在processing状态的任务
-    // 2. 超过1分钟仍在pending状态的任务（可能异步处理没有启动）
+    // 1. 超过2分钟仍在processing状态的任务（适应新的短周期处理）
+    // 2. 超过30秒仍在pending状态的任务（可能异步处理没有启动）
     const stuckTasks = await c.env.DB.prepare(`
       SELECT id, user_id, task_type, input_data, created_at, updated_at, status
       FROM async_tasks
       WHERE (
-        (status = 'processing' AND datetime(updated_at) < datetime('now', '-5 minutes'))
+        (status = 'processing' AND datetime(updated_at) < datetime('now', '-2 minutes'))
         OR
-        (status = 'pending' AND datetime(created_at) < datetime('now', '-1 minutes'))
+        (status = 'pending' AND datetime(created_at) < datetime('now', '-30 seconds'))
       )
       ORDER BY created_at ASC
       LIMIT 10
@@ -3172,21 +3289,21 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 export default {
   fetch: app.fetch,
 
-  // 每3分钟自动检查并处理卡住的任务
+  // 每1分钟自动检查并处理卡住的任务（适应短周期处理）
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
-    console.log('🕐 Scheduled task: Processing stuck tasks...');
+    console.log('🕐 Scheduled task: Processing stuck tasks (every minute)...');
 
     try {
       // 查找需要处理的任务：
-      // 1. 超过5分钟仍在processing状态的任务
-      // 2. 超过1分钟仍在pending状态的任务（可能异步处理没有启动）
+      // 1. 超过2分钟仍在processing状态的任务（适应新的短周期处理）
+      // 2. 超过30秒仍在pending状态的任务（可能异步处理没有启动）
       const stuckTasks = await env.DB.prepare(`
         SELECT id, user_id, task_type, input_data, created_at, updated_at, status
         FROM async_tasks
         WHERE (
-          (status = 'processing' AND datetime(updated_at) < datetime('now', '-5 minutes'))
+          (status = 'processing' AND datetime(updated_at) < datetime('now', '-2 minutes'))
           OR
-          (status = 'pending' AND datetime(created_at) < datetime('now', '-1 minutes'))
+          (status = 'pending' AND datetime(created_at) < datetime('now', '-30 seconds'))
         )
         ORDER BY created_at ASC
         LIMIT 5
@@ -3244,7 +3361,7 @@ export default {
         }
       }
 
-      console.log(`🎉 Scheduled task completed: Started reprocessing ${processed} stuck tasks (runs every 3 minutes)`);
+      console.log(`🎉 Scheduled task completed: Started reprocessing ${processed} stuck tasks (runs every minute)`);
 
     } catch (error) {
       console.error('❌ Scheduled task error:', error);

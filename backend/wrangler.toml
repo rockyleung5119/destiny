@@ -18,7 +18,7 @@ binding = "DB"
 database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
-# 定时任务配置 - 每3分钟自动处理卡住的任务
+# 定时任务配置 - 每1分钟自动处理卡住的任务（适应短周期处理）
 [triggers]
-crons = ["*/3 * * * *"]
+crons = ["* * * * *"]
 
