@@ -40,5 +40,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 简化部署命令，移除可能导致问题的标志
-          command: deploy
+          # 使用简化的配置文件进行部署
+          command: deploy --config wrangler-deploy.toml

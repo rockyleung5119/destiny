@@ -3565,9 +3565,18 @@ async function sendTaskToQueue(env: any, taskId: string, taskType: string, user:
       }
     }
 
-    // 方法3: 直接处理（最后的回退方案）
-    console.log(`🔄 [${taskId}] Using direct processing as fallback...`);
-    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
+    // 方法3: 直接处理（最后的回退方案）- 也使用后台模式
+    console.log(`🔄 [${taskId}] Using direct background processing as fallback...`);
+
+    // 使用后台处理，不阻塞响应
+    const backgroundPromise = processAIWithSegmentationBackground(env, taskId, taskType, user, language, question)
+      .catch(error => {
+        console.error(`❌ [${taskId}] Direct background processing failed:`, error);
+        updateAsyncTaskStatus(env, taskId, 'failed', `直接处理失败: ${error.message}`).catch(console.error);
+      });
+
+    // 注意：这里不等待完成，让任务在后台运行
+    console.log(`✅ [${taskId}] Direct background processing initiated`);
 
   } catch (error) {
     console.error(`❌ [${taskId}] All processing methods failed:`, error);
@@ -3653,8 +3662,8 @@ async function processAsyncTaskDirect(env: any, taskId: string, taskType: string
     // 更新任务状态为处理中，并记录开始时间
     await updateAsyncTaskStatus(env, taskId, 'processing', 'AI推理模型正在深度分析中...');
 
-    // 使用AI处理方案
-    await processAIWithSegmentation(env, taskId, taskType, user, language, question);
+    // 使用后台AI处理方案（支持长时间推理）
+    await processAIWithSegmentationBackground(env, taskId, taskType, user, language, question);
 
   } catch (error) {
     const processingTime = Date.now() - taskStartTime;
@@ -3700,9 +3709,29 @@ async function updateAsyncTaskStatus(env: any, taskId: string, status: string, m
   }
 }
 
+// 后台AI处理函数 - 专门用于长时间AI推理（2-5分钟）
+async function processAIWithSegmentationBackground(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  console.log(`🧠 [${taskId}] Starting background AI processing (long-running, 2-5 minutes)...`);
+
+  const startTime = Date.now();
+
+  try {
+    // 调用原有的AI处理逻辑
+    await processAIWithSegmentation(env, taskId, taskType, user, language, question);
+
+    const duration = Math.floor((Date.now() - startTime) / 1000);
+    console.log(`🎉 [${taskId}] Background AI processing completed in ${duration} seconds`);
+
+  } catch (error) {
+    const duration = Math.floor((Date.now() - startTime) / 1000);
+    console.error(`❌ [${taskId}] Background AI processing failed after ${duration} seconds:`, error);
+    throw error;
+  }
+}
+
 // 优化的AI处理函数 - 单次调用，给足够时间
 async function processAIWithSegmentation(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  console.log(`🧠 [${taskId}] Starting AI processing (single call, no retry)...`);
+  console.log(`🧠 [${taskId}] Starting AI processing (single call, up to 5 minutes)...`);
 
   try {
     // 验证环境变量
@@ -4014,15 +4043,15 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 export default {
   fetch: app.fetch,
 
-  // Cloudflare Queues消费者 - 标准异步架构的核心（可选）
+  // Cloudflare Queues消费者 - 快速分发模式（适应AI长时间推理）
   async queue(batch: MessageBatch, env: any, ctx: ExecutionContext) {
-    // 检查队列是否已配置
+    // 检查队列是否可用
     if (!batch || !batch.messages) {
-      console.warn('⚠️ [Queue] No messages in batch or queue not properly configured');
+      console.warn('⚠️ [Queue] Queue not available or not configured');
       return;
     }
 
-    console.log(`🔄 [Queue] Processing batch with ${batch.messages.length} messages`);
+    console.log(`🔄 [Queue] Fast dispatch mode: Processing batch with ${batch.messages.length} messages`);
 
     for (const message of batch.messages) {
       let taskId = 'unknown';
@@ -4034,31 +4063,27 @@ export default {
           throw new Error('Invalid message format: missing required fields');
         }
 
-        console.log(`🎯 [Queue-${taskId}] Processing AI task: ${taskType}`);
+        console.log(`🎯 [Queue-${taskId}] Fast dispatching AI task: ${taskType}`);
 
-        // 更新任务状态为处理中
-        await updateAsyncTaskStatus(env, taskId, 'processing', 'AI队列处理中...');
+        // 立即更新任务状态为处理中
+        await updateAsyncTaskStatus(env, taskId, 'processing', 'AI推理模型正在深度分析中...');
 
-        // 处理AI任务
-        await processAIWithSegmentation(env, taskId, taskType, user, language, question);
+        // 🔑 关键：使用waitUntil启动后台长时间处理，不阻塞队列消费者
+        ctx.waitUntil(
+          processAIWithSegmentationBackground(env, taskId, taskType, user, language, question)
+            .catch(error => {
+              console.error(`❌ [Queue-${taskId}] Background processing failed:`, error);
+              // 后台处理失败时更新任务状态
+              updateAsyncTaskStatus(env, taskId, 'failed', `AI处理失败: ${error.message}`).catch(console.error);
+            })
+        );
 
-        // 确认消息处理成功
+        // 立即确认消息处理成功（任务已分发到后台）
         message.ack();
-        console.log(`✅ [Queue-${taskId}] Task processed successfully`);
-
-        // 验证任务是否真正完成
-        const finalCheck = await env.DB.prepare(`
-          SELECT status, LENGTH(result) as result_length FROM async_tasks WHERE id = ?
-        `).bind(taskId).first();
-
-        if (finalCheck && finalCheck.status === 'completed' && finalCheck.result_length > 0) {
-          console.log(`✅ [Queue-${taskId}] Final verification passed: ${finalCheck.result_length} characters`);
-        } else {
-          console.error(`❌ [Queue-${taskId}] Final verification failed:`, finalCheck);
-        }
+        console.log(`✅ [Queue-${taskId}] Task dispatched to background processing`);
 
       } catch (error) {
-        console.error(`❌ [Queue-${taskId}] Message processing failed:`, error);
+        console.error(`❌ [Queue-${taskId}] Message dispatch failed:`, error);
 
         // 重试机制
         const attempts = message.attempts || 0;
@@ -4068,7 +4093,7 @@ export default {
           // 更新任务状态为失败
           if (taskId !== 'unknown') {
             try {
-              await updateAsyncTaskStatus(env, taskId, 'failed', `队列处理失败: ${error.message}`);
+              await updateAsyncTaskStatus(env, taskId, 'failed', `队列分发失败: ${error.message}`);
             } catch (updateError) {
               console.error(`❌ [Queue-${taskId}] Failed to update task status:`, updateError);
             }
@@ -4079,7 +4104,7 @@ export default {
             message.retry();
           }
         } else {
-          console.log(`🔄 [Queue-${taskId}] Retrying message (attempt ${attempts + 1}/3)`);
+          console.log(`🔄 [Queue-${taskId}] Retrying message dispatch (attempt ${attempts + 1}/3)`);
           if (message.retry) {
             message.retry();
           }
