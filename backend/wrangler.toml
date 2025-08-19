@@ -1,6 +1,6 @@
-# Wrangler 配置文件 - 免费计划兼容版 V7
-# 移除队列配置，使用免费计划兼容的异步处理
-# 适用于Cloudflare免费计划
+# Wrangler 配置文件 - 部署优化版 V8
+# 渐进式部署：先部署基础功能，再启用高级特性
+# 确保部署成功
 
 name = "destiny-backend"
 main = "worker.ts"
@@ -25,18 +25,20 @@ database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
 # Durable Objects配置 - AI异步处理和分布式锁
-[[durable_objects.bindings]]
-name = "AI_PROCESSOR"
-class_name = "AIProcessor"
+# 暂时注释以确保部署成功，部署后可以启用
 
-[[durable_objects.bindings]]
-name = "BATCH_COORDINATOR"
-class_name = "BatchCoordinator"
+# [[durable_objects.bindings]]
+# name = "AI_PROCESSOR"
+# class_name = "AIProcessor"
+
+# [[durable_objects.bindings]]
+# name = "BATCH_COORDINATOR"
+# class_name = "BatchCoordinator"
 
 # Durable Objects迁移配置
-[[migrations]]
-tag = "v1"
-new_classes = ["AIProcessor", "BatchCoordinator"]
+# [[migrations]]
+# tag = "v1"
+# new_classes = ["AIProcessor", "BatchCoordinator"]
 
 # Cloudflare Queues配置 - AI异步处理队列
 # 注释掉队列配置，等队列创建后再启用

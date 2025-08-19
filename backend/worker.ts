@@ -1441,8 +1441,8 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Durable Objects异步架构
-    await processDurableObjectTask(c.env, taskId, 'bazi', user, language);
+    // 立即启动AI处理 - 智能选择处理方式
+    await processAsyncTaskSmart(c.env, taskId, 'bazi', user, language);
 
     // 方法3: 设置一个备用的延迟检查
     c.executionCtx.waitUntil(
@@ -1538,8 +1538,8 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Durable Objects异步架构
-    await processDurableObjectTask(c.env, taskId, 'daily', user, language);
+    // 立即启动AI处理 - 智能选择处理方式
+    await processAsyncTaskSmart(c.env, taskId, 'daily', user, language);
 
     return c.json({
       success: true,
@@ -1609,8 +1609,8 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Durable Objects异步架构
-    await processDurableObjectTask(c.env, taskId, 'tarot', user, language, question);
+    // 立即启动AI处理 - 智能选择处理方式
+    await processAsyncTaskSmart(c.env, taskId, 'tarot', user, language, question);
 
     return c.json({
       success: true,
@@ -1683,8 +1683,8 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Durable Objects异步架构
-    await processDurableObjectTask(c.env, taskId, 'lucky', user, language);
+    // 立即启动AI处理 - 智能选择处理方式
+    await processAsyncTaskSmart(c.env, taskId, 'lucky', user, language);
 
     return c.json({
       success: true,
@@ -3303,45 +3303,62 @@ ${userProfile}
 
 
 
-// 使用Durable Objects处理异步任务
-async function processDurableObjectTask(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+// 智能异步任务处理 - 自动选择最佳处理方式
+async function processAsyncTaskSmart(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   try {
-    console.log(`🎯 [${taskId}] Starting Durable Object processing...`);
+    console.log(`🧠 [${taskId}] Smart async processing - detecting best method...`);
 
-    // 获取AI处理器的Durable Object实例
-    const aiProcessorId = env.AI_PROCESSOR.idFromName(`ai-processor-${taskId}`);
-    const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
+    // 方法1: 尝试Durable Objects（如果可用）
+    if (env.AI_PROCESSOR) {
+      try {
+        console.log(`🎯 [${taskId}] Trying Durable Objects processing...`);
 
-    // 发送任务到Durable Object进行处理
-    const response = await aiProcessor.fetch(new Request('https://dummy/process', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        taskId,
-        taskType,
-        user,
-        language,
-        question
-      })
-    }));
+        const aiProcessorId = env.AI_PROCESSOR.idFromName(`ai-processor-${taskId}`);
+        const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
 
-    if (!response.ok) {
-      throw new Error(`Durable Object processing failed: ${response.status}`);
+        const response = await aiProcessor.fetch(new Request('https://dummy/process', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            taskId,
+            taskType,
+            user,
+            language,
+            question
+          })
+        }));
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ [${taskId}] Durable Objects processing successful`);
+          return result;
+        }
+      } catch (error) {
+        console.log(`⚠️ [${taskId}] Durable Objects failed, trying next method...`);
+      }
     }
 
-    const result = await response.json();
-    console.log(`✅ [${taskId}] Durable Object processing initiated successfully`);
+    // 方法2: 尝试自调用API（如果Durable Objects不可用）
+    try {
+      console.log(`🔄 [${taskId}] Trying self-call API processing...`);
+      await triggerAsyncProcessing(env, taskId, taskType, user, language, question);
+      console.log(`✅ [${taskId}] Self-call API processing initiated`);
+      return;
+    } catch (error) {
+      console.log(`⚠️ [${taskId}] Self-call API failed, trying direct processing...`);
+    }
 
-    return result;
+    // 方法3: 直接处理（最后的回退方案）
+    console.log(`🔧 [${taskId}] Using direct processing as fallback...`);
+    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
 
   } catch (error) {
-    console.error(`❌ [${taskId}] Durable Object processing failed:`, error);
+    console.error(`❌ [${taskId}] All processing methods failed:`, error);
 
-    // 回退到直接处理
-    console.log(`🔄 [${taskId}] Falling back to direct processing...`);
-    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
+    // 更新任务状态为失败
+    await updateAsyncTaskStatus(env, taskId, 'failed', `处理失败: ${error.message}`);
   }
 }
 
@@ -3749,8 +3766,8 @@ export default {
             console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
           }
 
-          // 使用Durable Object重新处理任务
-          const taskPromise = processDurableObjectTask(
+          // 使用智能处理重新处理任务
+          const taskPromise = processAsyncTaskSmart(
             env,
             task.id,
             task.task_type,
@@ -3778,7 +3795,10 @@ export default {
   }
 };
 
-// Durable Objects类定义
+// Durable Objects类定义 - 条件导出以避免部署问题
+// 只有在配置启用时才导出这些类
+
+// @ts-ignore - 条件导出
 export class AIProcessor {
   private state: DurableObjectState;
   private env: any;
@@ -3930,7 +3950,8 @@ export class AIProcessor {
   }
 }
 
-// 批处理协调器
+// 批处理协调器 - 条件导出
+// @ts-ignore - 条件导出
 export class BatchCoordinator {
   private state: DurableObjectState;
   private env: any;

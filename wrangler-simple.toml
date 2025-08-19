@@ -1,0 +1,28 @@
+# Wrangler 配置文件 - 简化部署版
+# 移除所有可能导致部署失败的高级功能
+# 确保基础功能正常部署
+
+name = "destiny-backend"
+main = "worker.ts"
+compatibility_date = "2024-08-01"
+
+# 环境变量配置（非敏感信息）
+[vars]
+NODE_ENV = "production"
+CORS_ORIGIN = "https://destiny-frontend.pages.dev"
+FRONTEND_URL = "https://destiny-frontend.pages.dev"
+DEEPSEEK_BASE_URL = "https://api.siliconflow.cn/v1/chat/completions"
+DEEPSEEK_MODEL = "Pro/deepseek-ai/DeepSeek-R1"
+EMAIL_SERVICE = "resend"
+RESEND_FROM_EMAIL = "info@info.indicate.top"
+RESEND_FROM_NAME = "indicate.top"
+
+# D1数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "destiny-db"
+database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
+
+# 定时任务配置 - 每2分钟自动处理卡住的任务
+[triggers]
+crons = ["*/2 * * * *"]
