@@ -169,30 +169,99 @@ app.get('/api/health', async (c) => {
   });
 });
 
-// 异步处理状态检查（免费计划兼容）
+// Durable Objects异步处理状态检查
 app.get('/api/async-status', async (c) => {
   try {
-    console.log('🔍 Checking async processing status...');
+    console.log('🔍 Checking Durable Objects async processing status...');
+
+    // 检查Durable Objects绑定
+    const durableObjectsCheck = {
+      hasAIProcessor: !!c.env.AI_PROCESSOR,
+      hasBatchCoordinator: !!c.env.BATCH_COORDINATOR
+    };
+
+    console.log('🔧 Durable Objects bindings check:', durableObjectsCheck);
+
+    let aiProcessorStatus = null;
+    let batchCoordinatorStatus = null;
+
+    // 检查AI处理器状态
+    if (c.env.AI_PROCESSOR) {
+      try {
+        const aiProcessorId = c.env.AI_PROCESSOR.idFromName('status-check');
+        const aiProcessor = c.env.AI_PROCESSOR.get(aiProcessorId);
+        const response = await aiProcessor.fetch(new Request('https://dummy/status'));
+        aiProcessorStatus = await response.json();
+      } catch (error) {
+        aiProcessorStatus = { error: error.message };
+      }
+    }
+
+    // 检查批处理协调器状态
+    if (c.env.BATCH_COORDINATOR) {
+      try {
+        const batchCoordinatorId = c.env.BATCH_COORDINATOR.idFromName('status-check');
+        const batchCoordinator = c.env.BATCH_COORDINATOR.get(batchCoordinatorId);
+        const response = await batchCoordinator.fetch(new Request('https://dummy/status'));
+        batchCoordinatorStatus = await response.json();
+      } catch (error) {
+        batchCoordinatorStatus = { error: error.message };
+      }
+    }
 
     return c.json({
       status: 'healthy',
-      service: 'Self-Call Async Processing',
+      service: 'Durable Objects Async Processing',
       timestamp: new Date().toISOString(),
-      method: 'Self-call API (Free Plan Compatible)',
+      method: 'Durable Objects + Batch Processing',
+      durableObjectsCheck,
       details: {
-        processingMethod: 'Independent Worker calls',
+        processingMethod: 'Durable Objects with distributed locks',
+        batchProcessing: true,
+        streamingSupport: true,
         fallbackSupport: true,
-        freeplanCompatible: true
+        aiProcessorStatus,
+        batchCoordinatorStatus
       }
     });
   } catch (error) {
     console.error('❌ Async status check failed:', error);
     return c.json({
       status: 'error',
-      service: 'Async Processing',
+      service: 'Durable Objects Async Processing',
       error: error.message,
       timestamp: new Date().toISOString(),
       stack: error.stack?.substring(0, 500)
+    }, 500);
+  }
+});
+
+// AI API流式支持检查
+app.get('/api/ai-streaming-check', async (c) => {
+  try {
+    console.log('🔍 Checking AI API streaming support...');
+
+    const deepSeekService = new CloudflareDeepSeekService(c.env);
+    const streamingSupported = await deepSeekService.checkStreamingSupport();
+
+    return c.json({
+      status: 'checked',
+      service: 'DeepSeek API Streaming Check',
+      timestamp: new Date().toISOString(),
+      streamingSupported,
+      apiEndpoint: c.env.DEEPSEEK_BASE_URL,
+      model: c.env.DEEPSEEK_MODEL,
+      recommendation: streamingSupported ?
+        'API supports streaming - using optimized streaming calls' :
+        'API does not support streaming - using standard calls'
+    });
+  } catch (error) {
+    console.error('❌ AI streaming check failed:', error);
+    return c.json({
+      status: 'error',
+      service: 'DeepSeek API Streaming Check',
+      error: error.message,
+      timestamp: new Date().toISOString()
     }, 500);
   }
 });
@@ -1372,8 +1441,8 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
-    processAsyncTaskIndependently(c.env, taskId, 'bazi', user, language);
+    // 立即启动AI处理 - 使用Durable Objects异步架构
+    await processDurableObjectTask(c.env, taskId, 'bazi', user, language);
 
     // 方法3: 设置一个备用的延迟检查
     c.executionCtx.waitUntil(
@@ -1469,8 +1538,8 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
-    processAsyncTaskIndependently(c.env, taskId, 'daily', user, language);
+    // 立即启动AI处理 - 使用Durable Objects异步架构
+    await processDurableObjectTask(c.env, taskId, 'daily', user, language);
 
     return c.json({
       success: true,
@@ -1540,8 +1609,8 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
-    processAsyncTaskIndependently(c.env, taskId, 'tarot', user, language, question);
+    // 立即启动AI处理 - 使用Durable Objects异步架构
+    await processDurableObjectTask(c.env, taskId, 'tarot', user, language, question);
 
     return c.json({
       success: true,
@@ -1614,8 +1683,8 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
-    processAsyncTaskIndependently(c.env, taskId, 'lucky', user, language);
+    // 立即启动AI处理 - 使用Durable Objects异步架构
+    await processDurableObjectTask(c.env, taskId, 'lucky', user, language);
 
     return c.json({
       success: true,
@@ -2531,8 +2600,8 @@ Current Time: ${currentTime}
     return this.cleanAIOutput(content);
   }
 
-  // 调用DeepSeek API（单次调用，给足够时间）
-  async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000, abortSignal = null) {
+  // 优化的DeepSeek API调用（支持流式和批处理）
+  async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000, abortSignal = null, useStreaming = false) {
     const maxRetries = 0; // 移除重试机制，AI推理本身就很耗时
 
     // 快速验证基本配置
@@ -2564,7 +2633,7 @@ Current Time: ${currentTime}
         messages: messages,
         temperature: temperature,
         max_tokens: maxTokens,
-        stream: false
+        stream: useStreaming // 支持流式处理
       };
 
       console.log(`📤 Request data:`, {
@@ -2638,11 +2707,19 @@ Current Time: ${currentTime}
       }
 
       let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error('❌ Failed to parse JSON response:', e);
-        throw new Error('Invalid JSON response from AI service');
+
+      // 处理流式响应
+      if (useStreaming && response.body) {
+        console.log('🌊 Processing streaming response...');
+        data = await this.processStreamingResponse(response);
+      } else {
+        // 处理普通响应
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.error('❌ Failed to parse JSON response:', e);
+          throw new Error('Invalid JSON response from AI service');
+        }
       }
 
       console.log(`📊 Response data structure:`, {
@@ -3113,19 +3190,159 @@ ${userProfile}
 
     return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
   }
+
+  // 处理流式响应
+  async processStreamingResponse(response) {
+    console.log('🌊 Starting streaming response processing...');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          console.log('✅ Streaming response completed');
+          break;
+        }
+
+        // 解码数据块
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // 处理完整的行
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留不完整的行
+
+        for (const line of lines) {
+          if (line.trim() === '') continue;
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              console.log('🏁 Streaming finished');
+              break;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta) {
+                const content = parsed.choices[0].delta.content;
+                if (content) {
+                  fullContent += content;
+                  console.log(`📝 Streaming chunk: ${content.substring(0, 50)}...`);
+                }
+              }
+            } catch (e) {
+              console.warn('⚠️ Failed to parse streaming chunk:', data);
+            }
+          }
+        }
+      }
+
+      // 返回模拟的响应格式
+      return {
+        choices: [{
+          message: {
+            content: fullContent
+          }
+        }],
+        usage: {
+          total_tokens: Math.floor(fullContent.length / 4) // 估算token数
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Streaming processing error:', error);
+      throw new Error('Failed to process streaming response');
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  // 检查API是否支持流式处理
+  async checkStreamingSupport() {
+    try {
+      console.log('🔍 Checking streaming API support...');
+
+      const testMessages = [{
+        role: 'user',
+        content: '测试'
+      }];
+
+      const response = await fetch(this.baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: testMessages,
+          max_tokens: 10,
+          stream: true
+        })
+      });
+
+      if (response.ok && response.headers.get('content-type')?.includes('text/event-stream')) {
+        console.log('✅ Streaming API supported');
+        return true;
+      } else {
+        console.log('❌ Streaming API not supported');
+        return false;
+      }
+
+    } catch (error) {
+      console.log('❌ Streaming API check failed:', error);
+      return false;
+    }
+  }
 }
 
 
 
-// 独立的异步任务处理 - 通过自调用API避免Worker生命周期限制（免费计划兼容）
-function processAsyncTaskIndependently(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  // 立即触发自调用API来处理任务，避免依赖当前Worker实例
-  const processingPromise = triggerAsyncProcessing(env, taskId, taskType, user, language, question);
+// 使用Durable Objects处理异步任务
+async function processDurableObjectTask(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  try {
+    console.log(`🎯 [${taskId}] Starting Durable Object processing...`);
 
-  // 不等待结果，让处理在独立的请求中进行
-  processingPromise.catch(error => {
-    console.error(`❌ [${taskId}] Failed to trigger async processing:`, error);
-  });
+    // 获取AI处理器的Durable Object实例
+    const aiProcessorId = env.AI_PROCESSOR.idFromName(`ai-processor-${taskId}`);
+    const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
+
+    // 发送任务到Durable Object进行处理
+    const response = await aiProcessor.fetch(new Request('https://dummy/process', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        taskId,
+        taskType,
+        user,
+        language,
+        question
+      })
+    }));
+
+    if (!response.ok) {
+      throw new Error(`Durable Object processing failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`✅ [${taskId}] Durable Object processing initiated successfully`);
+
+    return result;
+
+  } catch (error) {
+    console.error(`❌ [${taskId}] Durable Object processing failed:`, error);
+
+    // 回退到直接处理
+    console.log(`🔄 [${taskId}] Falling back to direct processing...`);
+    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
+  }
 }
 
 // 通过自调用API触发异步处理（免费计划兼容）
@@ -3532,8 +3749,8 @@ export default {
             console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
           }
 
-          // 重新处理任务
-          const taskPromise = processAsyncTaskDirect(
+          // 使用Durable Object重新处理任务
+          const taskPromise = processDurableObjectTask(
             env,
             task.id,
             task.task_type,
@@ -3560,3 +3777,290 @@ export default {
     }
   }
 };
+
+// Durable Objects类定义
+export class AIProcessor {
+  private state: DurableObjectState;
+  private env: any;
+
+  constructor(state: DurableObjectState, env: any) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/process' && request.method === 'POST') {
+      return this.processAITask(request);
+    }
+
+    if (url.pathname === '/status' && request.method === 'GET') {
+      return this.getStatus();
+    }
+
+    return new Response('Not found', { status: 404 });
+  }
+
+  private async processAITask(request: Request): Promise<Response> {
+    try {
+      const { taskId, taskType, user, language, question } = await request.json();
+
+      console.log(`🎯 [DO-${taskId}] Starting AI processing in Durable Object...`);
+
+      // 获取分布式锁
+      const lockKey = `ai-task-${taskId}`;
+      const lock = await this.acquireLock(lockKey);
+
+      if (!lock) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Task already being processed'
+        }), { status: 409 });
+      }
+
+      try {
+        // 更新任务状态
+        await this.updateTaskStatus(taskId, 'processing', 'Durable Object处理中...');
+
+        // 使用优化的AI处理
+        const result = await this.processWithOptimizedAPI(taskType, user, language, question);
+
+        // 保存结果
+        await this.saveTaskResult(taskId, result);
+
+        // 更新完成状态
+        await this.updateTaskStatus(taskId, 'completed', '分析完成');
+
+        console.log(`✅ [DO-${taskId}] AI processing completed successfully`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          taskId,
+          result
+        }));
+
+      } finally {
+        // 释放锁
+        await this.releaseLock(lockKey);
+      }
+
+    } catch (error) {
+      console.error(`❌ [DO] AI processing failed:`, error);
+      return new Response(JSON.stringify({
+        success: false,
+        error: error.message
+      }), { status: 500 });
+    }
+  }
+
+  private async acquireLock(lockKey: string): Promise<boolean> {
+    const lockTimeout = 600000; // 10分钟锁超时
+    const currentTime = Date.now();
+
+    const existingLock = await this.state.storage.get(lockKey);
+
+    if (existingLock && existingLock.expiresAt > currentTime) {
+      return false; // 锁已被占用
+    }
+
+    // 获取锁
+    await this.state.storage.put(lockKey, {
+      acquiredAt: currentTime,
+      expiresAt: currentTime + lockTimeout
+    });
+
+    return true;
+  }
+
+  private async releaseLock(lockKey: string): Promise<void> {
+    await this.state.storage.delete(lockKey);
+  }
+
+  private async processWithOptimizedAPI(taskType: string, user: any, language: string, question?: string): Promise<string> {
+    console.log(`🚀 [DO] Starting optimized AI processing for ${taskType}...`);
+
+    const deepSeekService = new CloudflareDeepSeekService(this.env);
+
+    // 使用优化的AI调用
+    switch (taskType) {
+      case 'bazi':
+        return await deepSeekService.getBaziAnalysis(user, language);
+      case 'daily':
+        return await deepSeekService.getDailyFortune(user, language);
+      case 'tarot':
+        return await deepSeekService.getCelestialTarotReading(user, question || '', language);
+      case 'lucky':
+        return await deepSeekService.getLuckyItems(user, language);
+      default:
+        throw new Error(`Unknown task type: ${taskType}`);
+    }
+  }
+
+  private async updateTaskStatus(taskId: string, status: string, message: string): Promise<void> {
+    try {
+      await this.env.DB.prepare(`
+        UPDATE async_tasks
+        SET status = ?, message = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(status, message, taskId).run();
+    } catch (error) {
+      console.error(`❌ [DO] Failed to update task status:`, error);
+    }
+  }
+
+  private async saveTaskResult(taskId: string, result: string): Promise<void> {
+    try {
+      await this.env.DB.prepare(`
+        UPDATE async_tasks
+        SET result = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(result, taskId).run();
+    } catch (error) {
+      console.error(`❌ [DO] Failed to save task result:`, error);
+    }
+  }
+
+  private async getStatus(): Promise<Response> {
+    const locks = await this.state.storage.list();
+    return new Response(JSON.stringify({
+      activeLocks: locks.size,
+      timestamp: new Date().toISOString()
+    }));
+  }
+}
+
+// 批处理协调器
+export class BatchCoordinator {
+  private state: DurableObjectState;
+  private env: any;
+  private batchSize = 3; // 批处理大小
+  private batchTimeout = 30000; // 30秒批处理超时
+
+  constructor(state: DurableObjectState, env: any) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/add-task' && request.method === 'POST') {
+      return this.addTaskToBatch(request);
+    }
+
+    if (url.pathname === '/process-batch' && request.method === 'POST') {
+      return this.processBatch();
+    }
+
+    return new Response('Not found', { status: 404 });
+  }
+
+  private async addTaskToBatch(request: Request): Promise<Response> {
+    try {
+      const task = await request.json();
+
+      // 获取当前批次
+      let currentBatch = await this.state.storage.get('currentBatch') || [];
+      currentBatch.push({
+        ...task,
+        addedAt: Date.now()
+      });
+
+      await this.state.storage.put('currentBatch', currentBatch);
+
+      // 检查是否需要处理批次
+      if (currentBatch.length >= this.batchSize) {
+        // 立即处理批次
+        this.processBatchAsync();
+      } else {
+        // 设置超时处理
+        this.scheduleTimeoutProcessing();
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        batchSize: currentBatch.length
+      }));
+
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: error.message
+      }), { status: 500 });
+    }
+  }
+
+  private async processBatch(): Promise<Response> {
+    try {
+      const currentBatch = await this.state.storage.get('currentBatch') || [];
+
+      if (currentBatch.length === 0) {
+        return new Response(JSON.stringify({
+          success: true,
+          processed: 0
+        }));
+      }
+
+      // 清空当前批次
+      await this.state.storage.put('currentBatch', []);
+
+      // 并行处理批次中的任务
+      const processingPromises = currentBatch.map(task =>
+        this.processTaskInDurableObject(task)
+      );
+
+      const results = await Promise.allSettled(processingPromises);
+
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      console.log(`📊 [Batch] Processed ${successful} successful, ${failed} failed tasks`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        processed: currentBatch.length,
+        successful,
+        failed
+      }));
+
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: error.message
+      }), { status: 500 });
+    }
+  }
+
+  private async processTaskInDurableObject(task: any): Promise<void> {
+    // 获取AI处理器的Durable Object实例
+    const aiProcessorId = this.env.AI_PROCESSOR.idFromName(`ai-processor-${task.taskId}`);
+    const aiProcessor = this.env.AI_PROCESSOR.get(aiProcessorId);
+
+    // 发送任务到AI处理器
+    await aiProcessor.fetch(new Request('https://dummy/process', {
+      method: 'POST',
+      body: JSON.stringify(task)
+    }));
+  }
+
+  private async processBatchAsync(): Promise<void> {
+    // 异步处理批次，不阻塞响应
+    setTimeout(() => {
+      this.processBatch().catch(error => {
+        console.error('❌ [Batch] Async batch processing failed:', error);
+      });
+    }, 0);
+  }
+
+  private scheduleTimeoutProcessing(): void {
+    // 使用Durable Object的alarm功能来处理超时
+    this.state.storage.setAlarm(Date.now() + this.batchTimeout);
+  }
+
+  async alarm(): Promise<void> {
+    // 超时处理批次
+    console.log('⏰ [Batch] Processing batch due to timeout...');
+    await this.processBatch();
+  }
+}

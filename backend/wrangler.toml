@@ -24,6 +24,20 @@ binding = "DB"
 database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
+# Durable Objects配置 - AI异步处理和分布式锁
+[[durable_objects.bindings]]
+name = "AI_PROCESSOR"
+class_name = "AIProcessor"
+
+[[durable_objects.bindings]]
+name = "BATCH_COORDINATOR"
+class_name = "BatchCoordinator"
+
+# Durable Objects迁移配置
+[[migrations]]
+tag = "v1"
+new_classes = ["AIProcessor", "BatchCoordinator"]
+
 # Cloudflare Queues配置 - AI异步处理队列
 # 注释掉队列配置，等队列创建后再启用
 # 这样可以确保部署成功，避免引用不存在的队列
