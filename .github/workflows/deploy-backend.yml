@@ -31,6 +31,14 @@ jobs:
         run: npm install # 第三步：安装 npm 依赖
         working-directory: ./backend # 指定在 backend 目录下执行
 
+      - name: Verify Configuration
+        run: |
+          echo "🔍 Verifying wrangler configuration..."
+          npx wrangler --version
+          echo "📋 Configuration file content:"
+          cat wrangler.toml
+        working-directory: ./backend
+
       # 移除数据库迁移步骤，改为手动执行
       # 数据库迁移请使用: wrangler d1 execute destiny-db --file=./d1-schema.sql --remote
 
@@ -40,5 +48,20 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 使用简化的配置文件进行部署
-          command: deploy --config wrangler-deploy.toml
+          # 使用完整配置文件部署（包含Durable Objects和Queues）
+          command: deploy
+
+      - name: Verify Deployment
+        run: |
+          echo "🧪 Verifying deployment..."
+          sleep 10  # 等待部署完全生效
+
+          # 测试健康检查端点
+          echo "📊 Testing health endpoint..."
+          curl -f https://destiny-backend.jerryliang5119.workers.dev/api/health || exit 1
+
+          # 测试异步状态端点
+          echo "📊 Testing async status endpoint..."
+          curl -f https://destiny-backend.jerryliang5119.workers.dev/api/async-status || exit 1
+
+          echo "✅ Deployment verification completed successfully!"
