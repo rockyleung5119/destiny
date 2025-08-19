@@ -179,6 +179,64 @@ app.get('/api/health', async (c) => {
   });
 });
 
+// 任务状态监控端点
+app.get('/api/admin/task-monitor', async (c) => {
+  try {
+    // 获取最近的任务统计
+    const stats = await c.env.DB.prepare(`
+      SELECT
+        status,
+        COUNT(*) as count,
+        AVG(CASE
+          WHEN completed_at IS NOT NULL AND created_at IS NOT NULL
+          THEN (julianday(completed_at) - julianday(created_at)) * 24 * 60
+          ELSE NULL
+        END) as avg_duration_minutes
+      FROM async_tasks
+      WHERE created_at > datetime('now', '-24 hours')
+      GROUP BY status
+    `).all();
+
+    // 获取最近的失败任务
+    const failedTasks = await c.env.DB.prepare(`
+      SELECT id, task_type, error_message, created_at, updated_at
+      FROM async_tasks
+      WHERE status = 'failed' AND created_at > datetime('now', '-24 hours')
+      ORDER BY created_at DESC
+      LIMIT 10
+    `).all();
+
+    // 获取长时间运行的任务
+    const longRunningTasks = await c.env.DB.prepare(`
+      SELECT id, task_type, status, created_at, updated_at,
+             (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes
+      FROM async_tasks
+      WHERE status IN ('pending', 'processing')
+      AND created_at < datetime('now', '-10 minutes')
+      ORDER BY created_at ASC
+      LIMIT 10
+    `).all();
+
+    return c.json({
+      success: true,
+      data: {
+        stats: stats.results || [],
+        failedTasks: failedTasks.results || [],
+        longRunningTasks: longRunningTasks.results || [],
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Task monitor failed:', error);
+    return c.json({
+      success: false,
+      message: 'Failed to get task monitor data',
+      error: error.message
+    }, 500);
+  }
+});
+
 // 智能异步处理状态检查
 app.get('/api/async-status', async (c) => {
   try {
@@ -1351,14 +1409,20 @@ app.get('/api/fortune/task/:taskId', jwtMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
 
+    console.log(`🔍 [${taskId}] Checking task status for user ${userId}`);
+
     const task = await c.env.DB.prepare(`
-      SELECT id, task_type, status, result, error_message, created_at, completed_at
+      SELECT id, task_type, status, result, error_message, created_at, completed_at, updated_at,
+             LENGTH(result) as result_length
       FROM async_tasks WHERE id = ? AND user_id = ?
     `).bind(taskId, userId).first();
 
     if (!task) {
+      console.log(`❌ [${taskId}] Task not found for user ${userId}`);
       return c.json({ success: false, message: 'Task not found' }, 404);
     }
+
+    console.log(`📊 [${taskId}] Task status: ${task.status}, result_length: ${task.result_length || 0}`);
 
     const response: any = {
       success: true,
@@ -1367,7 +1431,9 @@ app.get('/api/fortune/task/:taskId', jwtMiddleware, async (c) => {
         type: task.task_type,
         status: task.status,
         createdAt: task.created_at,
-        completedAt: task.completed_at
+        completedAt: task.completed_at,
+        updatedAt: task.updated_at,
+        resultLength: task.result_length || 0
       }
     };
 
@@ -3643,6 +3709,47 @@ async function saveAIResult(env: any, taskId: string, taskType: string, user: an
   console.log(`🎉 [${taskId}] Task completed successfully`);
 }
 
+// 管理员接口 - 强制完成指定任务（调试用）
+app.post('/api/admin/force-complete-task', async (c) => {
+  try {
+    const { taskId, result } = await c.req.json();
+
+    if (!taskId) {
+      return c.json({ success: false, message: 'Task ID is required' }, 400);
+    }
+
+    const defaultResult = result || '由于技术问题，此分析结果由系统自动生成。请稍后重试获取完整分析。';
+    const completedTime = new Date().toISOString();
+
+    // 强制更新任务状态为完成
+    const updateResult = await c.env.DB.prepare(`
+      UPDATE async_tasks
+      SET status = 'completed', result = ?, completed_at = ?, updated_at = ?
+      WHERE id = ?
+    `).bind(defaultResult, completedTime, completedTime, taskId).run();
+
+    console.log(`🔧 [Admin] Force completed task ${taskId}:`, updateResult);
+
+    return c.json({
+      success: true,
+      message: `Task ${taskId} force completed`,
+      data: {
+        taskId,
+        status: 'completed',
+        resultLength: defaultResult.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Force complete task failed:', error);
+    return c.json({
+      success: false,
+      message: 'Failed to force complete task',
+      error: error.message
+    }, 500);
+  }
+});
+
 // 定时任务处理器 - 处理卡住的异步任务
 app.get('/api/admin/process-stuck-tasks', async (c) => {
   try {
@@ -3923,13 +4030,15 @@ export class AIProcessor {
         // 使用优化的AI处理
         const result = await this.processWithOptimizedAPI(taskType, user, language, question);
 
-        // 保存结果
+        // 验证结果
+        if (!result || typeof result !== 'string' || result.trim().length === 0) {
+          throw new Error('AI analysis returned empty or invalid content');
+        }
+
+        // 保存结果（这会自动设置status为completed）
         await this.saveTaskResult(taskId, result);
 
-        // 更新完成状态
-        await this.updateTaskStatus(taskId, 'completed', '分析完成');
-
-        console.log(`✅ [DO-${taskId}] AI processing completed successfully`);
+        console.log(`✅ [DO-${taskId}] AI processing completed successfully, result length: ${result.length}`);
 
         return new Response(JSON.stringify({
           success: true,
@@ -3943,7 +4052,15 @@ export class AIProcessor {
       }
 
     } catch (error) {
-      console.error(`❌ [DO] AI processing failed:`, error);
+      console.error(`❌ [DO-${taskId}] AI processing failed:`, error);
+
+      // 更新任务状态为失败
+      try {
+        await this.updateTaskStatus(taskId, 'failed', `Durable Object处理失败: ${error.message}`);
+      } catch (updateError) {
+        console.error(`❌ [DO-${taskId}] Failed to update error status:`, updateError);
+      }
+
       return new Response(JSON.stringify({
         success: false,
         error: error.message
@@ -3996,11 +4113,14 @@ export class AIProcessor {
 
   private async updateTaskStatus(taskId: string, status: string, message: string): Promise<void> {
     try {
+      const updateTime = new Date().toISOString();
       await this.env.DB.prepare(`
         UPDATE async_tasks
-        SET status = ?, message = ?, updated_at = datetime('now')
+        SET status = ?, error_message = ?, updated_at = ?
         WHERE id = ?
-      `).bind(status, message, taskId).run();
+      `).bind(status, message, updateTime, taskId).run();
+
+      console.log(`📊 [DO-${taskId}] Status updated to: ${status} - ${message}`);
     } catch (error) {
       console.error(`❌ [DO] Failed to update task status:`, error);
     }
@@ -4008,11 +4128,27 @@ export class AIProcessor {
 
   private async saveTaskResult(taskId: string, result: string): Promise<void> {
     try {
+      const completedTime = new Date().toISOString();
+
+      // 同时更新结果、状态和完成时间
       await this.env.DB.prepare(`
         UPDATE async_tasks
-        SET result = ?, updated_at = datetime('now')
+        SET result = ?, status = 'completed', completed_at = ?, updated_at = ?
         WHERE id = ?
-      `).bind(result, taskId).run();
+      `).bind(result, completedTime, completedTime, taskId).run();
+
+      console.log(`✅ [DO-${taskId}] Result saved and status set to completed`);
+
+      // 验证保存是否成功
+      const verification = await this.env.DB.prepare(`
+        SELECT status, LENGTH(result) as result_length FROM async_tasks WHERE id = ?
+      `).bind(taskId).first();
+
+      if (verification && verification.status === 'completed' && verification.result_length > 0) {
+        console.log(`✅ [DO-${taskId}] Result save verified: ${verification.result_length} characters`);
+      } else {
+        console.error(`❌ [DO-${taskId}] Result save verification failed:`, verification);
+      }
     } catch (error) {
       console.error(`❌ [DO] Failed to save task result:`, error);
     }
