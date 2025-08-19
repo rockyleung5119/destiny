@@ -169,44 +169,27 @@ app.get('/api/health', async (c) => {
   });
 });
 
-// 队列状态检查
-app.get('/api/queue-status', async (c) => {
+// 异步处理状态检查（免费计划兼容）
+app.get('/api/async-status', async (c) => {
   try {
-    console.log('🔍 Checking queue status...');
-
-    // 检查队列绑定
-    const queueCheck = {
-      hasAIQueue: !!c.env.AI_QUEUE,
-      hasAIDLQ: !!c.env.AI_DLQ
-    };
-
-    console.log('🔧 Queue bindings check:', queueCheck);
-
-    if (!c.env.AI_QUEUE) {
-      return c.json({
-        status: 'configuration_error',
-        service: 'Cloudflare Queues',
-        error: 'AI_QUEUE binding is missing',
-        timestamp: new Date().toISOString(),
-        queueCheck
-      }, 500);
-    }
+    console.log('🔍 Checking async processing status...');
 
     return c.json({
       status: 'healthy',
-      service: 'Cloudflare Queues',
+      service: 'Self-Call Async Processing',
       timestamp: new Date().toISOString(),
-      queueCheck,
+      method: 'Self-call API (Free Plan Compatible)',
       details: {
-        aiQueue: 'ai-processing-queue',
-        dlQueue: 'ai-processing-dlq'
+        processingMethod: 'Independent Worker calls',
+        fallbackSupport: true,
+        freeplanCompatible: true
       }
     });
   } catch (error) {
-    console.error('❌ Queue status check failed:', error);
+    console.error('❌ Async status check failed:', error);
     return c.json({
       status: 'error',
-      service: 'Cloudflare Queues',
+      service: 'Async Processing',
       error: error.message,
       timestamp: new Date().toISOString(),
       stack: error.stack?.substring(0, 500)
@@ -1389,8 +1372,8 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Cloudflare Queues
-    await sendToQueue(c.env, taskId, 'bazi', user, language);
+    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
+    processAsyncTaskIndependently(c.env, taskId, 'bazi', user, language);
 
     // 方法3: 设置一个备用的延迟检查
     c.executionCtx.waitUntil(
@@ -1486,8 +1469,8 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Cloudflare Queues
-    await sendToQueue(c.env, taskId, 'daily', user, language);
+    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
+    processAsyncTaskIndependently(c.env, taskId, 'daily', user, language);
 
     return c.json({
       success: true,
@@ -1557,8 +1540,8 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Cloudflare Queues
-    await sendToQueue(c.env, taskId, 'tarot', user, language, question);
+    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
+    processAsyncTaskIndependently(c.env, taskId, 'tarot', user, language, question);
 
     return c.json({
       success: true,
@@ -1631,8 +1614,8 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    // 立即启动AI处理 - 使用Cloudflare Queues
-    await sendToQueue(c.env, taskId, 'lucky', user, language);
+    // 立即启动AI处理 - 使用自调用API（免费计划兼容）
+    processAsyncTaskIndependently(c.env, taskId, 'lucky', user, language);
 
     return c.json({
       success: true,
@@ -3134,12 +3117,29 @@ ${userProfile}
 
 
 
-// 发送任务到Cloudflare Queue进行异步处理
-async function sendToQueue(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  try {
-    console.log(`📤 [${taskId}] Sending task to queue for processing...`);
+// 独立的异步任务处理 - 通过自调用API避免Worker生命周期限制（免费计划兼容）
+function processAsyncTaskIndependently(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  // 立即触发自调用API来处理任务，避免依赖当前Worker实例
+  const processingPromise = triggerAsyncProcessing(env, taskId, taskType, user, language, question);
 
-    const message = {
+  // 不等待结果，让处理在独立的请求中进行
+  processingPromise.catch(error => {
+    console.error(`❌ [${taskId}] Failed to trigger async processing:`, error);
+  });
+}
+
+// 通过自调用API触发异步处理（免费计划兼容）
+async function triggerAsyncProcessing(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  try {
+    console.log(`🚀 [${taskId}] Triggering independent async processing...`);
+
+    // 动态构建自调用URL - 支持多种可能的域名
+    const possibleUrls = [
+      `https://destiny-backend.wlk8s6v9y.workers.dev/api/internal/process-task`,
+      `https://destiny-backend.pages.dev/api/internal/process-task`
+    ];
+
+    const requestBody = {
       taskId,
       taskType,
       user,
@@ -3147,14 +3147,46 @@ async function sendToQueue(env: any, taskId: string, taskType: string, user: any
       question
     };
 
-    // 发送到AI处理队列
-    await env.AI_QUEUE.send(message);
+    let lastError = null;
 
-    console.log(`✅ [${taskId}] Task sent to queue successfully`);
+    // 尝试不同的URL
+    for (const workerUrl of possibleUrls) {
+      try {
+        console.log(`🔗 [${taskId}] Trying URL: ${workerUrl}`);
+
+        // 使用fetch自调用来启动独立的处理流程
+        const response = await fetch(workerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Request': 'true' // 标识内部请求
+          },
+          body: JSON.stringify(requestBody),
+          // 自调用只需要确保任务启动，不需要等待AI完成
+          signal: AbortSignal.timeout(60000) // 60秒超时，足够启动异步任务
+        });
+
+        if (!response.ok) {
+          throw new Error(`Self-call failed: ${response.status} ${response.statusText}`);
+        }
+
+        console.log(`✅ [${taskId}] Successfully triggered independent processing via ${workerUrl}`);
+        return; // 成功则退出
+
+      } catch (error) {
+        console.warn(`⚠️ [${taskId}] Failed to call ${workerUrl}:`, error.message);
+        lastError = error;
+        continue; // 尝试下一个URL
+      }
+    }
+
+    // 所有URL都失败了
+    throw lastError || new Error('All self-call URLs failed');
+
   } catch (error) {
-    console.error(`❌ [${taskId}] Failed to send task to queue:`, error);
+    console.error(`❌ [${taskId}] Failed to trigger independent processing:`, error);
 
-    // 如果队列发送失败，回退到直接处理
+    // 如果自调用失败，回退到原来的处理方式
     console.log(`🔄 [${taskId}] Falling back to direct processing...`);
     await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
   }
@@ -3447,39 +3479,7 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 export default {
   fetch: app.fetch,
 
-  // Cloudflare Queues消费者 - 处理AI异步任务
-  async queue(batch: MessageBatch, env: any, ctx: ExecutionContext) {
-    console.log(`🔄 Queue consumer triggered with ${batch.messages.length} messages`);
 
-    for (const message of batch.messages) {
-      try {
-        const { taskId, taskType, user, language, question } = message.body;
-        console.log(`🎯 Processing queue message for task: ${taskId}`);
-
-        // 更新任务状态为处理中
-        await updateAsyncTaskStatus(env, taskId, 'processing', 'AI队列处理中...');
-
-        // 处理AI任务
-        await processAIWithSegmentation(env, taskId, taskType, user, language, question);
-
-        // 确认消息处理成功
-        message.ack();
-        console.log(`✅ Queue message processed successfully for task: ${taskId}`);
-
-      } catch (error) {
-        console.error(`❌ Queue message processing failed:`, error);
-
-        // 重试次数检查
-        if (message.attempts >= 3) {
-          console.error(`❌ Max retries reached for message, sending to DLQ`);
-          message.retry(); // 这会发送到死信队列
-        } else {
-          console.log(`🔄 Retrying message (attempt ${message.attempts + 1}/3)`);
-          message.retry();
-        }
-      }
-    }
-  },
 
   // 每2分钟自动检查并处理卡住的任务
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
