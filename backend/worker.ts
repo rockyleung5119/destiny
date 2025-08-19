@@ -179,52 +179,60 @@ app.get('/api/health', async (c) => {
   });
 });
 
-// Cloudflare Queues异步处理状态检查
+// 智能异步处理状态检查
 app.get('/api/async-status', async (c) => {
   try {
-    console.log('🔍 Checking Cloudflare Queues async processing status...');
+    console.log('🔍 Checking intelligent async processing status...');
 
-    // 检查队列绑定
-    const queueCheck = {
+    // 检查所有可用的处理方式
+    const processingCheck = {
       hasAIQueue: !!c.env.AI_QUEUE,
       hasAIDLQ: !!c.env.AI_DLQ,
-      hasDurableObjects: !!c.env.AI_PROCESSOR
+      hasAIProcessor: !!c.env.AI_PROCESSOR,
+      hasBatchCoordinator: !!c.env.BATCH_COORDINATOR
     };
 
-    console.log('🔧 Queue bindings check:', queueCheck);
+    console.log('🔧 Processing capabilities check:', processingCheck);
 
-    if (!c.env.AI_QUEUE) {
-      return c.json({
-        status: 'configuration_error',
-        service: 'Cloudflare Queues',
-        error: 'AI_QUEUE binding is missing - 队列未配置',
-        timestamp: new Date().toISOString(),
-        queueCheck,
-        recommendation: '需要创建队列: wrangler queues create ai-processing-queue'
-      }, 500);
+    // 确定当前使用的处理方法
+    let currentMethod = 'direct_processing';
+    let methodDescription = '直接处理（回退方案）';
+
+    if (processingCheck.hasAIQueue) {
+      currentMethod = 'cloudflare_queues';
+      methodDescription = 'Cloudflare Queues（标准架构）';
+    } else if (processingCheck.hasAIProcessor) {
+      currentMethod = 'durable_objects';
+      methodDescription = 'Durable Objects（分布式处理）';
     }
 
     return c.json({
       status: 'healthy',
-      service: 'Cloudflare Queues Async Processing',
+      service: 'Intelligent Async Processing',
       timestamp: new Date().toISOString(),
-      architecture: 'Workers + D1 + Queues',
-      queueCheck,
+      architecture: 'Multi-tier: Queues → Durable Objects → Direct Processing',
+      currentMethod,
+      methodDescription,
+      processingCheck,
       details: {
-        processingMethod: 'Cloudflare Queues with retry mechanism',
-        queueName: 'ai-processing-queue',
-        dlqName: 'ai-processing-dlq',
-        maxRetries: 2,
-        batchSize: 1,
-        batchTimeout: 30,
-        fallbackSupport: true
-      }
+        tier1: processingCheck.hasAIQueue ? 'Cloudflare Queues (Available)' : 'Cloudflare Queues (Not configured)',
+        tier2: processingCheck.hasAIProcessor ? 'Durable Objects (Available)' : 'Durable Objects (Not configured)',
+        tier3: 'Direct Processing (Always available)',
+        fallbackChain: 'Queue → Durable Objects → Direct',
+        reliability: 'High (multiple fallback methods)'
+      },
+      recommendations: !processingCheck.hasAIQueue ? [
+        '1. 创建队列: wrangler queues create ai-processing-queue',
+        '2. 创建死信队列: wrangler queues create ai-processing-dlq',
+        '3. 启用wrangler.toml中的队列配置',
+        '4. 重新部署以获得最佳性能'
+      ] : []
     });
   } catch (error) {
     console.error('❌ Async status check failed:', error);
     return c.json({
       status: 'error',
-      service: 'Cloudflare Queues Async Processing',
+      service: 'Intelligent Async Processing',
       error: error.message,
       timestamp: new Date().toISOString(),
       stack: error.stack?.substring(0, 500)
@@ -3299,42 +3307,74 @@ ${userProfile}
 
 
 
-// 标准Cloudflare Queues异步处理 - 发送任务到队列
+// 智能异步处理 - 队列优先，自动回退到直接处理
 async function sendTaskToQueue(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   try {
-    console.log(`📤 [${taskId}] Sending task to Cloudflare Queue...`);
+    console.log(`🎯 [${taskId}] Starting intelligent async processing...`);
 
-    // 检查队列是否可用
-    if (!env.AI_QUEUE) {
-      console.warn(`⚠️ [${taskId}] AI_QUEUE not available, falling back to direct processing...`);
-      await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
-      return;
+    // 方法1: 尝试Cloudflare Queue（如果可用）
+    if (env.AI_QUEUE) {
+      try {
+        console.log(`📤 [${taskId}] Trying Cloudflare Queue...`);
+
+        // 构建队列消息
+        const queueMessage = {
+          taskId,
+          taskType,
+          user,
+          language,
+          question,
+          timestamp: new Date().toISOString()
+        };
+
+        // 发送到Cloudflare Queue
+        await env.AI_QUEUE.send(queueMessage);
+
+        console.log(`✅ [${taskId}] Task successfully sent to queue`);
+
+        // 更新任务状态为已入队
+        await updateAsyncTaskStatus(env, taskId, 'pending', 'AI任务已加入处理队列...');
+        return;
+
+      } catch (queueError) {
+        console.warn(`⚠️ [${taskId}] Queue failed: ${queueError.message}, trying next method...`);
+      }
+    } else {
+      console.log(`⚠️ [${taskId}] AI_QUEUE not available, trying alternative methods...`);
     }
 
-    // 构建队列消息
-    const queueMessage = {
-      taskId,
-      taskType,
-      user,
-      language,
-      question,
-      timestamp: new Date().toISOString()
-    };
+    // 方法2: 尝试Durable Objects（如果可用）
+    if (env.AI_PROCESSOR) {
+      try {
+        console.log(`🎯 [${taskId}] Trying Durable Objects...`);
 
-    // 发送到Cloudflare Queue
-    await env.AI_QUEUE.send(queueMessage);
+        const aiProcessorId = env.AI_PROCESSOR.idFromName(`ai-processor-${taskId}`);
+        const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
 
-    console.log(`✅ [${taskId}] Task successfully sent to queue`);
+        const response = await aiProcessor.fetch(new Request('https://dummy/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, taskType, user, language, question })
+        }));
 
-    // 更新任务状态为已入队
-    await updateAsyncTaskStatus(env, taskId, 'pending', 'AI任务已加入处理队列...');
+        if (response.ok) {
+          console.log(`✅ [${taskId}] Durable Objects processing initiated`);
+          return;
+        }
+      } catch (doError) {
+        console.warn(`⚠️ [${taskId}] Durable Objects failed: ${doError.message}, falling back...`);
+      }
+    }
+
+    // 方法3: 直接处理（最后的回退方案）
+    console.log(`🔄 [${taskId}] Using direct processing as fallback...`);
+    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
 
   } catch (error) {
-    console.error(`❌ [${taskId}] Failed to send task to queue:`, error);
+    console.error(`❌ [${taskId}] All processing methods failed:`, error);
 
-    // 队列失败时回退到直接处理
-    console.log(`🔄 [${taskId}] Queue failed, falling back to direct processing...`);
-    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
+    // 更新任务状态为失败
+    await updateAsyncTaskStatus(env, taskId, 'failed', `处理失败: ${error.message}`);
   }
 }
 
@@ -3689,13 +3729,25 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 export default {
   fetch: app.fetch,
 
-  // Cloudflare Queues消费者 - 标准异步架构的核心
+  // Cloudflare Queues消费者 - 标准异步架构的核心（可选）
   async queue(batch: MessageBatch, env: any, ctx: ExecutionContext) {
+    // 检查队列是否已配置
+    if (!batch || !batch.messages) {
+      console.warn('⚠️ [Queue] No messages in batch or queue not properly configured');
+      return;
+    }
+
     console.log(`🔄 [Queue] Processing batch with ${batch.messages.length} messages`);
 
     for (const message of batch.messages) {
+      let taskId = 'unknown';
       try {
-        const { taskId, taskType, user, language, question, timestamp } = message.body;
+        const { taskId: msgTaskId, taskType, user, language, question, timestamp } = message.body || {};
+        taskId = msgTaskId || 'unknown';
+
+        if (!taskId || !taskType || !user) {
+          throw new Error('Invalid message format: missing required fields');
+        }
 
         console.log(`🎯 [Queue-${taskId}] Processing AI task: ${taskType}`);
 
@@ -3710,19 +3762,31 @@ export default {
         console.log(`✅ [Queue-${taskId}] Task processed successfully`);
 
       } catch (error) {
-        console.error(`❌ [Queue] Message processing failed:`, error);
+        console.error(`❌ [Queue-${taskId}] Message processing failed:`, error);
 
         // 重试机制
-        if (message.attempts >= 3) {
-          console.error(`❌ [Queue] Max retries reached, sending to DLQ`);
+        const attempts = message.attempts || 0;
+        if (attempts >= 2) { // 最多重试2次
+          console.error(`❌ [Queue-${taskId}] Max retries reached, sending to DLQ`);
+
           // 更新任务状态为失败
-          if (message.body?.taskId) {
-            await updateAsyncTaskStatus(env, message.body.taskId, 'failed', `队列处理失败: ${error.message}`);
+          if (taskId !== 'unknown') {
+            try {
+              await updateAsyncTaskStatus(env, taskId, 'failed', `队列处理失败: ${error.message}`);
+            } catch (updateError) {
+              console.error(`❌ [Queue-${taskId}] Failed to update task status:`, updateError);
+            }
           }
-          message.retry(); // 发送到死信队列
+
+          // 发送到死信队列
+          if (message.retry) {
+            message.retry();
+          }
         } else {
-          console.log(`🔄 [Queue] Retrying message (attempt ${message.attempts + 1}/3)`);
-          message.retry();
+          console.log(`🔄 [Queue-${taskId}] Retrying message (attempt ${attempts + 1}/3)`);
+          if (message.retry) {
+            message.retry();
+          }
         }
       }
     }

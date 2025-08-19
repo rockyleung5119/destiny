@@ -42,22 +42,24 @@ new_classes = ["AIProcessor", "BatchCoordinator"]
 
 # Cloudflare Queues配置 - AI异步处理队列
 # 标准Cloudflare异步架构：Workers + D1 + Queues
+# 暂时注释队列配置，确保基础部署成功
+# 部署成功后再手动创建队列并启用
 
-[[queues.producers]]
-binding = "AI_QUEUE"
-queue = "ai-processing-queue"
+# [[queues.producers]]
+# binding = "AI_QUEUE"
+# queue = "ai-processing-queue"
 
-[[queues.consumers]]
-queue = "ai-processing-queue"
-max_batch_size = 1
-max_batch_timeout = 30
-max_retries = 2
-dead_letter_queue = "ai-processing-dlq"
+# [[queues.consumers]]
+# queue = "ai-processing-queue"
+# max_batch_size = 1
+# max_batch_timeout = 30
+# max_retries = 2
+# dead_letter_queue = "ai-processing-dlq"
 
 # 死信队列配置
-[[queues.producers]]
-binding = "AI_DLQ"
-queue = "ai-processing-dlq"
+# [[queues.producers]]
+# binding = "AI_DLQ"
+# queue = "ai-processing-dlq"
 
 # 定时任务配置 - 每2分钟自动处理卡住的任务（在前端超时前及时恢复）
 [triggers]
