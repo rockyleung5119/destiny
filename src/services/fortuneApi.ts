@@ -5,7 +5,7 @@ import { apiRequest } from './api';
 async function apiRequestWithTimeout<T>(
   endpoint: string,
   options: RequestInit = {},
-  timeoutMs: number = 180000 // 默认3分钟
+  timeoutMs: number = 300000 // 默认5分钟，适应AI大模型推理时间
 ): Promise<T> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
   const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
@@ -195,10 +195,10 @@ export const fortuneAPI = {
 
   // 轮询任务状态直到完成
   async pollTaskUntilComplete(taskId: string): Promise<FortuneResponse> {
-    const maxAttempts = 60; // 最多轮询6分钟 (60次 * 6秒) - 适应4分钟AI处理时间
+    const maxAttempts = 75; // 最多轮询7.5分钟 (75次 * 6秒) - 适应5分钟AI处理时间 + 缓冲
     let attempts = 0;
 
-    console.log(`🔄 Starting task polling for ${taskId}, max attempts: ${maxAttempts} (6 minutes timeout)`);
+    console.log(`🔄 Starting task polling for ${taskId}, max attempts: ${maxAttempts} (7.5 minutes timeout)`);
 
     while (attempts < maxAttempts) {
       try {
@@ -210,8 +210,11 @@ export const fortuneAPI = {
             taskId: string;
             status: string;
             analysis?: string;
+            aiAnalysis?: string;
             error?: string;
             type?: string;
+            progressMessage?: string;
+            resultLength?: number;
           };
           message: string;
         }>(`/fortune/task/${taskId}`, {
@@ -222,18 +225,26 @@ export const fortuneAPI = {
           throw new Error(statusResponse.message || 'Failed to check task status');
         }
 
-        const { status, analysis, error, type } = statusResponse.data;
-        console.log(`📈 Task status: ${status}`);
+        const { status, analysis, aiAnalysis, error, type, progressMessage, resultLength } = statusResponse.data;
+        console.log(`📈 Task status: ${status}, result length: ${resultLength || 0}`);
 
-        if (status === 'completed' && analysis) {
+        if (progressMessage) {
+          console.log(`💬 Progress: ${progressMessage}`);
+        }
+
+        // 优先使用aiAnalysis，回退到analysis
+        const result = aiAnalysis || analysis;
+
+        if (status === 'completed' && result) {
           // 任务完成，返回结果
-          console.log(`✅ Task ${taskId} completed successfully`);
+          console.log(`✅ Task ${taskId} completed successfully, result length: ${result.length}`);
           return {
             success: true,
             message: statusResponse.message,
             data: {
               type: type || 'analysis',
-              analysis: analysis,
+              analysis: result,
+              aiAnalysis: result,
               timestamp: new Date().toISOString()
             }
           };

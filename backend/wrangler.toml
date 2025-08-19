@@ -51,8 +51,8 @@ queue = "ai-processing-queue"
 [[queues.consumers]]
 queue = "ai-processing-queue"
 max_batch_size = 1
-max_batch_timeout = 30
-max_retries = 2
+max_batch_timeout = 300
+max_retries = 1
 dead_letter_queue = "ai-processing-dlq"
 
 # 死信队列配置

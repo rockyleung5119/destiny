@@ -162,6 +162,47 @@ function generateTaskId() {
   return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// 生成性能建议
+function generatePerformanceRecommendations(errorStats: any[], performanceStats: any[]): string[] {
+  const recommendations: string[] = [];
+
+  // 分析错误统计
+  errorStats.forEach(error => {
+    if (error.error_message.includes('524')) {
+      recommendations.push('检测到524超时错误，建议优化AI调用超时设置或升级Worker计划');
+    }
+    if (error.error_message.includes('timeout')) {
+      recommendations.push('检测到超时错误，建议检查网络连接和AI API响应时间');
+    }
+    if (error.error_message.includes('API key')) {
+      recommendations.push('检测到API密钥错误，建议验证环境变量配置');
+    }
+    if (error.count > 10) {
+      recommendations.push(`高频错误: ${error.error_message.substring(0, 50)}... (${error.count}次)`);
+    }
+  });
+
+  // 分析性能统计
+  performanceStats.forEach(stat => {
+    if (stat.avg_duration_minutes > 5) {
+      recommendations.push(`${stat.task_type}任务平均耗时过长 (${stat.avg_duration_minutes.toFixed(1)}分钟)`);
+    }
+    if (stat.max_duration_minutes > 10) {
+      recommendations.push(`${stat.task_type}任务最长耗时异常 (${stat.max_duration_minutes.toFixed(1)}分钟)`);
+    }
+  });
+
+  // 通用建议
+  if (recommendations.length === 0) {
+    recommendations.push('系统运行正常，无特殊建议');
+  } else {
+    recommendations.push('建议定期运行 /api/admin/process-stuck-tasks 清理卡住的任务');
+    recommendations.push('使用 wrangler tail 查看实时日志进行详细诊断');
+  }
+
+  return recommendations;
+}
+
 // 健康检查端点
 app.get('/api/health', async (c) => {
   // 确保demo用户存在（在所有环境中）
@@ -177,6 +218,69 @@ app.get('/api/health', async (c) => {
     environment: c.env.NODE_ENV || 'development',
     database: c.env.DB ? 'D1 Connected' : 'No Database'
   });
+});
+
+// Worker性能监控端点
+app.get('/api/admin/worker-performance', async (c) => {
+  try {
+    // 获取最近的错误统计
+    const errorStats = await c.env.DB.prepare(`
+      SELECT
+        error_message,
+        COUNT(*) as count,
+        MAX(updated_at) as last_occurrence
+      FROM async_tasks
+      WHERE status = 'failed'
+      AND created_at > datetime('now', '-24 hours')
+      AND error_message IS NOT NULL
+      GROUP BY error_message
+      ORDER BY count DESC
+      LIMIT 10
+    `).all();
+
+    // 获取处理时间统计
+    const performanceStats = await c.env.DB.prepare(`
+      SELECT
+        task_type,
+        COUNT(*) as total_tasks,
+        AVG(CASE
+          WHEN completed_at IS NOT NULL AND created_at IS NOT NULL
+          THEN (julianday(completed_at) - julianday(created_at)) * 24 * 60
+          ELSE NULL
+        END) as avg_duration_minutes,
+        MIN(CASE
+          WHEN completed_at IS NOT NULL AND created_at IS NOT NULL
+          THEN (julianday(completed_at) - julianday(created_at)) * 24 * 60
+          ELSE NULL
+        END) as min_duration_minutes,
+        MAX(CASE
+          WHEN completed_at IS NOT NULL AND created_at IS NOT NULL
+          THEN (julianday(completed_at) - julianday(created_at)) * 24 * 60
+          ELSE NULL
+        END) as max_duration_minutes
+      FROM async_tasks
+      WHERE created_at > datetime('now', '-24 hours')
+      GROUP BY task_type
+    `).all();
+
+    return c.json({
+      success: true,
+      data: {
+        errorStats: errorStats.results || [],
+        performanceStats: performanceStats.results || [],
+        timestamp: new Date().toISOString(),
+        recommendations: generatePerformanceRecommendations(errorStats.results || [], performanceStats.results || [])
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Worker performance monitor failed:', error);
+    return c.json({
+      success: false,
+      message: 'Failed to get worker performance data',
+      error: error.message
+    }, 500);
+  }
 });
 
 // 任务状态监控端点
@@ -1443,13 +1547,19 @@ app.get('/api/fortune/task/:taskId', jwtMiddleware, async (c) => {
       response.data.analysisType = task.task_type;
       response.data.timestamp = task.completed_at;
       response.message = `${task.task_type} analysis completed successfully`;
+      console.log(`✅ [${taskId}] Returning completed result, length: ${task.result.length}`);
     } else if (task.status === 'failed') {
       response.data.error = task.error_message;
       response.message = 'Analysis failed';
+      console.log(`❌ [${taskId}] Returning failed status: ${task.error_message}`);
     } else if (task.status === 'processing') {
       response.message = 'Analysis in progress';
+      response.data.progressMessage = task.error_message || 'AI推理模型正在深度分析中...';
+      console.log(`🔄 [${taskId}] Returning processing status`);
     } else {
       response.message = 'Analysis pending';
+      response.data.progressMessage = task.error_message || 'AI任务已加入处理队列...';
+      console.log(`⏳ [${taskId}] Returning pending status`);
     }
 
     return c.json(response);
@@ -2693,10 +2803,9 @@ Current Time: ${currentTime}
       console.log(`🤖 Model: ${this.model}`);
       console.log(`🔑 API Key: ${this.apiKey.substring(0, 10)}...`);
 
-      // 针对异步处理优化超时时间：AI推理模型需要2-3分钟
-      // 单次调用给足够的时间，避免重试导致总时间过长
-      const timeoutMs = 300000; // 5分钟超时，一次性给足够时间
-      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (single call, async processing)`);
+      // 统一超时时间为300秒（5分钟）- 适应AI大模型2-5分钟的推理时间
+      const timeoutMs = 300000; // 统一5分钟超时，给AI推理充足时间
+      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (unified 5-minute timeout for AI inference)`);
 
       const requestData = {
         model: this.model,
@@ -2857,14 +2966,21 @@ Current Time: ${currentTime}
       // 检查是否是超时错误
       if (error.name === 'AbortError') {
         console.error(`❌ Request timeout after ${timeoutMs/1000} seconds`);
-      } else if (error.message.includes('524') || error.message.includes('timeout')) {
+        throw new Error(`AI分析超时（${timeoutMs/1000}秒），请稍后重试`);
+      } else if (error.message.includes('524')) {
+        console.error('❌ Cloudflare 524 timeout detected - Worker execution time limit exceeded');
+        throw new Error('AI服务暂时繁忙，请稍后重试（错误代码：524）');
+      } else if (error.message.includes('timeout')) {
         console.error('❌ API timeout detected, service may be overloaded');
+        throw new Error('AI分析超时，请稍后重试');
       } else if (error.message.includes('fetch')) {
         console.error('❌ Network fetch error detected');
+        throw new Error('网络连接错误，请检查网络后重试');
       }
 
       // 不进行重试，直接返回错误
       console.error('❌ API call failed (no retry for async processing)');
+      throw new Error(`AI服务调用失败: ${error.message}`);
 
       // 根据具体错误类型提供更准确的错误信息
       let userFriendlyMessage;
@@ -3417,11 +3533,22 @@ async function sendTaskToQueue(env: any, taskId: string, taskType: string, user:
         const aiProcessorId = env.AI_PROCESSOR.idFromName(`ai-processor-${taskId}`);
         const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
 
+        // 设置Durable Objects调用超时
+        const doTimeout = 300000; // 统一5分钟超时
+        const doController = new AbortController();
+        const doTimeoutId = setTimeout(() => {
+          console.log(`⏰ [${taskId}] Durable Objects timeout after ${doTimeout/1000}s`);
+          doController.abort();
+        }, doTimeout);
+
         const response = await aiProcessor.fetch(new Request('https://dummy/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, taskType, user, language, question })
+          body: JSON.stringify({ taskId, taskType, user, language, question }),
+          signal: doController.signal
         }));
+
+        clearTimeout(doTimeoutId);
 
         if (response.ok) {
           console.log(`✅ [${taskId}] Durable Objects processing initiated`);
@@ -3429,6 +3556,12 @@ async function sendTaskToQueue(env: any, taskId: string, taskType: string, user:
         }
       } catch (doError) {
         console.warn(`⚠️ [${taskId}] Durable Objects failed: ${doError.message}, falling back...`);
+
+        // 如果是524错误，直接标记任务失败
+        if (doError.message.includes('524')) {
+          await updateAsyncTaskStatus(env, taskId, 'failed', 'AI服务暂时繁忙，请稍后重试（错误代码：524）');
+          return;
+        }
       }
     }
 
@@ -3537,6 +3670,7 @@ async function updateAsyncTaskStatus(env: any, taskId: string, status: string, m
   try {
     const updateTime = new Date().toISOString();
 
+    // 统一使用error_message字段存储状态消息
     if (message) {
       await env.DB.prepare(`
         UPDATE async_tasks SET status = ?, error_message = ?, updated_at = ? WHERE id = ?
@@ -3548,8 +3682,21 @@ async function updateAsyncTaskStatus(env: any, taskId: string, status: string, m
     }
 
     console.log(`📊 [${taskId}] Status updated to: ${status}${message ? ` - ${message}` : ''}`);
+
+    // 验证状态更新是否成功
+    const verification = await env.DB.prepare(`
+      SELECT status, updated_at FROM async_tasks WHERE id = ?
+    `).bind(taskId).first();
+
+    if (verification && verification.status === status) {
+      console.log(`✅ [${taskId}] Status update verified: ${status}`);
+    } else {
+      console.error(`❌ [${taskId}] Status update verification failed. Expected: ${status}, Got: ${verification?.status}`);
+    }
+
   } catch (error) {
     console.error(`❌ [${taskId}] Failed to update task status:`, error);
+    throw error; // 重新抛出错误，让调用者知道状态更新失败
   }
 }
 
@@ -3577,13 +3724,13 @@ async function processAIWithSegmentation(env: any, taskId: string, taskType: str
     // 调用AI服务，给足够的时间完成推理
     console.log(`🔮 [${taskId}] Calling AI service (single call mode)...`);
 
-    // 单次调用，使用足够长的超时时间
+    // 单次调用，使用统一的300秒超时
     const aiCallPromise = callAIService(deepSeekService, taskType, user, language, question);
-    const asyncTimeoutMs = 420000; // 7分钟超时，给AI推理充足时间
+    const asyncTimeoutMs = 300000; // 统一5分钟超时，给AI推理充足时间
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         console.log(`⏰ [${taskId}] AI call timeout after ${asyncTimeoutMs/1000} seconds`);
-        reject(new Error(`AI call timeout after ${asyncTimeoutMs/1000} seconds`));
+        reject(new Error(`AI分析超时（${asyncTimeoutMs/1000}秒），请稍后重试`));
       }, asyncTimeoutMs);
     });
 
@@ -3756,13 +3903,14 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
     console.log('🔧 Processing stuck tasks...');
 
     // 查找需要处理的任务：
-    // 1. 超过8分钟仍在processing状态的任务（单次调用7分钟超时+1分钟缓冲）
+    // 1. 超过6分钟仍在processing状态的任务（5分钟超时+1分钟缓冲）
     // 2. 超过60秒仍在pending状态的任务（可能异步处理没有启动）
     const stuckTasks = await c.env.DB.prepare(`
-      SELECT id, user_id, task_type, input_data, created_at, updated_at, status
+      SELECT id, user_id, task_type, input_data, created_at, updated_at, status,
+             (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes
       FROM async_tasks
       WHERE (
-        (status = 'processing' AND datetime(updated_at) < datetime('now', '-480 seconds'))
+        (status = 'processing' AND datetime(updated_at) < datetime('now', '-360 seconds'))
         OR
         (status = 'pending' AND datetime(created_at) < datetime('now', '-60 seconds'))
       )
@@ -3780,7 +3928,21 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 
     for (const task of stuckTasks.results) {
       try {
-        console.log(`🔧 Processing stuck task: ${task.id}`);
+        const durationMinutes = task.duration_minutes || 0;
+        console.log(`🔧 Processing stuck task: ${task.id} (${task.status}, ${durationMinutes.toFixed(1)} minutes old)`);
+
+        // 对于超过10分钟的任务，直接标记为失败
+        if (durationMinutes > 10) {
+          await c.env.DB.prepare(`
+            UPDATE async_tasks
+            SET status = 'failed', error_message = '任务超时失败，请重新尝试', updated_at = ?
+            WHERE id = ?
+          `).bind(new Date().toISOString(), task.id).run();
+
+          console.log(`❌ Marked task ${task.id} as failed (too old: ${durationMinutes.toFixed(1)} minutes)`);
+          processed++;
+          continue;
+        }
 
         // 获取用户信息
         const user = await c.env.DB.prepare(`
@@ -3790,6 +3952,11 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 
         if (!user) {
           console.error(`❌ User not found for task ${task.id}`);
+          await c.env.DB.prepare(`
+            UPDATE async_tasks
+            SET status = 'failed', error_message = '用户信息不存在', updated_at = ?
+            WHERE id = ?
+          `).bind(new Date().toISOString(), task.id).run();
           continue;
         }
 
@@ -3798,7 +3965,7 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
         try {
           inputData = JSON.parse(task.input_data || '{}');
         } catch (e) {
-          console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
+          console.warn(`⚠️ Failed to parse input data for task ${task.id}, using defaults`);
         }
 
         // 重新处理任务
@@ -3816,6 +3983,17 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 
       } catch (error) {
         console.error(`❌ Failed to reprocess task ${task.id}:`, error);
+
+        // 标记任务为失败
+        try {
+          await c.env.DB.prepare(`
+            UPDATE async_tasks
+            SET status = 'failed', error_message = ?, updated_at = ?
+            WHERE id = ?
+          `).bind(error.message || '任务处理失败', new Date().toISOString(), task.id).run();
+        } catch (updateError) {
+          console.error(`❌ Failed to update task status for ${task.id}:`, updateError);
+        }
       }
     }
 
@@ -3868,6 +4046,17 @@ export default {
         message.ack();
         console.log(`✅ [Queue-${taskId}] Task processed successfully`);
 
+        // 验证任务是否真正完成
+        const finalCheck = await env.DB.prepare(`
+          SELECT status, LENGTH(result) as result_length FROM async_tasks WHERE id = ?
+        `).bind(taskId).first();
+
+        if (finalCheck && finalCheck.status === 'completed' && finalCheck.result_length > 0) {
+          console.log(`✅ [Queue-${taskId}] Final verification passed: ${finalCheck.result_length} characters`);
+        } else {
+          console.error(`❌ [Queue-${taskId}] Final verification failed:`, finalCheck);
+        }
+
       } catch (error) {
         console.error(`❌ [Queue-${taskId}] Message processing failed:`, error);
 
@@ -3905,13 +4094,14 @@ export default {
 
     try {
       // 查找需要处理的任务：
-      // 1. 超过8分钟仍在processing状态的任务（单次调用7分钟超时+1分钟缓冲）
+      // 1. 超过6分钟仍在processing状态的任务（5分钟超时+1分钟缓冲）
       // 2. 超过60秒仍在pending状态的任务（可能异步处理没有启动）
       const stuckTasks = await env.DB.prepare(`
-        SELECT id, user_id, task_type, input_data, created_at, updated_at, status
+        SELECT id, user_id, task_type, input_data, created_at, updated_at, status,
+               (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes
         FROM async_tasks
         WHERE (
-          (status = 'processing' AND datetime(updated_at) < datetime('now', '-480 seconds'))
+          (status = 'processing' AND datetime(updated_at) < datetime('now', '-360 seconds'))
           OR
           (status = 'pending' AND datetime(created_at) < datetime('now', '-60 seconds'))
         )
