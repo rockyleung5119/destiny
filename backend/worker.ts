@@ -10,6 +10,16 @@ type D1Database = any;
 type D1PreparedStatement = any;
 type D1Result = any;
 type D1ExecResult = any;
+
+// Cloudflare Queues类型定义
+interface MessageBatch {
+  messages: Array<{
+    body: any;
+    attempts: number;
+    ack(): void;
+    retry(): void;
+  }>;
+}
 // 邮箱验证模板（内联以避免导入问题）
 const verificationTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -169,66 +179,52 @@ app.get('/api/health', async (c) => {
   });
 });
 
-// Durable Objects异步处理状态检查
+// Cloudflare Queues异步处理状态检查
 app.get('/api/async-status', async (c) => {
   try {
-    console.log('🔍 Checking Durable Objects async processing status...');
+    console.log('🔍 Checking Cloudflare Queues async processing status...');
 
-    // 检查Durable Objects绑定
-    const durableObjectsCheck = {
-      hasAIProcessor: !!c.env.AI_PROCESSOR,
-      hasBatchCoordinator: !!c.env.BATCH_COORDINATOR
+    // 检查队列绑定
+    const queueCheck = {
+      hasAIQueue: !!c.env.AI_QUEUE,
+      hasAIDLQ: !!c.env.AI_DLQ,
+      hasDurableObjects: !!c.env.AI_PROCESSOR
     };
 
-    console.log('🔧 Durable Objects bindings check:', durableObjectsCheck);
+    console.log('🔧 Queue bindings check:', queueCheck);
 
-    let aiProcessorStatus = null;
-    let batchCoordinatorStatus = null;
-
-    // 检查AI处理器状态
-    if (c.env.AI_PROCESSOR) {
-      try {
-        const aiProcessorId = c.env.AI_PROCESSOR.idFromName('status-check');
-        const aiProcessor = c.env.AI_PROCESSOR.get(aiProcessorId);
-        const response = await aiProcessor.fetch(new Request('https://dummy/status'));
-        aiProcessorStatus = await response.json();
-      } catch (error) {
-        aiProcessorStatus = { error: error.message };
-      }
-    }
-
-    // 检查批处理协调器状态
-    if (c.env.BATCH_COORDINATOR) {
-      try {
-        const batchCoordinatorId = c.env.BATCH_COORDINATOR.idFromName('status-check');
-        const batchCoordinator = c.env.BATCH_COORDINATOR.get(batchCoordinatorId);
-        const response = await batchCoordinator.fetch(new Request('https://dummy/status'));
-        batchCoordinatorStatus = await response.json();
-      } catch (error) {
-        batchCoordinatorStatus = { error: error.message };
-      }
+    if (!c.env.AI_QUEUE) {
+      return c.json({
+        status: 'configuration_error',
+        service: 'Cloudflare Queues',
+        error: 'AI_QUEUE binding is missing - 队列未配置',
+        timestamp: new Date().toISOString(),
+        queueCheck,
+        recommendation: '需要创建队列: wrangler queues create ai-processing-queue'
+      }, 500);
     }
 
     return c.json({
       status: 'healthy',
-      service: 'Durable Objects Async Processing',
+      service: 'Cloudflare Queues Async Processing',
       timestamp: new Date().toISOString(),
-      method: 'Durable Objects + Batch Processing',
-      durableObjectsCheck,
+      architecture: 'Workers + D1 + Queues',
+      queueCheck,
       details: {
-        processingMethod: 'Durable Objects with distributed locks',
-        batchProcessing: true,
-        streamingSupport: true,
-        fallbackSupport: true,
-        aiProcessorStatus,
-        batchCoordinatorStatus
+        processingMethod: 'Cloudflare Queues with retry mechanism',
+        queueName: 'ai-processing-queue',
+        dlqName: 'ai-processing-dlq',
+        maxRetries: 2,
+        batchSize: 1,
+        batchTimeout: 30,
+        fallbackSupport: true
       }
     });
   } catch (error) {
     console.error('❌ Async status check failed:', error);
     return c.json({
       status: 'error',
-      service: 'Durable Objects Async Processing',
+      service: 'Cloudflare Queues Async Processing',
       error: error.message,
       timestamp: new Date().toISOString(),
       stack: error.stack?.substring(0, 500)
@@ -1441,8 +1437,8 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 立即启动AI处理 - 智能选择处理方式
-    await processAsyncTaskSmart(c.env, taskId, 'bazi', user, language);
+    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
+    await sendTaskToQueue(c.env, taskId, 'bazi', user, language);
 
     // 方法3: 设置一个备用的延迟检查
     c.executionCtx.waitUntil(
@@ -1538,8 +1534,8 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    // 立即启动AI处理 - 智能选择处理方式
-    await processAsyncTaskSmart(c.env, taskId, 'daily', user, language);
+    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
+    await sendTaskToQueue(c.env, taskId, 'daily', user, language);
 
     return c.json({
       success: true,
@@ -1609,8 +1605,8 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    // 立即启动AI处理 - 智能选择处理方式
-    await processAsyncTaskSmart(c.env, taskId, 'tarot', user, language, question);
+    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
+    await sendTaskToQueue(c.env, taskId, 'tarot', user, language, question);
 
     return c.json({
       success: true,
@@ -1683,8 +1679,8 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    // 立即启动AI处理 - 智能选择处理方式
-    await processAsyncTaskSmart(c.env, taskId, 'lucky', user, language);
+    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
+    await sendTaskToQueue(c.env, taskId, 'lucky', user, language);
 
     return c.json({
       success: true,
@@ -3303,62 +3299,42 @@ ${userProfile}
 
 
 
-// 智能异步任务处理 - 自动选择最佳处理方式
-async function processAsyncTaskSmart(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+// 标准Cloudflare Queues异步处理 - 发送任务到队列
+async function sendTaskToQueue(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   try {
-    console.log(`🧠 [${taskId}] Smart async processing - detecting best method...`);
+    console.log(`📤 [${taskId}] Sending task to Cloudflare Queue...`);
 
-    // 方法1: 尝试Durable Objects（如果可用）
-    if (env.AI_PROCESSOR) {
-      try {
-        console.log(`🎯 [${taskId}] Trying Durable Objects processing...`);
-
-        const aiProcessorId = env.AI_PROCESSOR.idFromName(`ai-processor-${taskId}`);
-        const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
-
-        const response = await aiProcessor.fetch(new Request('https://dummy/process', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            taskId,
-            taskType,
-            user,
-            language,
-            question
-          })
-        }));
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`✅ [${taskId}] Durable Objects processing successful`);
-          return result;
-        }
-      } catch (error) {
-        console.log(`⚠️ [${taskId}] Durable Objects failed, trying next method...`);
-      }
-    }
-
-    // 方法2: 尝试自调用API（如果Durable Objects不可用）
-    try {
-      console.log(`🔄 [${taskId}] Trying self-call API processing...`);
-      await triggerAsyncProcessing(env, taskId, taskType, user, language, question);
-      console.log(`✅ [${taskId}] Self-call API processing initiated`);
+    // 检查队列是否可用
+    if (!env.AI_QUEUE) {
+      console.warn(`⚠️ [${taskId}] AI_QUEUE not available, falling back to direct processing...`);
+      await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
       return;
-    } catch (error) {
-      console.log(`⚠️ [${taskId}] Self-call API failed, trying direct processing...`);
     }
 
-    // 方法3: 直接处理（最后的回退方案）
-    console.log(`🔧 [${taskId}] Using direct processing as fallback...`);
-    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
+    // 构建队列消息
+    const queueMessage = {
+      taskId,
+      taskType,
+      user,
+      language,
+      question,
+      timestamp: new Date().toISOString()
+    };
+
+    // 发送到Cloudflare Queue
+    await env.AI_QUEUE.send(queueMessage);
+
+    console.log(`✅ [${taskId}] Task successfully sent to queue`);
+
+    // 更新任务状态为已入队
+    await updateAsyncTaskStatus(env, taskId, 'pending', 'AI任务已加入处理队列...');
 
   } catch (error) {
-    console.error(`❌ [${taskId}] All processing methods failed:`, error);
+    console.error(`❌ [${taskId}] Failed to send task to queue:`, error);
 
-    // 更新任务状态为失败
-    await updateAsyncTaskStatus(env, taskId, 'failed', `处理失败: ${error.message}`);
+    // 队列失败时回退到直接处理
+    console.log(`🔄 [${taskId}] Queue failed, falling back to direct processing...`);
+    await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
   }
 }
 
@@ -3713,7 +3689,44 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 export default {
   fetch: app.fetch,
 
+  // Cloudflare Queues消费者 - 标准异步架构的核心
+  async queue(batch: MessageBatch, env: any, ctx: ExecutionContext) {
+    console.log(`🔄 [Queue] Processing batch with ${batch.messages.length} messages`);
 
+    for (const message of batch.messages) {
+      try {
+        const { taskId, taskType, user, language, question, timestamp } = message.body;
+
+        console.log(`🎯 [Queue-${taskId}] Processing AI task: ${taskType}`);
+
+        // 更新任务状态为处理中
+        await updateAsyncTaskStatus(env, taskId, 'processing', 'AI队列处理中...');
+
+        // 处理AI任务
+        await processAIWithSegmentation(env, taskId, taskType, user, language, question);
+
+        // 确认消息处理成功
+        message.ack();
+        console.log(`✅ [Queue-${taskId}] Task processed successfully`);
+
+      } catch (error) {
+        console.error(`❌ [Queue] Message processing failed:`, error);
+
+        // 重试机制
+        if (message.attempts >= 3) {
+          console.error(`❌ [Queue] Max retries reached, sending to DLQ`);
+          // 更新任务状态为失败
+          if (message.body?.taskId) {
+            await updateAsyncTaskStatus(env, message.body.taskId, 'failed', `队列处理失败: ${error.message}`);
+          }
+          message.retry(); // 发送到死信队列
+        } else {
+          console.log(`🔄 [Queue] Retrying message (attempt ${message.attempts + 1}/3)`);
+          message.retry();
+        }
+      }
+    }
+  },
 
   // 每2分钟自动检查并处理卡住的任务
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
@@ -3766,8 +3779,8 @@ export default {
             console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
           }
 
-          // 使用智能处理重新处理任务
-          const taskPromise = processAsyncTaskSmart(
+          // 使用队列重新处理任务
+          const taskPromise = sendTaskToQueue(
             env,
             task.id,
             task.task_type,
