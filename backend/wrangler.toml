@@ -18,6 +18,23 @@ binding = "DB"
 database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
+# Cloudflare Queues配置 - AI异步处理队列
+[[queues.producers]]
+binding = "AI_QUEUE"
+queue = "ai-processing-queue"
+
+[[queues.consumers]]
+queue = "ai-processing-queue"
+max_batch_size = 1
+max_batch_timeout = 30
+max_retries = 2
+dead_letter_queue = "ai-processing-dlq"
+
+# 死信队列配置
+[[queues.producers]]
+binding = "AI_DLQ"
+queue = "ai-processing-dlq"
+
 # 定时任务配置 - 每2分钟自动处理卡住的任务（在前端超时前及时恢复）
 [triggers]
 crons = ["*/2 * * * *"]

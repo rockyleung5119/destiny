@@ -169,25 +169,106 @@ app.get('/api/health', async (c) => {
   });
 });
 
+// 队列状态检查
+app.get('/api/queue-status', async (c) => {
+  try {
+    console.log('🔍 Checking queue status...');
+
+    // 检查队列绑定
+    const queueCheck = {
+      hasAIQueue: !!c.env.AI_QUEUE,
+      hasAIDLQ: !!c.env.AI_DLQ
+    };
+
+    console.log('🔧 Queue bindings check:', queueCheck);
+
+    if (!c.env.AI_QUEUE) {
+      return c.json({
+        status: 'configuration_error',
+        service: 'Cloudflare Queues',
+        error: 'AI_QUEUE binding is missing',
+        timestamp: new Date().toISOString(),
+        queueCheck
+      }, 500);
+    }
+
+    return c.json({
+      status: 'healthy',
+      service: 'Cloudflare Queues',
+      timestamp: new Date().toISOString(),
+      queueCheck,
+      details: {
+        aiQueue: 'ai-processing-queue',
+        dlQueue: 'ai-processing-dlq'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Queue status check failed:', error);
+    return c.json({
+      status: 'error',
+      service: 'Cloudflare Queues',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+      stack: error.stack?.substring(0, 500)
+    }, 500);
+  }
+});
+
 // AI服务状态检查
 app.get('/api/ai-status', async (c) => {
   try {
+    console.log('🔍 Checking AI service status...');
+
+    // 检查环境变量
+    const envCheck = {
+      DEEPSEEK_API_KEY: !!c.env.DEEPSEEK_API_KEY,
+      DEEPSEEK_BASE_URL: !!c.env.DEEPSEEK_BASE_URL,
+      DEEPSEEK_MODEL: !!c.env.DEEPSEEK_MODEL
+    };
+
+    console.log('🔧 Environment variables check:', envCheck);
+
+    if (!c.env.DEEPSEEK_API_KEY || !c.env.DEEPSEEK_BASE_URL || !c.env.DEEPSEEK_MODEL) {
+      const missing = Object.entries(envCheck)
+        .filter(([key, value]) => !value)
+        .map(([key]) => key);
+
+      return c.json({
+        status: 'configuration_error',
+        service: 'DeepSeek API',
+        error: `Missing environment variables: ${missing.join(', ')}`,
+        timestamp: new Date().toISOString(),
+        envCheck
+      }, 500);
+    }
+
     const deepSeekService = new CloudflareDeepSeekService(c.env);
+    console.log('🤖 Testing AI service health...');
+
     const isHealthy = await deepSeekService.checkAPIHealth();
+    console.log('🏥 AI service health check result:', isHealthy);
 
     return c.json({
       status: isHealthy ? 'healthy' : 'unhealthy',
       service: 'DeepSeek API',
       timestamp: new Date().toISOString(),
       endpoint: deepSeekService.baseURL,
-      model: deepSeekService.model
+      model: deepSeekService.model,
+      envCheck,
+      details: {
+        apiKeyLength: c.env.DEEPSEEK_API_KEY?.length || 0,
+        baseURL: c.env.DEEPSEEK_BASE_URL,
+        model: c.env.DEEPSEEK_MODEL
+      }
     });
   } catch (error) {
+    console.error('❌ AI status check failed:', error);
     return c.json({
       status: 'error',
       service: 'DeepSeek API',
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      stack: error.stack?.substring(0, 500)
     }, 500);
   }
 });
@@ -1308,9 +1389,8 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 BaZi task created: ${taskId}`);
 
-    // 立即启动AI处理，不依赖executionCtx.waitUntil
-    // 使用独立的异步处理避免Worker生命周期限制
-    processAsyncTaskIndependently(c.env, taskId, 'bazi', user, language);
+    // 立即启动AI处理 - 使用Cloudflare Queues
+    await sendToQueue(c.env, taskId, 'bazi', user, language);
 
     // 方法3: 设置一个备用的延迟检查
     c.executionCtx.waitUntil(
@@ -1341,7 +1421,8 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       data: {
         taskId: taskId,
         status: 'pending',
-        estimatedTime: '2-3 minutes'
+        estimatedTime: '2-4 minutes',
+        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
       }
     });
 
@@ -1405,8 +1486,8 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Daily Fortune task created: ${taskId}`);
 
-    // 立即启动AI处理，不依赖executionCtx.waitUntil
-    processAsyncTaskIndependently(c.env, taskId, 'daily', user, language);
+    // 立即启动AI处理 - 使用Cloudflare Queues
+    await sendToQueue(c.env, taskId, 'daily', user, language);
 
     return c.json({
       success: true,
@@ -1414,7 +1495,8 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
       data: {
         taskId: taskId,
         status: 'pending',
-        estimatedTime: '2-3 minutes'
+        estimatedTime: '2-4 minutes',
+        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
       }
     });
 
@@ -1475,8 +1557,8 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Tarot Reading task created: ${taskId}`);
 
-    // 立即启动AI处理，不依赖executionCtx.waitUntil
-    processAsyncTaskIndependently(c.env, taskId, 'tarot', user, language, question);
+    // 立即启动AI处理 - 使用Cloudflare Queues
+    await sendToQueue(c.env, taskId, 'tarot', user, language, question);
 
     return c.json({
       success: true,
@@ -1484,7 +1566,8 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
       data: {
         taskId: taskId,
         status: 'pending',
-        estimatedTime: '2-3 minutes'
+        estimatedTime: '2-4 minutes',
+        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
       }
     });
 
@@ -1548,8 +1631,8 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     // 立即返回任务ID，不等待AI处理
     console.log(`🔮 Lucky Items task created: ${taskId}`);
 
-    // 立即启动AI处理，不依赖executionCtx.waitUntil
-    processAsyncTaskIndependently(c.env, taskId, 'lucky', user, language);
+    // 立即启动AI处理 - 使用Cloudflare Queues
+    await sendToQueue(c.env, taskId, 'lucky', user, language);
 
     return c.json({
       success: true,
@@ -1557,7 +1640,8 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
       data: {
         taskId: taskId,
         status: 'pending',
-        estimatedTime: '2-3 minutes'
+        estimatedTime: '2-4 minutes',
+        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
       }
     });
 
@@ -2464,29 +2548,33 @@ Current Time: ${currentTime}
     return this.cleanAIOutput(content);
   }
 
-  // 调用DeepSeek API（带重试机制和AbortSignal支持）
+  // 调用DeepSeek API（单次调用，给足够时间）
   async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000, abortSignal = null) {
-    const maxRetries = 1; // 减少重试次数，依赖短超时提高响应速度
+    const maxRetries = 0; // 移除重试机制，AI推理本身就很耗时
 
     // 快速验证基本配置
     if (!this.apiKey || !this.baseURL || !this.model) {
       console.error('❌ Missing API configuration:', {
         hasApiKey: !!this.apiKey,
         hasBaseURL: !!this.baseURL,
-        hasModel: !!this.model
+        hasModel: !!this.model,
+        apiKeyLength: this.apiKey?.length || 0,
+        baseURL: this.baseURL,
+        model: this.model
       });
-      throw new Error('AI service configuration error');
+      throw new Error(`AI service configuration error: Missing ${!this.apiKey ? 'API_KEY' : !this.baseURL ? 'BASE_URL' : 'MODEL'}`);
     }
 
     try {
       console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}, Phase: ${cleaningType}`);
       console.log(`🌐 API URL: ${this.baseURL}`);
       console.log(`🤖 Model: ${this.model}`);
+      console.log(`🔑 API Key: ${this.apiKey.substring(0, 10)}...`);
 
-      // 使用更长的超时时间适应AI推理模型的实际需求
-      // 大多数推理模型需要2-3分钟，设置4分钟超时确保成功率
-      const timeoutMs = 240000; // 4分钟超时，适应推理模型的实际响应时间
-      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (retry: ${retryCount}, phase: ${cleaningType})`);
+      // 针对异步处理优化超时时间：AI推理模型需要2-3分钟
+      // 单次调用给足够的时间，避免重试导致总时间过长
+      const timeoutMs = 300000; // 5分钟超时，一次性给足够时间
+      console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (single call, async processing)`);
 
       const requestData = {
         model: this.model,
@@ -2496,13 +2584,26 @@ Current Time: ${currentTime}
         stream: false
       };
 
+      console.log(`📤 Request data:`, {
+        model: requestData.model,
+        messageCount: messages.length,
+        temperature: requestData.temperature,
+        maxTokens: requestData.max_tokens
+      });
+
       // 创建带超时的fetch请求，支持外部AbortSignal
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const timeoutId = setTimeout(() => {
+        console.log(`⏰ Request timeout after ${timeoutMs/1000} seconds`);
+        controller.abort();
+      }, timeoutMs);
 
       // 如果提供了外部AbortSignal，监听它的abort事件
       if (abortSignal) {
-        abortSignal.addEventListener('abort', () => controller.abort());
+        abortSignal.addEventListener('abort', () => {
+          console.log('🛑 External abort signal received');
+          controller.abort();
+        });
       }
 
       const response = await fetch(this.baseURL, {
@@ -2517,8 +2618,16 @@ Current Time: ${currentTime}
 
       clearTimeout(timeoutId);
 
+      console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = 'Failed to read error response';
+        }
+
         console.error(`❌ API Error ${response.status}:`, errorText);
         console.error(`❌ Request details:`, {
           url: this.baseURL,
@@ -2526,15 +2635,43 @@ Current Time: ${currentTime}
           messageCount: messages.length,
           temperature,
           maxTokens,
-          retryCount
+          retryCount,
+          headers: response.headers
         });
-        throw new Error(`API request failed: ${response.status}`);
+
+        // 提供更详细的错误信息
+        let errorMessage = `API request failed: ${response.status}`;
+        if (response.status === 401) {
+          errorMessage = 'API authentication failed - check API key';
+        } else if (response.status === 429) {
+          errorMessage = 'API rate limit exceeded - please try again later';
+        } else if (response.status === 500) {
+          errorMessage = 'AI service internal error - please try again';
+        } else if (response.status === 503) {
+          errorMessage = 'AI service temporarily unavailable';
+        }
+
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('❌ Failed to parse JSON response:', e);
+        throw new Error('Invalid JSON response from AI service');
+      }
+
+      console.log(`📊 Response data structure:`, {
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length || 0,
+        hasFirstChoice: !!data.choices?.[0],
+        hasMessage: !!data.choices?.[0]?.message,
+        hasContent: !!data.choices?.[0]?.message?.content
+      });
 
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        console.error('❌ Invalid API response format:', data);
+        console.error('❌ Invalid API response format:', JSON.stringify(data, null, 2));
         throw new Error('Invalid response format from DeepSeek API');
       }
 
@@ -2542,7 +2679,11 @@ Current Time: ${currentTime}
 
       // 验证内容不为空
       if (!content || typeof content !== 'string') {
-        console.error('❌ AI returned empty or invalid content:', content);
+        console.error('❌ AI returned empty or invalid content:', {
+          content,
+          type: typeof content,
+          length: content?.length || 0
+        });
         throw new Error('AI service returned empty response');
       }
 
@@ -2575,33 +2716,37 @@ Current Time: ${currentTime}
 
     } catch (error) {
       console.error(`❌ API call failed (attempt ${retryCount + 1}):`, error);
+      console.error(`❌ Error details:`, {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500),
+        retryCount,
+        maxRetries
+      });
 
       // 检查是否是超时错误
       if (error.name === 'AbortError') {
         console.error(`❌ Request timeout after ${timeoutMs/1000} seconds`);
       } else if (error.message.includes('524') || error.message.includes('timeout')) {
         console.error('❌ API timeout detected, service may be overloaded');
+      } else if (error.message.includes('fetch')) {
+        console.error('❌ Network fetch error detected');
       }
 
-      if (retryCount < maxRetries) {
-        // 使用较长的重试延迟，适应300秒超时的大模型调用
-        const delay = 10000; // 10秒延迟，给API服务器恢复时间
-        console.log(`🔄 Retrying in ${delay/1000} seconds... (attempt ${retryCount + 2}/${maxRetries + 1})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens, abortSignal);
-      }
-
-      // 保留原始错误信息用于调试，同时提供用户友好的错误信息
-      console.error('❌ Final API call failure, original error:', error.message);
-      console.error('❌ Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack?.substring(0, 500)
-      });
+      // 不进行重试，直接返回错误
+      console.error('❌ API call failed (no retry for async processing)');
 
       // 根据具体错误类型提供更准确的错误信息
       let userFriendlyMessage;
-      if (error.message.includes('Invalid response format')) {
+      if (error.message.includes('API authentication failed')) {
+        userFriendlyMessage = language === 'en' ?
+          'AI service authentication failed. Please contact support.' :
+          'AI服务认证失败，请联系技术支持。';
+      } else if (error.message.includes('rate limit')) {
+        userFriendlyMessage = language === 'en' ?
+          'AI service rate limit exceeded. Please try again in a few minutes.' :
+          'AI服务请求频率超限，请几分钟后重试。';
+      } else if (error.message.includes('Invalid response format')) {
         userFriendlyMessage = language === 'en' ?
           'AI service returned invalid response. Please try again.' :
           'AI服务返回了无效响应，请重试。';
@@ -2609,10 +2754,14 @@ Current Time: ${currentTime}
         userFriendlyMessage = language === 'en' ?
           'AI analysis timeout. Please try again later.' :
           'AI分析超时，请稍后重试。';
-      } else if (error.message.includes('fetch')) {
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
         userFriendlyMessage = language === 'en' ?
           'Network connection failed. Please check your connection.' :
           '网络连接失败，请检查网络连接。';
+      } else if (error.message.includes('configuration error')) {
+        userFriendlyMessage = language === 'en' ?
+          'AI service configuration error. Please contact support.' :
+          'AI服务配置错误，请联系技术支持。';
       } else {
         // 对于未知错误，保留原始错误信息用于调试
         userFriendlyMessage = `AI service error: ${error.message}`;
@@ -2620,6 +2769,22 @@ Current Time: ${currentTime}
 
       throw new Error(userFriendlyMessage);
     }
+  }
+
+  // 判断是否为不可重试的错误
+  isNonRetryableError(error) {
+    const message = error.message.toLowerCase();
+
+    // 认证错误、配置错误等不可重试
+    if (message.includes('authentication failed') ||
+        message.includes('invalid api key') ||
+        message.includes('configuration error') ||
+        message.includes('missing') ||
+        error.message.includes('API authentication failed')) {
+      return true;
+    }
+
+    return false;
   }
 
   // 获取用户友好的错误信息
@@ -2634,6 +2799,14 @@ Current Time: ${currentTime}
   // 检查API健康状态
   async checkAPIHealth() {
     try {
+      console.log('🏥 Starting API health check...');
+      console.log('🔧 Health check config:', {
+        baseURL: this.baseURL,
+        model: this.model,
+        hasApiKey: !!this.apiKey,
+        apiKeyLength: this.apiKey?.length || 0
+      });
+
       const testMessages = [
         { role: 'system', content: '你是一个测试助手。' },
         { role: 'user', content: '请回复"健康"' }
@@ -2641,8 +2814,12 @@ Current Time: ${currentTime}
 
       // 健康检查使用较短的超时时间（30秒）
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Health check timeout after 30 seconds');
+        controller.abort();
+      }, 30000);
 
+      console.log('📤 Sending health check request...');
       const response = await fetch(this.baseURL, {
         method: 'POST',
         headers: {
@@ -2660,9 +2837,29 @@ Current Time: ${currentTime}
       });
 
       clearTimeout(timeoutId);
-      return response.ok;
+
+      console.log(`📥 Health check response: ${response.status} ${response.statusText}`);
+
+      if (response.ok) {
+        try {
+          const data = await response.json();
+          const hasValidResponse = data.choices && data.choices[0] && data.choices[0].message;
+          console.log('✅ Health check successful, valid response:', hasValidResponse);
+          return hasValidResponse;
+        } catch (e) {
+          console.warn('⚠️ Health check response parsing failed:', e);
+          return false;
+        }
+      } else {
+        console.error('❌ Health check failed with status:', response.status);
+        return false;
+      }
     } catch (error) {
       console.error('❌ API health check failed:', error);
+      console.error('❌ Health check error details:', {
+        name: error.name,
+        message: error.message
+      });
       return false;
     }
   }
@@ -2937,26 +3134,12 @@ ${userProfile}
 
 
 
-// 独立的异步任务处理 - 通过自调用API避免Worker生命周期限制
-function processAsyncTaskIndependently(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  // 立即触发自调用API来处理任务，避免依赖当前Worker实例
-  const processingPromise = triggerAsyncProcessing(env, taskId, taskType, user, language, question);
-
-  // 不等待结果，让处理在独立的请求中进行
-  processingPromise.catch(error => {
-    console.error(`❌ [${taskId}] Failed to trigger async processing:`, error);
-  });
-}
-
-// 通过自调用API触发异步处理
-async function triggerAsyncProcessing(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+// 发送任务到Cloudflare Queue进行异步处理
+async function sendToQueue(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   try {
-    console.log(`🚀 [${taskId}] Triggering independent async processing...`);
+    console.log(`📤 [${taskId}] Sending task to queue for processing...`);
 
-    // 构建自调用URL
-    const workerUrl = `https://destiny-backend.wlk8s6v9y.workers.dev/api/internal/process-task`;
-
-    const requestBody = {
+    const message = {
       taskId,
       taskType,
       user,
@@ -2964,30 +3147,20 @@ async function triggerAsyncProcessing(env: any, taskId: string, taskType: string
       question
     };
 
-    // 使用fetch自调用来启动独立的处理流程
-    const response = await fetch(workerUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Request': 'true' // 标识内部请求
-      },
-      body: JSON.stringify(requestBody)
-    });
+    // 发送到AI处理队列
+    await env.AI_QUEUE.send(message);
 
-    if (!response.ok) {
-      throw new Error(`Self-call failed: ${response.status} ${response.statusText}`);
-    }
-
-    console.log(`✅ [${taskId}] Successfully triggered independent processing`);
-
+    console.log(`✅ [${taskId}] Task sent to queue successfully`);
   } catch (error) {
-    console.error(`❌ [${taskId}] Failed to trigger independent processing:`, error);
+    console.error(`❌ [${taskId}] Failed to send task to queue:`, error);
 
-    // 如果自调用失败，回退到原来的处理方式
+    // 如果队列发送失败，回退到直接处理
     console.log(`🔄 [${taskId}] Falling back to direct processing...`);
     await processAsyncTaskDirect(env, taskId, taskType, user, language, question);
   }
 }
+
+
 
 // 直接处理异步任务（回退方案）
 async function processAsyncTaskDirect(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
@@ -2996,10 +3169,8 @@ async function processAsyncTaskDirect(env: any, taskId: string, taskType: string
   try {
     console.log(`🔄 [${taskId}] Starting direct async task processing, type: ${taskType}`);
 
-    // 更新任务状态为处理中
-    await env.DB.prepare(`
-      UPDATE async_tasks SET status = 'processing', updated_at = ? WHERE id = ?
-    `).bind(new Date().toISOString(), taskId).run();
+    // 更新任务状态为处理中，并记录开始时间
+    await updateAsyncTaskStatus(env, taskId, 'processing', 'AI推理模型正在深度分析中...');
 
     // 使用AI处理方案
     await processAIWithSegmentation(env, taskId, taskType, user, language, question);
@@ -3009,82 +3180,81 @@ async function processAsyncTaskDirect(env: any, taskId: string, taskType: string
     console.error(`❌ [${taskId}] Task failed after ${processingTime}ms:`, error);
 
     // 更新任务状态为失败
-    try {
-      await env.DB.prepare(`
-        UPDATE async_tasks SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?
-      `).bind(error.message || 'Unknown error', new Date().toISOString(), taskId).run();
-    } catch (dbError) {
-      console.error(`❌ [${taskId}] Failed to update task status:`, dbError);
-    }
+    await updateAsyncTaskStatus(env, taskId, 'failed', error.message || 'AI推理处理失败');
   }
 }
 
-// 优化的AI处理函数 - 添加重试和更好的错误处理
-async function processAIWithSegmentation(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
-  console.log(`🧠 [${taskId}] Starting optimized AI processing...`);
+// 更新异步任务状态的统一函数
+async function updateAsyncTaskStatus(env: any, taskId: string, status: string, message?: string) {
+  try {
+    const updateTime = new Date().toISOString();
 
-  const maxRetries = 2; // 最多重试2次
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`🔄 [${taskId}] Attempt ${attempt}/${maxRetries}`);
-
-      // 验证环境变量
-      if (!env.DEEPSEEK_API_KEY || !env.DEEPSEEK_BASE_URL || !env.DEEPSEEK_MODEL) {
-        const missingVars = [];
-        if (!env.DEEPSEEK_API_KEY) missingVars.push('DEEPSEEK_API_KEY');
-        if (!env.DEEPSEEK_BASE_URL) missingVars.push('DEEPSEEK_BASE_URL');
-        if (!env.DEEPSEEK_MODEL) missingVars.push('DEEPSEEK_MODEL');
-
-        console.error(`❌ [${taskId}] Missing environment variables:`, missingVars);
-        throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
-      }
-
-      const deepSeekService = new CloudflareDeepSeekService(env);
-
-      // 调用AI服务，添加超时保护
-      console.log(`🔮 [${taskId}] Calling AI service (attempt ${attempt})...`);
-      let result: string;
-
-      // 使用Promise.race添加额外的超时保护
-      const aiCallPromise = callAIService(deepSeekService, taskType, user, language, question);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('AI call timeout after 5 minutes')), 300000); // 5分钟超时
-      });
-
-      result = await Promise.race([aiCallPromise, timeoutPromise]);
-
-      // 验证结果
-      if (!result || typeof result !== 'string' || result.trim().length === 0) {
-        throw new Error('AI analysis returned empty or invalid content');
-      }
-
-      // 保存结果到数据库
-      await saveAIResult(env, taskId, taskType, user, language, question, result);
-
-      console.log(`✅ [${taskId}] AI processing completed successfully on attempt ${attempt}, result length: ${result.length}`);
-      return; // 成功完成，退出重试循环
-
-    } catch (error) {
-      lastError = error as Error;
-      console.error(`❌ [${taskId}] Attempt ${attempt} failed:`, error);
-
-      // 如果是最后一次尝试，或者是不可重试的错误，直接抛出
-      if (attempt === maxRetries || isNonRetryableError(error as Error)) {
-        break;
-      }
-
-      // 等待一段时间后重试
-      const delay = attempt * 10000; // 递增延迟：10秒、20秒
-      console.log(`⏳ [${taskId}] Waiting ${delay/1000}s before retry...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+    if (message) {
+      await env.DB.prepare(`
+        UPDATE async_tasks SET status = ?, error_message = ?, updated_at = ? WHERE id = ?
+      `).bind(status, message, updateTime, taskId).run();
+    } else {
+      await env.DB.prepare(`
+        UPDATE async_tasks SET status = ?, updated_at = ? WHERE id = ?
+      `).bind(status, updateTime, taskId).run();
     }
-  }
 
-  // 所有重试都失败了
-  console.error(`❌ [${taskId}] All ${maxRetries} attempts failed`);
-  throw lastError || new Error('AI processing failed after all retries');
+    console.log(`📊 [${taskId}] Status updated to: ${status}${message ? ` - ${message}` : ''}`);
+  } catch (error) {
+    console.error(`❌ [${taskId}] Failed to update task status:`, error);
+  }
+}
+
+// 优化的AI处理函数 - 单次调用，给足够时间
+async function processAIWithSegmentation(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  console.log(`🧠 [${taskId}] Starting AI processing (single call, no retry)...`);
+
+  try {
+    // 验证环境变量
+    if (!env.DEEPSEEK_API_KEY || !env.DEEPSEEK_BASE_URL || !env.DEEPSEEK_MODEL) {
+      const missingVars = [];
+      if (!env.DEEPSEEK_API_KEY) missingVars.push('DEEPSEEK_API_KEY');
+      if (!env.DEEPSEEK_BASE_URL) missingVars.push('DEEPSEEK_BASE_URL');
+      if (!env.DEEPSEEK_MODEL) missingVars.push('DEEPSEEK_MODEL');
+
+      console.error(`❌ [${taskId}] Missing environment variables:`, missingVars);
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    }
+
+    const deepSeekService = new CloudflareDeepSeekService(env);
+
+    // 更新进度状态
+    await updateAsyncTaskStatus(env, taskId, 'processing', `正在调用AI服务进行${taskType}分析...`);
+
+    // 调用AI服务，给足够的时间完成推理
+    console.log(`🔮 [${taskId}] Calling AI service (single call mode)...`);
+
+    // 单次调用，使用足够长的超时时间
+    const aiCallPromise = callAIService(deepSeekService, taskType, user, language, question);
+    const asyncTimeoutMs = 420000; // 7分钟超时，给AI推理充足时间
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        console.log(`⏰ [${taskId}] AI call timeout after ${asyncTimeoutMs/1000} seconds`);
+        reject(new Error(`AI call timeout after ${asyncTimeoutMs/1000} seconds`));
+      }, asyncTimeoutMs);
+    });
+
+    const result = await Promise.race([aiCallPromise, timeoutPromise]);
+
+    // 验证结果
+    if (!result || typeof result !== 'string' || result.trim().length === 0) {
+      throw new Error('AI analysis returned empty or invalid content');
+    }
+
+    // 保存结果到数据库
+    await saveAIResult(env, taskId, taskType, user, language, question, result);
+
+    console.log(`✅ [${taskId}] AI processing completed successfully, result length: ${result.length}`);
+
+  } catch (error) {
+    console.error(`❌ [${taskId}] AI processing failed:`, error);
+    throw error;
+  }
 }
 
 // 调用AI服务的统一接口
@@ -3197,15 +3367,15 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
     console.log('🔧 Processing stuck tasks...');
 
     // 查找需要处理的任务：
-    // 1. 超过4.5分钟仍在processing状态的任务（在AI超时后立即恢复，给前端留1.5分钟缓冲）
-    // 2. 超过30秒仍在pending状态的任务（可能异步处理没有启动）
+    // 1. 超过8分钟仍在processing状态的任务（单次调用7分钟超时+1分钟缓冲）
+    // 2. 超过60秒仍在pending状态的任务（可能异步处理没有启动）
     const stuckTasks = await c.env.DB.prepare(`
       SELECT id, user_id, task_type, input_data, created_at, updated_at, status
       FROM async_tasks
       WHERE (
-        (status = 'processing' AND datetime(updated_at) < datetime('now', '-270 seconds'))
+        (status = 'processing' AND datetime(updated_at) < datetime('now', '-480 seconds'))
         OR
-        (status = 'pending' AND datetime(created_at) < datetime('now', '-30 seconds'))
+        (status = 'pending' AND datetime(created_at) < datetime('now', '-60 seconds'))
       )
       ORDER BY created_at ASC
       LIMIT 10
@@ -3243,7 +3413,7 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
         }
 
         // 重新处理任务
-        await processAsyncTask(
+        await processAsyncTaskDirect(
           c.env,
           task.id,
           task.task_type,
@@ -3277,21 +3447,55 @@ app.get('/api/admin/process-stuck-tasks', async (c) => {
 export default {
   fetch: app.fetch,
 
+  // Cloudflare Queues消费者 - 处理AI异步任务
+  async queue(batch: MessageBatch, env: any, ctx: ExecutionContext) {
+    console.log(`🔄 Queue consumer triggered with ${batch.messages.length} messages`);
+
+    for (const message of batch.messages) {
+      try {
+        const { taskId, taskType, user, language, question } = message.body;
+        console.log(`🎯 Processing queue message for task: ${taskId}`);
+
+        // 更新任务状态为处理中
+        await updateAsyncTaskStatus(env, taskId, 'processing', 'AI队列处理中...');
+
+        // 处理AI任务
+        await processAIWithSegmentation(env, taskId, taskType, user, language, question);
+
+        // 确认消息处理成功
+        message.ack();
+        console.log(`✅ Queue message processed successfully for task: ${taskId}`);
+
+      } catch (error) {
+        console.error(`❌ Queue message processing failed:`, error);
+
+        // 重试次数检查
+        if (message.attempts >= 3) {
+          console.error(`❌ Max retries reached for message, sending to DLQ`);
+          message.retry(); // 这会发送到死信队列
+        } else {
+          console.log(`🔄 Retrying message (attempt ${message.attempts + 1}/3)`);
+          message.retry();
+        }
+      }
+    }
+  },
+
   // 每2分钟自动检查并处理卡住的任务
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
     console.log('🕐 Scheduled task: Processing stuck tasks (every 2 minutes)...');
 
     try {
       // 查找需要处理的任务：
-      // 1. 超过4.5分钟仍在processing状态的任务（在AI超时后立即恢复，给前端留1.5分钟缓冲）
-      // 2. 超过30秒仍在pending状态的任务（可能异步处理没有启动）
+      // 1. 超过8分钟仍在processing状态的任务（单次调用7分钟超时+1分钟缓冲）
+      // 2. 超过60秒仍在pending状态的任务（可能异步处理没有启动）
       const stuckTasks = await env.DB.prepare(`
         SELECT id, user_id, task_type, input_data, created_at, updated_at, status
         FROM async_tasks
         WHERE (
-          (status = 'processing' AND datetime(updated_at) < datetime('now', '-270 seconds'))
+          (status = 'processing' AND datetime(updated_at) < datetime('now', '-480 seconds'))
           OR
-          (status = 'pending' AND datetime(created_at) < datetime('now', '-30 seconds'))
+          (status = 'pending' AND datetime(created_at) < datetime('now', '-60 seconds'))
         )
         ORDER BY created_at ASC
         LIMIT 5
@@ -3329,7 +3533,7 @@ export default {
           }
 
           // 重新处理任务
-          const taskPromise = processAsyncTask(
+          const taskPromise = processAsyncTaskDirect(
             env,
             task.id,
             task.task_type,
