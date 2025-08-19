@@ -195,10 +195,10 @@ export const fortuneAPI = {
 
   // 轮询任务状态直到完成
   async pollTaskUntilComplete(taskId: string): Promise<FortuneResponse> {
-    const maxAttempts = 50; // 最多轮询5分钟 (50次 * 6秒)
+    const maxAttempts = 60; // 最多轮询6分钟 (60次 * 6秒) - 适应4分钟AI处理时间
     let attempts = 0;
 
-    console.log(`🔄 Starting task polling for ${taskId}, max attempts: ${maxAttempts}`);
+    console.log(`🔄 Starting task polling for ${taskId}, max attempts: ${maxAttempts} (6 minutes timeout)`);
 
     while (attempts < maxAttempts) {
       try {
@@ -263,7 +263,7 @@ export const fortuneAPI = {
     }
 
     // 超时
-    console.log(`⏰ Task ${taskId} timeout after ${maxAttempts} attempts (5 minutes)`);
+    console.log(`⏰ Task ${taskId} timeout after ${maxAttempts} attempts (6 minutes)`);
     throw new Error('Analysis timeout. Please try again later.');
   },
 
