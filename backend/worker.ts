@@ -3709,6 +3709,52 @@ async function updateAsyncTaskStatus(env: any, taskId: string, status: string, m
   }
 }
 
+// 启动AI处理并设置结果轮询 - 绕过waitUntil 30秒限制
+async function startAIProcessingWithResultPolling(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
+  console.log(`🚀 [${taskId}] Starting AI processing with result polling...`);
+
+  try {
+    // 立即启动AI调用（不等待结果）
+    const aiPromise = processAIWithSegmentation(env, taskId, taskType, user, language, question);
+
+    // 设置一个25秒的检查点（在waitUntil 30秒限制内）
+    const quickCheckPromise = new Promise<void>(async (resolve) => {
+      try {
+        // 等待25秒
+        await new Promise(r => setTimeout(r, 25000));
+
+        // 检查任务是否已完成
+        const taskCheck = await env.DB.prepare(`
+          SELECT status, result FROM async_tasks WHERE id = ?
+        `).bind(taskId).first();
+
+        if (taskCheck && taskCheck.status === 'completed') {
+          console.log(`✅ [${taskId}] AI processing completed within 25 seconds`);
+        } else {
+          console.log(`⏳ [${taskId}] AI still processing, will be handled by scheduled task`);
+          // 更新状态，表明AI正在后台继续处理
+          await updateAsyncTaskStatus(env, taskId, 'processing', 'AI推理正在后台继续处理，预计1-3分钟完成...');
+        }
+
+        resolve();
+      } catch (error) {
+        console.warn(`⚠️ [${taskId}] Quick check failed:`, error);
+        resolve();
+      }
+    });
+
+    // 等待快速检查完成（确保在30秒内）
+    await quickCheckPromise;
+
+    // AI处理继续在后台运行，由定时任务负责检查结果
+    console.log(`🔄 [${taskId}] AI processing delegated to background, scheduled task will handle completion`);
+
+  } catch (error) {
+    console.error(`❌ [${taskId}] Failed to start AI processing:`, error);
+    throw error;
+  }
+}
+
 // 后台AI处理函数 - 专门用于长时间AI推理（2-5分钟）
 async function processAIWithSegmentationBackground(env: any, taskId: string, taskType: string, user: any, language: string, question?: string) {
   console.log(`🧠 [${taskId}] Starting background AI processing (long-running, 2-5 minutes)...`);
@@ -3724,7 +3770,21 @@ async function processAIWithSegmentationBackground(env: any, taskId: string, tas
 
   } catch (error) {
     const duration = Math.floor((Date.now() - startTime) / 1000);
-    console.error(`❌ [${taskId}] Background AI processing failed after ${duration} seconds:`, error);
+    console.error(`❌ [${taskId}] Background AI processing failed after ${duration} seconds:`, {
+      error: error.message,
+      stack: error.stack,
+      duration: duration,
+      taskType: taskType
+    });
+
+    // 确保任务状态被正确更新为失败
+    try {
+      await updateAsyncTaskStatus(env, taskId, 'failed', `AI处理失败: ${error.message}`);
+      console.log(`📊 [${taskId}] Task status updated to failed`);
+    } catch (statusError) {
+      console.error(`💥 [${taskId}] Failed to update task status:`, statusError);
+    }
+
     throw error;
   }
 }
@@ -3834,6 +3894,15 @@ async function updateTaskProgress(env: any, taskId: string, status: string, prog
 async function saveAIResult(env: any, taskId: string, taskType: string, user: any, language: string, question: string | undefined, result: string) {
   console.log(`💾 [${taskId}] Saving AI result to database, length: ${result.length} characters`);
 
+  // 检查结果长度，如果太长则截断并添加警告
+  let finalResult = result;
+  const maxLength = 50000; // D1数据库TEXT字段的安全长度限制
+
+  if (result.length > maxLength) {
+    console.warn(`⚠️ [${taskId}] Result too long (${result.length} chars), truncating to ${maxLength} chars`);
+    finalResult = result.substring(0, maxLength - 100) + '\n\n[注意：由于内容过长，部分内容已被截断]';
+  }
+
   // 保存结果到async_tasks表，带重试机制
   let dbSaveSuccess = false;
   let dbRetries = 0;
@@ -3841,32 +3910,60 @@ async function saveAIResult(env: any, taskId: string, taskType: string, user: an
 
   while (!dbSaveSuccess && dbRetries < maxDbRetries) {
     try {
+      const completedTime = new Date().toISOString();
+
+      console.log(`🔄 [${taskId}] Attempting database save (attempt ${dbRetries + 1}/${maxDbRetries})`);
+
       const updateResult = await env.DB.prepare(`
         UPDATE async_tasks SET status = 'completed', result = ?, completed_at = ?, updated_at = ? WHERE id = ?
-      `).bind(result, new Date().toISOString(), new Date().toISOString(), taskId).run();
+      `).bind(finalResult, completedTime, completedTime, taskId).run();
 
-      console.log(`✅ [${taskId}] Database update result:`, updateResult);
+      console.log(`📊 [${taskId}] Database update result:`, {
+        success: updateResult.success,
+        changes: updateResult.changes,
+        meta: updateResult.meta
+      });
 
       // 验证保存是否成功
       const verification = await env.DB.prepare(`
         SELECT status, LENGTH(result) as result_length FROM async_tasks WHERE id = ?
       `).bind(taskId).first();
 
+      console.log(`🔍 [${taskId}] Verification result:`, verification);
+
       if (verification && verification.status === 'completed' && verification.result_length > 0) {
-        console.log(`✅ [${taskId}] Result successfully saved and verified`);
+        console.log(`✅ [${taskId}] Result successfully saved and verified (${verification.result_length} chars)`);
         dbSaveSuccess = true;
       } else {
-        throw new Error('Result save verification failed');
+        throw new Error(`Result save verification failed: status=${verification?.status}, length=${verification?.result_length}`);
       }
 
     } catch (dbError) {
       dbRetries++;
-      console.error(`❌ [${taskId}] Database save attempt ${dbRetries}/${maxDbRetries} failed:`, dbError);
+      console.error(`❌ [${taskId}] Database save attempt ${dbRetries}/${maxDbRetries} failed:`, {
+        error: dbError.message,
+        stack: dbError.stack,
+        resultLength: finalResult.length,
+        taskId: taskId
+      });
 
       if (dbRetries < maxDbRetries) {
         console.log(`🔄 [${taskId}] Retrying database save in 2 seconds...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
       } else {
+        // 最后一次尝试：只更新状态为completed，不保存结果
+        try {
+          console.log(`🆘 [${taskId}] Final attempt: saving status only without result`);
+          await env.DB.prepare(`
+            UPDATE async_tasks SET status = 'completed', error_message = ?, completed_at = ?, updated_at = ? WHERE id = ?
+          `).bind('AI分析完成，但结果保存失败。请重新尝试。', new Date().toISOString(), new Date().toISOString(), taskId).run();
+
+          console.log(`⚠️ [${taskId}] Task marked as completed but result not saved due to database error`);
+          return; // 成功更新状态，退出函数
+        } catch (finalError) {
+          console.error(`💥 [${taskId}] Final status update also failed:`, finalError);
+        }
+
         throw new Error(`Failed to save result after ${maxDbRetries} attempts: ${dbError.message}`);
       }
     }
@@ -3921,6 +4018,97 @@ app.post('/api/admin/force-complete-task', async (c) => {
     return c.json({
       success: false,
       message: 'Failed to force complete task',
+      error: error.message
+    }, 500);
+  }
+});
+
+// 管理员接口 - 修复卡住的任务（生产环境专用）
+app.post('/api/admin/fix-stuck-task', async (c) => {
+  try {
+    const { taskId } = await c.req.json();
+
+    if (!taskId) {
+      return c.json({ success: false, message: 'Task ID is required' }, 400);
+    }
+
+    // 检查任务当前状态
+    const task = await c.env.DB.prepare(`
+      SELECT id, task_type, status, created_at, updated_at, user_id, input_data
+      FROM async_tasks WHERE id = ?
+    `).bind(taskId).first();
+
+    if (!task) {
+      return c.json({ success: false, message: 'Task not found' }, 404);
+    }
+
+    if (task.status === 'completed') {
+      return c.json({ success: false, message: 'Task already completed' }, 400);
+    }
+
+    console.log(`🔧 [Admin] Fixing stuck task: ${taskId}, current status: ${task.status}`);
+
+    // 获取用户信息
+    const user = await c.env.DB.prepare(`
+      SELECT id, name, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place
+      FROM users WHERE id = ?
+    `).bind(task.user_id).first();
+
+    if (!user) {
+      return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    // 解析输入数据
+    let inputData: any = {};
+    try {
+      inputData = JSON.parse(task.input_data || '{}');
+    } catch (e) {
+      console.warn(`⚠️ Failed to parse input data for task ${taskId}`);
+    }
+
+    // 重新处理任务
+    try {
+      await processAIWithSegmentationBackground(
+        c.env,
+        taskId,
+        task.task_type,
+        user,
+        inputData.language || 'zh',
+        inputData.question
+      );
+
+      return c.json({
+        success: true,
+        message: `Task ${taskId} reprocessing started`,
+        data: {
+          taskId,
+          previousStatus: task.status,
+          action: 'reprocessing_started'
+        }
+      });
+
+    } catch (error) {
+      console.error(`❌ [Admin] Failed to reprocess task ${taskId}:`, error);
+
+      // 如果重新处理失败，标记为失败状态
+      await c.env.DB.prepare(`
+        UPDATE async_tasks
+        SET status = 'failed', error_message = ?, updated_at = ?
+        WHERE id = ?
+      `).bind(`管理员修复失败: ${error.message}`, new Date().toISOString(), taskId).run();
+
+      return c.json({
+        success: false,
+        message: `Failed to reprocess task ${taskId}`,
+        error: error.message
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('❌ Fix stuck task error:', error);
+    return c.json({
+      success: false,
+      message: 'Failed to fix stuck task',
       error: error.message
     }, 500);
   }
@@ -4068,13 +4256,14 @@ export default {
         // 立即更新任务状态为处理中
         await updateAsyncTaskStatus(env, taskId, 'processing', 'AI推理模型正在深度分析中...');
 
-        // 🔑 关键：使用waitUntil启动后台长时间处理，不阻塞队列消费者
+        // 🔑 关键：使用分段处理绕过waitUntil的30秒限制
+        // 方案：立即启动AI调用，然后使用定时任务检查和保存结果
         ctx.waitUntil(
-          processAIWithSegmentationBackground(env, taskId, taskType, user, language, question)
+          startAIProcessingWithResultPolling(env, taskId, taskType, user, language, question)
             .catch(error => {
-              console.error(`❌ [Queue-${taskId}] Background processing failed:`, error);
-              // 后台处理失败时更新任务状态
-              updateAsyncTaskStatus(env, taskId, 'failed', `AI处理失败: ${error.message}`).catch(console.error);
+              console.error(`❌ [Queue-${taskId}] AI processing startup failed:`, error);
+              // 启动失败时更新任务状态
+              updateAsyncTaskStatus(env, taskId, 'failed', `AI处理启动失败: ${error.message}`).catch(console.error);
             })
         );
 
@@ -4119,19 +4308,23 @@ export default {
 
     try {
       // 查找需要处理的任务：
-      // 1. 超过6分钟仍在processing状态的任务（5分钟超时+1分钟缓冲）
+      // 1. 超过7分钟仍在processing状态的任务（5分钟AI超时+2分钟缓冲）
       // 2. 超过60秒仍在pending状态的任务（可能异步处理没有启动）
+      // 3. 新增：检查AI可能已完成但结果未保存的任务
       const stuckTasks = await env.DB.prepare(`
         SELECT id, user_id, task_type, input_data, created_at, updated_at, status,
-               (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes
+               (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes,
+               (julianday('now') - julianday(updated_at)) * 24 * 60 as last_update_minutes
         FROM async_tasks
         WHERE (
-          (status = 'processing' AND datetime(updated_at) < datetime('now', '-360 seconds'))
+          (status = 'processing' AND datetime(updated_at) < datetime('now', '-420 seconds'))
           OR
           (status = 'pending' AND datetime(created_at) < datetime('now', '-60 seconds'))
+          OR
+          (status = 'processing' AND datetime(created_at) < datetime('now', '-180 seconds') AND result IS NULL)
         )
         ORDER BY created_at ASC
-        LIMIT 5
+        LIMIT 10
       `).all();
 
       if (!stuckTasks.results || stuckTasks.results.length === 0) {
@@ -4144,7 +4337,16 @@ export default {
 
       for (const task of stuckTasks.results) {
         try {
-          console.log(`🔧 Scheduled processing of stuck task: ${task.id}`);
+          console.log(`🔧 Scheduled processing of stuck task: ${task.id} (${task.status}, ${task.duration_minutes.toFixed(1)}min old)`);
+
+          // 智能处理：根据任务年龄和状态决定处理方式
+          if (task.duration_minutes > 7) {
+            // 超过7分钟的任务直接标记为失败
+            console.log(`⏰ [${task.id}] Task too old (${task.duration_minutes.toFixed(1)}min), marking as failed`);
+            await updateAsyncTaskStatus(env, task.id, 'failed', 'AI分析超时，请重新尝试');
+            processed++;
+            continue;
+          }
 
           // 获取用户信息
           const user = await env.DB.prepare(`
@@ -4153,7 +4355,8 @@ export default {
           `).bind(task.user_id).first();
 
           if (!user) {
-            console.error(`❌ User not found for task ${task.id}`);
+            console.error(`❌ User not found for task ${task.id}, marking as failed`);
+            await updateAsyncTaskStatus(env, task.id, 'failed', 'User not found');
             continue;
           }
 
@@ -4165,7 +4368,37 @@ export default {
             console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
           }
 
+          // 对于3-7分钟的processing任务，尝试直接完成AI处理
+          if (task.status === 'processing' && task.duration_minutes > 3 && task.duration_minutes <= 7) {
+            console.log(`🔄 [${task.id}] Attempting direct AI completion for stuck processing task...`);
+
+            try {
+              // 直接调用AI处理，给25秒时间完成
+              const directProcessPromise = processAIWithSegmentation(
+                env,
+                task.id,
+                task.task_type,
+                user,
+                inputData.language || 'zh',
+                inputData.question
+              );
+
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Direct processing timeout')), 25000);
+              });
+
+              await Promise.race([directProcessPromise, timeoutPromise]);
+              console.log(`✅ [${task.id}] Direct AI processing completed successfully`);
+              processed++;
+              continue;
+
+            } catch (directError) {
+              console.log(`⚠️ [${task.id}] Direct processing failed: ${directError.message}, will restart via queue`);
+            }
+          }
+
           // 使用队列重新处理任务
+          console.log(`🔄 [${task.id}] Restarting task via queue...`);
           const taskPromise = sendTaskToQueue(
             env,
             task.id,
@@ -4175,7 +4408,7 @@ export default {
             inputData.question
           );
 
-          // 使用waitUntil确保任务完成
+          // 使用waitUntil确保任务启动
           ctx.waitUntil(taskPromise);
 
           processed++;
