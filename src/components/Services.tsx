@@ -116,26 +116,10 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
       }
 
       if (response.success) {
-        // 验证AI分析结果是否完整
-        const analysis = response.data?.analysis || response.data?.aiAnalysis || '';
-
-        // 检查是否是有效的AI分析结果（不是初始状态消息）
-        const isValidAnalysis = analysis &&
-          analysis.length > 50 && // 至少50个字符
-          !analysis.toLowerCase().includes('started') && // 不包含"started"
-          !analysis.toLowerCase().includes('processing') && // 不包含"processing"
-          !analysis.toLowerCase().includes('please wait'); // 不包含"please wait"
-
-        if (isValidAnalysis) {
-          setFortuneResult(response);
-          setShowResultModal(true);
-          // 消费积分
-          await consumeCredit();
-        } else {
-          // AI结果不完整，显示错误
-          setError('AI分析结果不完整，请稍后重试');
-          console.warn('Incomplete AI analysis result:', analysis);
-        }
+        setFortuneResult(response);
+        setShowResultModal(true);
+        // 消费积分
+        await consumeCredit();
       } else {
         setError(response.message || 'Analysis failed');
       }

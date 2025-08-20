@@ -1569,10 +1569,10 @@ app.get('/api/fortune/task/:taskId', jwtMiddleware, async (c) => {
   }
 });
 
-// 八字精算
+// 八字精算 - 同步处理版本
 app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 BaZi Analysis Request');
+    console.log('🔮 BaZi Analysis Request (Sync Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1609,52 +1609,25 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       }, 400);
     }
 
-    // 创建异步任务
-    const taskId = generateTaskId();
-    const inputData = JSON.stringify({ user, language });
+    // 直接调用AI服务进行同步处理
+    console.log('🤖 Starting synchronous AI processing...');
+    const deepSeekService = new CloudflareDeepSeekService(c.env);
+    const analysis = await deepSeekService.getBaziAnalysis(user, language);
 
-    await c.env.DB.prepare(`
-      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(taskId, userId, 'bazi', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
+    if (!analysis || analysis.length < 50) {
+      throw new Error('AI analysis returned empty or insufficient content');
+    }
 
-    // 立即返回任务ID，不等待AI处理
-    console.log(`🔮 BaZi task created: ${taskId}`);
-
-    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
-    await sendTaskToQueue(c.env, taskId, 'bazi', user, language);
-
-    // 方法3: 设置一个备用的延迟检查
-    c.executionCtx.waitUntil(
-      new Promise(async (resolve) => {
-        try {
-          // 等待30秒后检查任务状态
-          await new Promise(r => setTimeout(r, 30000));
-
-          const taskCheck = await c.env.DB.prepare(`
-            SELECT status FROM async_tasks WHERE id = ?
-          `).bind(taskId).first();
-
-          if (taskCheck && taskCheck.status === 'processing') {
-            console.log(`⚠️ [${taskId}] Task still processing after 30s, this is normal for AI tasks`);
-          }
-
-          resolve(undefined);
-        } catch (error) {
-          console.error(`❌ [${taskId}] Backup check failed:`, error);
-          resolve(undefined);
-        }
-      })
-    );
-
+    console.log('✅ BaZi analysis completed successfully');
     return c.json({
       success: true,
-      message: 'BaZi analysis started',
+      message: 'BaZi analysis completed successfully',
       data: {
-        taskId: taskId,
-        status: 'pending',
-        estimatedTime: '2-4 minutes',
-        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
+        type: 'bazi',
+        analysis: analysis,
+        aiAnalysis: analysis, // 前端期望的字段名
+        analysisType: 'bazi',
+        timestamp: new Date().toISOString()
       }
     });
 
@@ -1688,10 +1661,10 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   }
 });
 
-// 每日运势
+// 每日运势 - 同步处理版本
 app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 Daily Fortune Request');
+    console.log('🔮 Daily Fortune Request (Sync Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1706,29 +1679,25 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 创建异步任务
-    const taskId = generateTaskId();
-    const inputData = JSON.stringify({ user, language });
+    // 直接调用AI服务进行同步处理
+    console.log('🤖 Starting synchronous AI processing...');
+    const deepSeekService = new CloudflareDeepSeekService(c.env);
+    const fortune = await deepSeekService.getDailyFortune(user, language);
 
-    await c.env.DB.prepare(`
-      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(taskId, userId, 'daily', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
+    if (!fortune || fortune.length < 50) {
+      throw new Error('AI analysis returned empty or insufficient content');
+    }
 
-    // 立即返回任务ID，不等待AI处理
-    console.log(`🔮 Daily Fortune task created: ${taskId}`);
-
-    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
-    await sendTaskToQueue(c.env, taskId, 'daily', user, language);
-
+    console.log('✅ Daily fortune completed successfully');
     return c.json({
       success: true,
-      message: 'Daily fortune analysis started',
+      message: 'Daily fortune completed successfully',
       data: {
-        taskId: taskId,
-        status: 'pending',
-        estimatedTime: '2-4 minutes',
-        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
+        type: 'daily',
+        analysis: fortune,
+        aiAnalysis: fortune, // 前端期望的字段名
+        analysisType: 'daily',
+        timestamp: new Date().toISOString()
       }
     });
 
@@ -1759,10 +1728,10 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
   }
 });
 
-// 塔罗占卜
+// 塔罗占卜 - 同步处理版本
 app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 Tarot Reading Request');
+    console.log('🔮 Tarot Reading Request (Sync Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { question = '', language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1777,29 +1746,26 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 创建异步任务
-    const taskId = generateTaskId();
-    const inputData = JSON.stringify({ user, question, language });
+    // 直接调用AI服务进行同步处理
+    console.log('🤖 Starting synchronous AI processing...');
+    const deepSeekService = new CloudflareDeepSeekService(c.env);
+    const reading = await deepSeekService.getCelestialTarotReading(user, question, language);
 
-    await c.env.DB.prepare(`
-      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(taskId, userId, 'tarot', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
+    if (!reading || reading.length < 50) {
+      throw new Error('AI analysis returned empty or insufficient content');
+    }
 
-    // 立即返回任务ID，不等待AI处理
-    console.log(`🔮 Tarot Reading task created: ${taskId}`);
-
-    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
-    await sendTaskToQueue(c.env, taskId, 'tarot', user, language, question);
-
+    console.log('✅ Tarot reading completed successfully');
     return c.json({
       success: true,
-      message: 'Tarot reading started',
+      message: 'Tarot reading completed successfully',
       data: {
-        taskId: taskId,
-        status: 'pending',
-        estimatedTime: '2-4 minutes',
-        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
+        type: 'tarot',
+        analysis: reading,
+        aiAnalysis: reading, // 前端期望的字段名
+        analysisType: 'tarot',
+        question: question,
+        timestamp: new Date().toISOString()
       }
     });
 
@@ -1833,10 +1799,10 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
   }
 });
 
-// 幸运物品和颜色
+// 幸运物品和颜色 - 同步处理版本
 app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 Lucky Items Request');
+    console.log('🔮 Lucky Items Request (Sync Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1851,29 +1817,25 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 创建异步任务
-    const taskId = generateTaskId();
-    const inputData = JSON.stringify({ user, language });
+    // 直接调用AI服务进行同步处理
+    console.log('🤖 Starting synchronous AI processing...');
+    const deepSeekService = new CloudflareDeepSeekService(c.env);
+    const luckyItems = await deepSeekService.getLuckyItems(user, language);
 
-    await c.env.DB.prepare(`
-      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(taskId, userId, 'lucky', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
+    if (!luckyItems || luckyItems.length < 50) {
+      throw new Error('AI analysis returned empty or insufficient content');
+    }
 
-    // 立即返回任务ID，不等待AI处理
-    console.log(`🔮 Lucky Items task created: ${taskId}`);
-
-    // 立即启动AI处理 - 使用Cloudflare Queues标准架构
-    await sendTaskToQueue(c.env, taskId, 'lucky', user, language);
-
+    console.log('✅ Lucky items analysis completed successfully');
     return c.json({
       success: true,
-      message: 'Lucky items analysis started',
+      message: 'Lucky items analysis completed successfully',
       data: {
-        taskId: taskId,
-        status: 'pending',
-        estimatedTime: '2-4 minutes',
-        note: 'AI推理模型正在深度分析，单次处理确保最佳质量'
+        type: 'lucky',
+        analysis: luckyItems,
+        aiAnalysis: luckyItems, // 前端期望的字段名
+        analysisType: 'lucky',
+        timestamp: new Date().toISOString()
       }
     });
 
