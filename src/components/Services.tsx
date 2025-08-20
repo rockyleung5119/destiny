@@ -21,7 +21,8 @@ interface ServicesProps {
 }
 
 const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
+  const language = currentLanguage;
   const { isAuthenticated } = useAuth();
   const { membership, canUseService, consumeCredit } = useMembership();
   const [selectedService, setSelectedService] = useState<string | null>(null);
@@ -115,10 +116,26 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
       }
 
       if (response.success) {
-        setFortuneResult(response);
-        setShowResultModal(true);
-        // 消费积分
-        await consumeCredit();
+        // 验证AI分析结果是否完整
+        const analysis = response.data?.analysis || response.data?.aiAnalysis || '';
+
+        // 检查是否是有效的AI分析结果（不是初始状态消息）
+        const isValidAnalysis = analysis &&
+          analysis.length > 50 && // 至少50个字符
+          !analysis.toLowerCase().includes('started') && // 不包含"started"
+          !analysis.toLowerCase().includes('processing') && // 不包含"processing"
+          !analysis.toLowerCase().includes('please wait'); // 不包含"please wait"
+
+        if (isValidAnalysis) {
+          setFortuneResult(response);
+          setShowResultModal(true);
+          // 消费积分
+          await consumeCredit();
+        } else {
+          // AI结果不完整，显示错误
+          setError('AI分析结果不完整，请稍后重试');
+          console.warn('Incomplete AI analysis result:', analysis);
+        }
       } else {
         setError(response.message || 'Analysis failed');
       }
@@ -267,7 +284,9 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
                   {isCurrentlyAnalyzing ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      {t('analyzing')}
+                      <span className="text-sm">
+                        {language === 'zh' ? 'AI正在分析中，请稍候...' : 'AI is analyzing, please wait...'}
+                      </span>
                     </>
                   ) : (
                     <>
@@ -299,6 +318,23 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
         </div>
 
         {/* Error Display */}
+        {/* AI Processing Status */}
+        {isAnalyzing && (
+          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center justify-center">
+              <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mr-4"></div>
+              <div className="text-center">
+                <p className="text-blue-800 font-semibold text-lg">
+                  {language === 'zh' ? 'AI大模型正在为您分析中...' : 'AI is analyzing for you...'}
+                </p>
+                <p className="text-blue-600 text-sm mt-1">
+                  {language === 'zh' ? '预计需要15-25秒，请耐心等待' : 'Estimated 15-25 seconds, please wait patiently'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center">

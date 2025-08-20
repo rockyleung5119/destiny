@@ -113,7 +113,23 @@ const FortuneServices: React.FC<FortuneServicesProps> = ({ isLoggedIn, onLoginRe
           throw new Error('Unknown service type');
       }
 
-      setFortuneResult(response);
+      // 验证AI分析结果是否完整
+      const analysis = response.data?.analysis || response.data?.aiAnalysis || '';
+
+      // 检查是否是有效的AI分析结果
+      const isValidAnalysis = analysis &&
+        analysis.length > 50 && // 至少50个字符
+        !analysis.toLowerCase().includes('started') && // 不包含"started"
+        !analysis.toLowerCase().includes('processing') && // 不包含"processing"
+        !analysis.toLowerCase().includes('please wait'); // 不包含"please wait"
+
+      if (isValidAnalysis) {
+        setFortuneResult(response);
+      } else {
+        // AI结果不完整，显示错误
+        setError('AI分析结果不完整，请稍后重试');
+        console.warn('Incomplete AI analysis result:', analysis);
+      }
     } catch (error) {
       setError(handleFortuneError(error));
     } finally {
@@ -145,7 +161,24 @@ const FortuneServices: React.FC<FortuneServicesProps> = ({ isLoggedIn, onLoginRe
 
     try {
       const response = await fortuneAPI.getTarotReading(tarotQuestion, language);
-      setFortuneResult(response);
+
+      // 验证AI分析结果是否完整
+      const analysis = response.data?.analysis || response.data?.aiAnalysis || '';
+
+      // 检查是否是有效的AI分析结果
+      const isValidAnalysis = analysis &&
+        analysis.length > 50 && // 至少50个字符
+        !analysis.toLowerCase().includes('started') && // 不包含"started"
+        !analysis.toLowerCase().includes('processing') && // 不包含"processing"
+        !analysis.toLowerCase().includes('please wait'); // 不包含"please wait"
+
+      if (isValidAnalysis) {
+        setFortuneResult(response);
+      } else {
+        // AI结果不完整，显示错误
+        setError('AI分析结果不完整，请稍后重试');
+        console.warn('Incomplete AI analysis result:', analysis);
+      }
     } catch (error) {
       setError(handleFortuneError(error));
     } finally {
@@ -319,10 +352,13 @@ const FortuneServices: React.FC<FortuneServicesProps> = ({ isLoggedIn, onLoginRe
       {activeService === 'tarot' && renderTarotInterface()}
       
       {loading && (
-        <div className="text-center py-8">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-purple-600 mb-4" />
-          <p className="text-gray-600">
-            {language === 'zh' ? 'AI正在为您分析中，请稍候...' : 'AI is analyzing for you, please wait...'}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-blue-600 mb-4" />
+          <p className="text-blue-800 font-semibold text-lg mb-2">
+            {language === 'zh' ? 'AI大模型正在为您分析中...' : 'AI is analyzing for you...'}
+          </p>
+          <p className="text-blue-600 text-sm">
+            {language === 'zh' ? '预计需要15-25秒，请耐心等待' : 'Estimated 15-25 seconds, please wait patiently'}
           </p>
         </div>
       )}
