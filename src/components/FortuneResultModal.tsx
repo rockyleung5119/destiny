@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Star, Calendar, Sparkles, Gift, Copy, Download } from 'lucide-react';
+import { X, Star, Calendar, Sparkles, Gift, Copy } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 
 // 添加自定义滚动条样式 - 适配白色主题
@@ -253,19 +253,7 @@ const FortuneResultModal: React.FC<FortuneResultModalProps> = ({
     }
   };
 
-  // 下载结果为文本文件
-  const downloadResult = () => {
-    const content = result.data?.analysis || result.message || '';
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${serviceInfo.title}_${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // 下载功能已移除 - 暂时禁用以优化生产环境性能
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -358,13 +346,7 @@ const FortuneResultModal: React.FC<FortuneResultModalProps> = ({
                 <Copy className="w-4 h-4" />
                 <span className="font-semibold">{copySuccess ? (t('copied') || '已复制!') : (t('copyResult') || '复制结果')}</span>
               </button>
-              <button
-                onClick={downloadResult}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium border-2 border-indigo-400"
-              >
-                <Download className="w-4 h-4" />
-                <span className="font-semibold">{t('downloadFile') || '下载文件'}</span>
-              </button>
+
               <button
                 onClick={onClose}
                 className="px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium border-2 border-indigo-400"

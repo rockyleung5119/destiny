@@ -3069,7 +3069,7 @@ Current Time: ${currentTime}
 
     console.log(`🌐 BaZi Analysis Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是资深的八字命理大师，拥有数十年的实战经验，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析。请务必用${targetLanguage}回复，不要使用其他语言。`;
+    const systemMessage = `你是数十年经验的专家八字命理大师，拥有数十年的实战经验，精通子平八字、五行生克、十神配置、大运流年等传统命理学。请基于正统八字理论进行专业分析。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请为以下用户进行详细的八字命理分析：
 
@@ -3151,7 +3151,7 @@ ${userProfile}
 
     console.log(`🌐 Daily Fortune Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势。请务必用${targetLanguage}回复，不要使用其他语言。`;
+    const systemMessage = `你是数十年经验的专业的命理师，精通八字、紫微斗数、奇门遁甲等传统术数。请基于用户的出生信息和当前时间，分析今日运势。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请为以下用户分析今日运势：
 
@@ -3211,7 +3211,7 @@ ${userProfile}
 
     console.log(`🌐 Tarot Reading Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜。请务必用${targetLanguage}回复，不要使用其他语言。`;
+    const systemMessage = `你是数十年经验丰富的塔罗占卜师，精通韦特塔罗、透特塔罗等各种塔罗体系，同时融合东方命理智慧。请进行专业的塔罗占卜。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请为以下用户进行塔罗占卜：
 
@@ -3222,7 +3222,7 @@ ${userProfile}
 请按照以下结构进行塔罗占卜：
 
 ## 🔮 牌阵选择
-根据问题选择合适的牌阵（如三张牌、凯尔特十字等）。
+根据问题选择合适的牌阵（如三张牌）。
 
 ## 🃏 抽牌过程
 描述抽牌的过程和抽到的牌。
@@ -3273,7 +3273,7 @@ ${userProfile}
 
     console.log(`🌐 Lucky Items Language: ${language}, Timezone: ${userTimezone}`);
 
-    const systemMessage = `你是精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析。请务必用${targetLanguage}回复，不要使用其他语言。`;
+    const systemMessage = `你是数十年经验精通五行理论和传统文化的风水命理师，能够根据个人八字推算最适合的幸运物品和颜色。请基于五行相生相克原理进行分析。请务必用${targetLanguage}回复，不要使用其他语言。`;
 
     const userMessage = `请根据以下用户信息推荐幸运物品和颜色：
 
