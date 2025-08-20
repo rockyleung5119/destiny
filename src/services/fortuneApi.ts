@@ -5,7 +5,7 @@ import { apiRequest } from './api';
 async function apiRequestWithTimeout<T>(
   endpoint: string,
   options: RequestInit = {},
-  timeoutMs: number = 300000 // 默认5分钟，适应AI大模型推理时间
+  timeoutMs: number = 30000 // 默认30秒，匹配Cloudflare Workers限制
 ): Promise<T> {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
   const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
@@ -117,166 +117,63 @@ export const fortuneAPI = {
     });
   },
 
-  // 八字精算 - 异步任务模式
+  // 八字精算 - 同步处理模式（利用DeepSeek官方API高速响应）
   async getBaziAnalysis(language: string = 'zh'): Promise<FortuneResponse> {
-    // 1. 启动异步任务
-    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/bazi', {
+    console.log(`🔮 Starting BaZi Analysis - Language: ${language}`);
+
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/bazi', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
+        'X-Language': language,
       },
       body: JSON.stringify({ language }),
-    });
-
-    if (!startResponse.success || !startResponse.data.taskId) {
-      throw new Error('Failed to start BaZi analysis');
-    }
-
-    // 2. 轮询任务状态直到完成
-    return await this.pollTaskUntilComplete(startResponse.data.taskId);
+    }, 30000); // 30秒超时，匹配Cloudflare Workers限制
   },
 
-  // 每日运势 - 异步任务模式
+  // 每日运势 - 同步处理模式（利用DeepSeek官方API高速响应）
   async getDailyFortune(language: string = 'zh'): Promise<FortuneResponse> {
-    // 1. 启动异步任务
-    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/daily', {
+    console.log(`🔮 Starting Daily Fortune - Language: ${language}`);
+
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/daily', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
+        'X-Language': language,
       },
       body: JSON.stringify({ language }),
-    });
-
-    if (!startResponse.success || !startResponse.data.taskId) {
-      throw new Error('Failed to start daily fortune analysis');
-    }
-
-    // 2. 轮询任务状态直到完成
-    return await this.pollTaskUntilComplete(startResponse.data.taskId);
+    }, 30000); // 30秒超时，匹配Cloudflare Workers限制
   },
 
-  // 天体塔罗占卜 - 异步任务模式
+  // 天体塔罗占卜 - 同步处理模式（利用DeepSeek官方API高速响应）
   async getTarotReading(question: string = '', language: string = 'zh'): Promise<FortuneResponse> {
-    // 1. 启动异步任务
-    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/tarot', {
+    console.log(`🔮 Starting Tarot Reading - Language: ${language}, Question: ${question}`);
+
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/tarot', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
+        'X-Language': language,
       },
       body: JSON.stringify({ question, language }),
-    });
-
-    if (!startResponse.success || !startResponse.data.taskId) {
-      throw new Error('Failed to start tarot reading');
-    }
-
-    // 2. 轮询任务状态直到完成
-    return await this.pollTaskUntilComplete(startResponse.data.taskId);
+    }, 30000); // 30秒超时，匹配Cloudflare Workers限制
   },
 
-  // 幸运物品和颜色 - 异步任务模式
+  // 幸运物品和颜色 - 同步处理模式（利用DeepSeek官方API高速响应）
   async getLuckyItems(language: string = 'zh'): Promise<FortuneResponse> {
-    // 1. 启动异步任务
-    const startResponse = await apiRequest<{ success: boolean; data: { taskId: string; status: string; estimatedTime: string } }>('/fortune/lucky', {
+    console.log(`🔮 Starting Lucky Items Analysis - Language: ${language}`);
+
+    return await apiRequestWithTimeout<FortuneResponse>('/fortune/lucky', {
       method: 'POST',
       headers: {
         'Accept-Language': language,
+        'X-Language': language,
       },
       body: JSON.stringify({ language }),
-    });
-
-    if (!startResponse.success || !startResponse.data.taskId) {
-      throw new Error('Failed to start lucky items analysis');
-    }
-
-    // 2. 轮询任务状态直到完成
-    return await this.pollTaskUntilComplete(startResponse.data.taskId);
+    }, 30000); // 30秒超时，匹配Cloudflare Workers限制
   },
 
-  // 轮询任务状态直到完成
-  async pollTaskUntilComplete(taskId: string): Promise<FortuneResponse> {
-    const maxAttempts = 75; // 最多轮询7.5分钟 (75次 * 6秒) - 适应5分钟AI处理时间 + 缓冲
-    let attempts = 0;
 
-    console.log(`🔄 Starting task polling for ${taskId}, max attempts: ${maxAttempts} (7.5 minutes timeout)`);
-
-    while (attempts < maxAttempts) {
-      try {
-        console.log(`📊 Polling attempt ${attempts + 1}/${maxAttempts} (${attempts * 6}s elapsed)`);
-
-        const statusResponse = await apiRequest<{
-          success: boolean;
-          data: {
-            taskId: string;
-            status: string;
-            analysis?: string;
-            aiAnalysis?: string;
-            error?: string;
-            type?: string;
-            progressMessage?: string;
-            resultLength?: number;
-          };
-          message: string;
-        }>(`/fortune/task/${taskId}`, {
-          method: 'GET',
-        });
-
-        if (!statusResponse.success) {
-          throw new Error(statusResponse.message || 'Failed to check task status');
-        }
-
-        const { status, analysis, aiAnalysis, error, type, progressMessage, resultLength } = statusResponse.data;
-        console.log(`📈 Task status: ${status}, result length: ${resultLength || 0}`);
-
-        if (progressMessage) {
-          console.log(`💬 Progress: ${progressMessage}`);
-        }
-
-        // 优先使用aiAnalysis，回退到analysis
-        const result = aiAnalysis || analysis;
-
-        if (status === 'completed' && result) {
-          // 任务完成，返回结果
-          console.log(`✅ Task ${taskId} completed successfully, result length: ${result.length}`);
-          return {
-            success: true,
-            message: statusResponse.message,
-            data: {
-              type: type || 'analysis',
-              analysis: result,
-              aiAnalysis: result,
-              timestamp: new Date().toISOString()
-            }
-          };
-        } else if (status === 'failed') {
-          // 任务失败
-          console.log(`❌ Task ${taskId} failed: ${error}`);
-          throw new Error(error || 'Analysis failed');
-        }
-
-        // 任务仍在进行中，等待6秒后重试
-        if (attempts < maxAttempts - 1) {
-          console.log(`⏳ Task still ${status}, waiting 6 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 6000));
-        }
-        attempts++;
-
-      } catch (error) {
-        console.error('Error polling task status:', error);
-        if (attempts >= maxAttempts - 1) {
-          throw error;
-        }
-        // 等待6秒后重试
-        console.log(`⚠️ Error occurred, retrying in 6 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 6000));
-        attempts++;
-      }
-    }
-
-    // 超时
-    console.log(`⏰ Task ${taskId} timeout after ${maxAttempts} attempts (6 minutes)`);
-    throw new Error('Analysis timeout. Please try again later.');
-  },
 
   // 获取算命历史记录
   async getFortuneHistory(type?: string, limit: number = 10, offset: number = 0): Promise<{

@@ -3,9 +3,10 @@ const axios = require('axios');
 
 class DeepSeekService {
   constructor() {
+    // 使用DeepSeek官方API，速度更快，响应更稳定
     this.apiKey = 'sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn';
-    this.baseURL = 'https://api.siliconflow.cn/v1/chat/completions';
-    this.model = 'Pro/deepseek-ai/DeepSeek-R1';
+    this.baseURL = 'https://api.deepseek.com/v1/chat/completions';
+    this.model = 'deepseek-chat'; // 使用官方模型，速度更快
   }
 
   // 获取语言名称（中文）
@@ -133,18 +134,13 @@ class DeepSeekService {
     return this.cleanAIOutput(content);
   }
 
-  // 调用DeepSeek API（带重试机制）
-  async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', retryCount = 0, cleaningType = 'default', maxTokens = 4000) {
-    const maxRetries = 1; // 最多重试1次，减少总等待时间
-
+  // 调用DeepSeek API（Cloudflare Workers 30秒限制优化）
+  async callDeepSeekAPI(messages, temperature = 0.7, language = 'zh', cleaningType = 'default', maxTokens = 1500) {
     try {
-      console.log(`🔧 callDeepSeekAPI - Language: ${language}, Retry: ${retryCount}`);
+      console.log(`🔧 callDeepSeekAPI - Language: ${language}`);
       console.log(`🌐 API URL: ${this.baseURL}`);
       console.log(`🤖 Model: ${this.model}`);
-
-      if (retryCount === 0) {
-        console.log(`📝 Messages:`, JSON.stringify(messages, null, 2));
-      }
+      console.log(`📝 Messages:`, JSON.stringify(messages, null, 2));
 
       const requestData = {
         model: this.model,
@@ -154,11 +150,11 @@ class DeepSeekService {
         stream: false
       };
 
-      console.log(`📤 发送请求到DeepSeek API...`);
+      console.log(`📤 发送请求到DeepSeek官方API...`);
       const startTime = Date.now();
 
-      // 根据重试次数调整超时时间
-      const timeout = 300000; // 增加到5分钟超时，确保R1模型有足够推理时间
+      // Cloudflare Workers有30秒执行限制，设置25秒超时留出处理时间
+      const timeout = 25000;
 
       const response = await axios.post(this.baseURL, requestData, {
         headers: {
@@ -194,28 +190,23 @@ class DeepSeekService {
         throw new Error('Invalid API response format');
       }
     } catch (error) {
-      console.error(`❌ DeepSeek API调用失败 (尝试 ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+      console.error(`❌ DeepSeek API调用失败:`, error.message);
       console.error('📊 错误详情:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data
       });
 
-      // 如果是超时错误且还有重试次数，则重试
-      if ((error.code === 'ECONNABORTED' || error.message.includes('timeout')) && retryCount < maxRetries) {
-        console.log(`🔄 ${300}秒后重试...`);
-        await new Promise(resolve => setTimeout(resolve, 300000));
-        return this.callDeepSeekAPI(messages, temperature, language, retryCount + 1, cleaningType, maxTokens);
-      }
-
-      // 提供更友好的错误消息
-      let userFriendlyMessage = 'AI服务暂时不可用';
+      // 不重试，直接返回错误（符合Cloudflare Workers 30秒限制）
+      let userFriendlyMessage = 'AI服务暂时不可用，请稍后重试';
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        userFriendlyMessage = 'AI分析超时，请稍后重试';
+        userFriendlyMessage = 'AI分析超时（25秒），请稍后重试';
       } else if (error.response?.status === 429) {
         userFriendlyMessage = 'API调用频率过高，请稍后重试';
       } else if (error.response?.status >= 500) {
         userFriendlyMessage = 'AI服务器暂时不可用，请稍后重试';
+      } else if (error.response?.status === 401) {
+        userFriendlyMessage = 'AI服务认证失败，请联系管理员';
       }
 
       throw new Error(userFriendlyMessage);
@@ -301,7 +292,7 @@ ${userProfile}
       }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'bazi', 6000);
+    return await this.callDeepSeekAPI(messages, 0.7, language, 'bazi', 2000);
   }
 
   // 每日运势（专业版）
@@ -339,7 +330,7 @@ ${userProfile}
       }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+    return await this.callDeepSeekAPI(messages, 0.7, language, 'default');
   }
 
   // 塔罗占卜（专业版）
@@ -379,7 +370,7 @@ ${userProfile}
       }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+    return await this.callDeepSeekAPI(messages, 0.7, language, 'default');
   }
 
   // 幸运物品（专业版）
@@ -417,7 +408,7 @@ ${userProfile}
       }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+    return await this.callDeepSeekAPI(messages, 0.7, language, 'default');
   }
 }
 
