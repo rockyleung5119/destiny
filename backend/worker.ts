@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
+import { DatabaseBackupService } from './database-backup-service';
 import bcrypt from 'bcryptjs';
 import { HTTPException } from 'hono/http-exception';
 
@@ -218,6 +219,70 @@ app.get('/api/health', async (c) => {
     environment: c.env.NODE_ENV || 'development',
     database: c.env.DB ? 'D1 Connected' : 'No Database'
   });
+});
+
+// 数据库备份API端点
+app.post('/api/admin/backup-database', async (c) => {
+  try {
+    console.log('🔄 Manual database backup requested');
+
+    const backupService = new DatabaseBackupService(c.env);
+    const result = await backupService.performBackup();
+
+    return c.json(result);
+  } catch (error) {
+    console.error('❌ Manual backup failed:', error);
+    return c.json({
+      success: false,
+      message: `Backup failed: ${error.message}`
+    }, 500);
+  }
+});
+
+// 获取备份列表
+app.get('/api/admin/backups', async (c) => {
+  try {
+    const backupService = new DatabaseBackupService(c.env);
+    const backups = await backupService.listBackups();
+
+    return c.json({
+      success: true,
+      backups: backups
+    });
+  } catch (error) {
+    console.error('❌ Failed to list backups:', error);
+    return c.json({
+      success: false,
+      message: `Failed to list backups: ${error.message}`
+    }, 500);
+  }
+});
+
+// 从备份恢复数据库
+app.post('/api/admin/restore-database', async (c) => {
+  try {
+    const { backupFileName } = await c.req.json();
+
+    if (!backupFileName) {
+      return c.json({
+        success: false,
+        message: 'Backup file name is required'
+      }, 400);
+    }
+
+    console.log(`🔄 Database restore requested: ${backupFileName}`);
+
+    const backupService = new DatabaseBackupService(c.env);
+    const result = await backupService.restoreFromBackup(backupFileName);
+
+    return c.json(result);
+  } catch (error) {
+    console.error('❌ Database restore failed:', error);
+    return c.json({
+      success: false,
+      message: `Restore failed: ${error.message}`
+    }, 500);
+  }
 });
 
 // Worker性能监控端点
@@ -4253,11 +4318,37 @@ export default {
     }
   },
 
-  // 每2分钟自动处理AI任务 - 优化为Cron触发器主要处理器
+  // 每2分钟自动处理AI任务 + 每日数据库备份
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
-    console.log('🕐 Cron Trigger: Processing AI tasks (every 2 minutes, 15-minute execution limit)...');
+    console.log('🕐 Cron Trigger: Processing AI tasks and checking backup schedule...');
 
     try {
+      // 检查是否需要执行每日备份（每天凌晨2点执行）
+      const now = new Date();
+      const hour = now.getUTCHours();
+      const minute = now.getMinutes();
+
+      // 每天凌晨2:00-2:02之间执行备份（考虑到cron每2分钟执行一次）
+      if (hour === 2 && minute <= 2) {
+        console.log('🔄 Daily backup time detected, starting database backup...');
+
+        try {
+          if (env.BACKUP_STORAGE) {
+            const backupService = new DatabaseBackupService(env);
+            const backupResult = await backupService.performBackup();
+
+            if (backupResult.success) {
+              console.log('✅ Daily database backup completed successfully');
+            } else {
+              console.error('❌ Daily database backup failed:', backupResult.message);
+            }
+          } else {
+            console.warn('⚠️ BACKUP_STORAGE not configured, skipping backup');
+          }
+        } catch (backupError) {
+          console.error('❌ Daily backup error:', backupError);
+        }
+      }
       // 优先处理pending状态的AI任务（新任务）
       const pendingTasks = await env.DB.prepare(`
         SELECT id, user_id, task_type, input_data, created_at, updated_at, status

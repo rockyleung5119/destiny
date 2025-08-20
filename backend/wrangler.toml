@@ -24,6 +24,11 @@ binding = "DB"
 database_name = "destiny-db"
 database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
+# R2存储绑定 - 数据库备份存储
+[[r2_buckets]]
+binding = "BACKUP_STORAGE"
+bucket_name = "destiny-backups"
+
 # Durable Objects配置 - AI异步处理和分布式锁
 # 启用Durable Objects配置
 
@@ -60,7 +65,7 @@ dead_letter_queue = "ai-processing-dlq"
 binding = "AI_DLQ"
 queue = "ai-processing-dlq"
 
-# 定时任务配置 - 每2分钟自动处理卡住的任务（在前端超时前及时恢复）
+# 定时任务配置 - 每2分钟自动处理卡住的任务 + 每日数据库备份
 [triggers]
 crons = ["*/2 * * * *"]
 
