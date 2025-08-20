@@ -309,10 +309,7 @@ const Services: React.FC<ServicesProps> = ({ onShowSettings }) => {
               <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mr-4"></div>
               <div className="text-center">
                 <p className="text-blue-800 font-semibold text-lg">
-                  {language === 'zh' ? 'AI大模型正在为您分析中...' : 'AI is analyzing for you...'}
-                </p>
-                <p className="text-blue-600 text-sm mt-1">
-                  {language === 'zh' ? '预计需要15-25秒，请耐心等待' : 'Estimated 15-25 seconds, please wait patiently'}
+                  {language === 'zh' ? '正在处理中...' : 'Processing...'}
                 </p>
               </div>
             </div>

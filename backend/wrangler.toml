@@ -64,3 +64,7 @@ queue = "ai-processing-dlq"
 [triggers]
 crons = ["*/2 * * * *"]
 
+# 性能配置 - 解决AI服务超时问题
+# 注意：Cloudflare Workers付费计划支持更长的执行时间
+# HTTP请求最大30秒，但可以通过优化代码和API调用来提升性能
+

@@ -322,10 +322,7 @@ const FortuneServices: React.FC<FortuneServicesProps> = ({ isLoggedIn, onLoginRe
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto text-blue-600 mb-4" />
           <p className="text-blue-800 font-semibold text-lg mb-2">
-            {language === 'zh' ? 'AI大模型正在为您分析中...' : 'AI is analyzing for you...'}
-          </p>
-          <p className="text-blue-600 text-sm">
-            {language === 'zh' ? '预计需要15-25秒，请耐心等待' : 'Estimated 15-25 seconds, please wait patiently'}
+            {language === 'zh' ? '正在处理中...' : 'Processing...'}
           </p>
         </div>
       )}

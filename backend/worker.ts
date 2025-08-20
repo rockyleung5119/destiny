@@ -1569,10 +1569,10 @@ app.get('/api/fortune/task/:taskId', jwtMiddleware, async (c) => {
   }
 });
 
-// 八字精算 - 同步处理版本
+// 八字精算 - Cron触发器异步处理版本
 app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 BaZi Analysis Request (Sync Mode)');
+    console.log('🔮 BaZi Analysis Request (Cron Async Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1588,18 +1588,6 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 调试：打印用户信息
-    console.log('🔍 User data for BaZi analysis:', {
-      id: user.id,
-      name: user.name,
-      birth_year: user.birth_year,
-      birth_month: user.birth_month,
-      birth_day: user.birth_day,
-      birth_hour: user.birth_hour,
-      birth_minute: user.birth_minute,
-      birth_place: user.birth_place
-    });
-
     // 检查用户是否有完整的出生信息
     if (!user.birth_year || !user.birth_month || !user.birth_day) {
       console.log('❌ Missing required birth information');
@@ -1609,25 +1597,26 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       }, 400);
     }
 
-    // 直接调用AI服务进行同步处理
-    console.log('🤖 Starting synchronous AI processing...');
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    const analysis = await deepSeekService.getBaziAnalysis(user, language);
+    // 创建异步任务，由Cron触发器处理
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, language });
 
-    if (!analysis || analysis.length < 50) {
-      throw new Error('AI analysis returned empty or insufficient content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'bazi', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log('✅ BaZi analysis completed successfully');
+    console.log(`🔮 BaZi task created for Cron processing: ${taskId}`);
+
+    // 立即返回任务ID，Cron触发器将在后台处理
     return c.json({
       success: true,
-      message: 'BaZi analysis completed successfully',
+      message: 'BaZi analysis task created successfully',
       data: {
+        taskId: taskId,
+        status: 'pending',
         type: 'bazi',
-        analysis: analysis,
-        aiAnalysis: analysis, // 前端期望的字段名
-        analysisType: 'bazi',
-        timestamp: new Date().toISOString()
+        note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
 
@@ -1661,10 +1650,10 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
   }
 });
 
-// 每日运势 - 同步处理版本
+// 每日运势 - Cron触发器异步处理版本
 app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 Daily Fortune Request (Sync Mode)');
+    console.log('🔮 Daily Fortune Request (Cron Async Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1679,25 +1668,25 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 直接调用AI服务进行同步处理
-    console.log('🤖 Starting synchronous AI processing...');
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    const fortune = await deepSeekService.getDailyFortune(user, language);
+    // 创建异步任务，由Cron触发器处理
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, language });
 
-    if (!fortune || fortune.length < 50) {
-      throw new Error('AI analysis returned empty or insufficient content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'daily', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log('✅ Daily fortune completed successfully');
+    console.log(`🔮 Daily Fortune task created for Cron processing: ${taskId}`);
+
     return c.json({
       success: true,
-      message: 'Daily fortune completed successfully',
+      message: 'Daily fortune task created successfully',
       data: {
+        taskId: taskId,
+        status: 'pending',
         type: 'daily',
-        analysis: fortune,
-        aiAnalysis: fortune, // 前端期望的字段名
-        analysisType: 'daily',
-        timestamp: new Date().toISOString()
+        note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
 
@@ -1728,10 +1717,10 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
   }
 });
 
-// 塔罗占卜 - 同步处理版本
+// 塔罗占卜 - Cron触发器异步处理版本
 app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 Tarot Reading Request (Sync Mode)');
+    console.log('🔮 Tarot Reading Request (Cron Async Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { question = '', language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1746,26 +1735,26 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 直接调用AI服务进行同步处理
-    console.log('🤖 Starting synchronous AI processing...');
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    const reading = await deepSeekService.getCelestialTarotReading(user, question, language);
+    // 创建异步任务，由Cron触发器处理
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, question, language });
 
-    if (!reading || reading.length < 50) {
-      throw new Error('AI analysis returned empty or insufficient content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'tarot', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log('✅ Tarot reading completed successfully');
+    console.log(`🔮 Tarot Reading task created for Cron processing: ${taskId}`);
+
     return c.json({
       success: true,
-      message: 'Tarot reading completed successfully',
+      message: 'Tarot reading task created successfully',
       data: {
+        taskId: taskId,
+        status: 'pending',
         type: 'tarot',
-        analysis: reading,
-        aiAnalysis: reading, // 前端期望的字段名
-        analysisType: 'tarot',
         question: question,
-        timestamp: new Date().toISOString()
+        note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
 
@@ -1799,10 +1788,10 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
   }
 });
 
-// 幸运物品和颜色 - 同步处理版本
+// 幸运物品和颜色 - Cron触发器异步处理版本
 app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
   try {
-    console.log('🔮 Lucky Items Request (Sync Mode)');
+    console.log('🔮 Lucky Items Request (Cron Async Mode)');
     const payload = c.get('jwtPayload');
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
@@ -1817,25 +1806,25 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
       return c.json({ success: false, message: 'User not found' }, 404);
     }
 
-    // 直接调用AI服务进行同步处理
-    console.log('🤖 Starting synchronous AI processing...');
-    const deepSeekService = new CloudflareDeepSeekService(c.env);
-    const luckyItems = await deepSeekService.getLuckyItems(user, language);
+    // 创建异步任务，由Cron触发器处理
+    const taskId = generateTaskId();
+    const inputData = JSON.stringify({ user, language });
 
-    if (!luckyItems || luckyItems.length < 50) {
-      throw new Error('AI analysis returned empty or insufficient content');
-    }
+    await c.env.DB.prepare(`
+      INSERT INTO async_tasks (id, user_id, task_type, status, input_data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(taskId, userId, 'lucky', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log('✅ Lucky items analysis completed successfully');
+    console.log(`🔮 Lucky Items task created for Cron processing: ${taskId}`);
+
     return c.json({
       success: true,
-      message: 'Lucky items analysis completed successfully',
+      message: 'Lucky items task created successfully',
       data: {
+        taskId: taskId,
+        status: 'pending',
         type: 'lucky',
-        analysis: luckyItems,
-        aiAnalysis: luckyItems, // 前端期望的字段名
-        analysisType: 'lucky',
-        timestamp: new Date().toISOString()
+        note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
 
@@ -2765,8 +2754,8 @@ Current Time: ${currentTime}
       console.log(`🤖 Model: ${this.model}`);
       console.log(`🔑 API Key: ${this.apiKey.substring(0, 10)}...`);
 
-      // 统一超时时间为300秒（5分钟）- 适应AI大模型2-5分钟的推理时间
-      const timeoutMs = 300000; // 统一5分钟超时，给AI推理充足时间
+      // 调整超时时间为25秒 - 在Cloudflare Workers 30秒限制内
+      const timeoutMs = 25000; // 25秒超时，适应Cloudflare Workers限制
       console.log(`⏱️ Timeout: ${timeoutMs/1000} seconds (unified 5-minute timeout for AI inference)`);
 
       const requestData = {
@@ -3151,7 +3140,7 @@ ${userProfile}
       { role: 'user', content: userMessage }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'bazi', 6000);
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'bazi', 3000);
   }
 
   // 每日运势（专业版）
@@ -3211,7 +3200,7 @@ ${userProfile}
       { role: 'user', content: userMessage }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default', 3000);
   }
 
   // 塔罗占卜（专业版）
@@ -3273,7 +3262,7 @@ ${userProfile}
       { role: 'user', content: userMessage }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default', 6000);
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default', 3000);
   }
 
   // 幸运物品（专业版）
@@ -3336,7 +3325,7 @@ ${userProfile}
       { role: 'user', content: userMessage }
     ];
 
-    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default');
+    return await this.callDeepSeekAPI(messages, 0.7, language, 0, 'default', 3000);
   }
 
   // 处理流式响应
@@ -3496,7 +3485,7 @@ async function sendTaskToQueue(env: any, taskId: string, taskType: string, user:
         const aiProcessor = env.AI_PROCESSOR.get(aiProcessorId);
 
         // 设置Durable Objects调用超时
-        const doTimeout = 300000; // 统一5分钟超时
+        const doTimeout = 25000; // 25秒超时，适应Cloudflare Workers限制
         const doController = new AbortController();
         const doTimeoutId = setTimeout(() => {
           console.log(`⏰ [${taskId}] Durable Objects timeout after ${doTimeout/1000}s`);
@@ -3775,9 +3764,9 @@ async function processAIWithSegmentation(env: any, taskId: string, taskType: str
     // 调用AI服务，给足够的时间完成推理
     console.log(`🔮 [${taskId}] Calling AI service (single call mode)...`);
 
-    // 单次调用，使用统一的300秒超时
+    // 单次调用，使用25秒超时适应Cloudflare Workers限制
     const aiCallPromise = callAIService(deepSeekService, taskType, user, language, question);
-    const asyncTimeoutMs = 300000; // 统一5分钟超时，给AI推理充足时间
+    const asyncTimeoutMs = 25000; // 25秒超时，适应Cloudflare Workers限制
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         console.log(`⏰ [${taskId}] AI call timeout after ${asyncTimeoutMs/1000} seconds`);
@@ -4264,61 +4253,75 @@ export default {
     }
   },
 
-  // 每2分钟自动检查并处理卡住的任务
+  // 每2分钟自动处理AI任务 - 优化为Cron触发器主要处理器
   async scheduled(event: ScheduledEvent, env: any, ctx: ExecutionContext) {
-    console.log('🕐 Scheduled task: Processing stuck tasks (every 2 minutes)...');
+    console.log('🕐 Cron Trigger: Processing AI tasks (every 2 minutes, 15-minute execution limit)...');
 
     try {
-      // 查找需要处理的任务：
-      // 1. 超过7分钟仍在processing状态的任务（5分钟AI超时+2分钟缓冲）
-      // 2. 超过60秒仍在pending状态的任务（可能异步处理没有启动）
-      // 3. 新增：检查AI可能已完成但结果未保存的任务
+      // 优先处理pending状态的AI任务（新任务）
+      const pendingTasks = await env.DB.prepare(`
+        SELECT id, user_id, task_type, input_data, created_at, updated_at, status
+        FROM async_tasks
+        WHERE status = 'pending'
+        AND task_type IN ('bazi', 'daily', 'tarot', 'lucky')
+        ORDER BY created_at ASC
+        LIMIT 20
+      `).all();
+
+      // 处理卡住的任务（备用恢复机制）
       const stuckTasks = await env.DB.prepare(`
         SELECT id, user_id, task_type, input_data, created_at, updated_at, status,
-               (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes,
-               (julianday('now') - julianday(updated_at)) * 24 * 60 as last_update_minutes
+               (julianday('now') - julianday(created_at)) * 24 * 60 as duration_minutes
         FROM async_tasks
         WHERE (
-          (status = 'processing' AND datetime(updated_at) < datetime('now', '-420 seconds'))
+          (status = 'processing' AND datetime(updated_at) < datetime('now', '-300 seconds'))
           OR
-          (status = 'pending' AND datetime(created_at) < datetime('now', '-60 seconds'))
-          OR
-          (status = 'processing' AND datetime(created_at) < datetime('now', '-180 seconds') AND result IS NULL)
+          (status = 'pending' AND datetime(created_at) < datetime('now', '-300 seconds'))
         )
+        AND task_type IN ('bazi', 'daily', 'tarot', 'lucky')
         ORDER BY created_at ASC
         LIMIT 10
       `).all();
 
-      if (!stuckTasks.results || stuckTasks.results.length === 0) {
-        console.log('✅ No stuck tasks found in scheduled check');
+      const allTasks = [
+        ...(pendingTasks.results || []),
+        ...(stuckTasks.results || [])
+      ];
+
+      if (allTasks.length === 0) {
+        console.log('✅ No AI tasks to process in Cron trigger');
         return;
       }
 
-      console.log(`🔧 Found ${stuckTasks.results.length} stuck tasks in scheduled check`);
+      console.log(`🔧 Cron Trigger: Found ${allTasks.length} AI tasks to process`);
       let processed = 0;
+      let failed = 0;
 
-      for (const task of stuckTasks.results) {
+      // 利用Cron触发器的15分钟执行时间限制，直接处理AI任务
+      for (const task of allTasks) {
         try {
-          console.log(`🔧 Scheduled processing of stuck task: ${task.id} (${task.status}, ${task.duration_minutes.toFixed(1)}min old)`);
+          const taskAge = task.duration_minutes || 0;
+          console.log(`🔧 Cron processing AI task: ${task.id} (${task.status}, ${taskAge.toFixed(1)}min old)`);
 
-          // 智能处理：根据任务年龄和状态决定处理方式
-          if (task.duration_minutes > 7) {
-            // 超过7分钟的任务直接标记为失败
-            console.log(`⏰ [${task.id}] Task too old (${task.duration_minutes.toFixed(1)}min), marking as failed`);
+          // 超过10分钟的任务标记为失败
+          if (taskAge > 10) {
+            console.log(`⏰ [${task.id}] Task too old (${taskAge.toFixed(1)}min), marking as failed`);
             await updateAsyncTaskStatus(env, task.id, 'failed', 'AI分析超时，请重新尝试');
-            processed++;
+            failed++;
             continue;
           }
 
-          // 获取用户信息
+          // 获取完整用户信息
           const user = await env.DB.prepare(`
-            SELECT id, name, birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_place
+            SELECT id, name, email, gender, birth_year, birth_month, birth_day,
+                   birth_hour, birth_minute, birth_place, timezone
             FROM users WHERE id = ?
           `).bind(task.user_id).first();
 
           if (!user) {
             console.error(`❌ User not found for task ${task.id}, marking as failed`);
             await updateAsyncTaskStatus(env, task.id, 'failed', 'User not found');
+            failed++;
             continue;
           }
 
@@ -4330,61 +4333,69 @@ export default {
             console.warn(`⚠️ Failed to parse input data for task ${task.id}`);
           }
 
-          // 对于3-7分钟的processing任务，尝试直接完成AI处理
-          if (task.status === 'processing' && task.duration_minutes > 3 && task.duration_minutes <= 7) {
-            console.log(`🔄 [${task.id}] Attempting direct AI completion for stuck processing task...`);
-
-            try {
-              // 直接调用AI处理，给25秒时间完成
-              const directProcessPromise = processAIWithSegmentation(
-                env,
-                task.id,
-                task.task_type,
-                user,
-                inputData.language || 'zh',
-                inputData.question
-              );
-
-              const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Direct processing timeout')), 25000);
-              });
-
-              await Promise.race([directProcessPromise, timeoutPromise]);
-              console.log(`✅ [${task.id}] Direct AI processing completed successfully`);
-              processed++;
-              continue;
-
-            } catch (directError) {
-              console.log(`⚠️ [${task.id}] Direct processing failed: ${directError.message}, will restart via queue`);
-            }
+          // 更新任务状态为处理中
+          if (task.status === 'pending') {
+            await updateAsyncTaskStatus(env, task.id, 'processing', 'Cron触发器正在处理AI分析...');
           }
 
-          // 使用队列重新处理任务
-          console.log(`🔄 [${task.id}] Restarting task via queue...`);
-          const taskPromise = sendTaskToQueue(
-            env,
-            task.id,
-            task.task_type,
-            user,
-            inputData.language || 'zh',
-            inputData.question
-          );
+          console.log(`🤖 [${task.id}] Starting AI processing in Cron trigger (15min limit)...`);
 
-          // 使用waitUntil确保任务启动
-          ctx.waitUntil(taskPromise);
+          try {
+            // 直接调用AI服务 - 利用Cron触发器的15分钟执行时间
+            const deepSeekService = new CloudflareDeepSeekService(env);
+            let result: string;
 
-          processed++;
-          console.log(`✅ Scheduled reprocessing started for task: ${task.id}`);
+            switch (task.task_type) {
+              case 'bazi':
+                result = await deepSeekService.getBaziAnalysis(user, inputData.language || 'zh');
+                break;
+              case 'daily':
+                result = await deepSeekService.getDailyFortune(user, inputData.language || 'zh');
+                break;
+              case 'tarot':
+                result = await deepSeekService.getCelestialTarotReading(user, inputData.question || '', inputData.language || 'zh');
+                break;
+              case 'lucky':
+                result = await deepSeekService.getLuckyItems(user, inputData.language || 'zh');
+                break;
+              default:
+                throw new Error(`Unknown task type: ${task.task_type}`);
+            }
+
+            // 验证AI结果
+            if (!result || result.length < 50) {
+              throw new Error('AI analysis returned empty or insufficient content');
+            }
+
+            // 保存AI分析结果
+            const completedAt = new Date().toISOString();
+            await env.DB.prepare(`
+              UPDATE async_tasks
+              SET status = 'completed', result = ?, completed_at = ?, updated_at = ?
+              WHERE id = ?
+            `).bind(result, completedAt, completedAt, task.id).run();
+
+            console.log(`✅ [${task.id}] AI processing completed successfully in Cron trigger`);
+            processed++;
+
+          } catch (aiError) {
+            console.error(`❌ [${task.id}] AI processing failed in Cron trigger:`, aiError);
+
+            // 标记任务为失败
+            await updateAsyncTaskStatus(env, task.id, 'failed', `AI分析失败: ${aiError.message}`);
+            failed++;
+          }
 
         } catch (error) {
-          console.error(`❌ Failed to reprocess task ${task.id} in scheduled event:`, error);
+          console.error(`❌ Failed to process task ${task.id} in Cron trigger:`, error);
+          failed++;
         }
       }
 
-      console.log(`🎉 Scheduled task completed: Started reprocessing ${processed} stuck tasks (runs every 2 minutes)`);
+      console.log(`🎉 Cron Trigger completed: Processed ${processed} tasks, Failed ${failed} tasks (runs every 2 minutes)`);
 
     } catch (error) {
-      console.error('❌ Scheduled task error:', error);
+      console.error('❌ Cron Trigger error:', error);
     }
   }
 };
