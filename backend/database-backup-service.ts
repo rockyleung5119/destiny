@@ -79,37 +79,21 @@ export class DatabaseBackupService {
     
     for (const tableName of tables) {
       console.log(`📊 Backing up table: ${tableName}`);
-
-      // 获取表结构（轻量级操作）
+      
+      // 获取表结构
       const schema = await this.getTableSchema(tableName);
       sqlBackup += `-- Table: ${tableName}\n`;
       sqlBackup += `${schema}\n\n`;
-
-      // 获取表数据（分批处理，性能友好）
+      
+      // 获取表数据
       const data = await this.getTableData(tableName);
       if (data.length > 0) {
         sqlBackup += `-- Data for table: ${tableName}\n`;
-
-        // 分批生成INSERT语句，避免内存峰值
-        const insertBatchSize = 100;
-        for (let i = 0; i < data.length; i += insertBatchSize) {
-          const batch = data.slice(i, i + insertBatchSize);
-          for (const row of batch) {
-            const insertSQL = this.generateInsertSQL(tableName, row);
-            sqlBackup += `${insertSQL}\n`;
-          }
-
-          // 在批次之间添加微小延迟，确保不阻塞其他操作
-          if (i + insertBatchSize < data.length) {
-            await this.sleep(5); // 5ms延迟
-          }
+        for (const row of data) {
+          const insertSQL = this.generateInsertSQL(tableName, row);
+          sqlBackup += `${insertSQL}\n`;
         }
         sqlBackup += `\n`;
-      }
-
-      // 表之间添加延迟，让数据库有时间处理其他请求
-      if (tables.indexOf(tableName) < tables.length - 1) {
-        await this.sleep(50); // 50ms延迟
       }
     }
     
@@ -152,49 +136,16 @@ export class DatabaseBackupService {
   }
 
   /**
-   * 获取表数据（分批处理，减少内存占用和锁定时间）
+   * 获取表数据
    */
   private async getTableData(tableName: string): Promise<any[]> {
     try {
-      // 分批读取，每次最多1000条记录，减少对数据库的影响
-      const batchSize = 1000;
-      let offset = 0;
-      let allData: any[] = [];
-      let hasMore = true;
-
-      while (hasMore) {
-        const result = await this.env.DB.prepare(`
-          SELECT * FROM ${tableName}
-          LIMIT ${batchSize} OFFSET ${offset}
-        `).all();
-
-        const batchData = result.results || [];
-        allData = allData.concat(batchData);
-
-        // 如果返回的记录数少于批次大小，说明已经读完
-        hasMore = batchData.length === batchSize;
-        offset += batchSize;
-
-        // 在批次之间添加小延迟，让其他操作有机会执行
-        if (hasMore && batchData.length > 0) {
-          await this.sleep(10); // 10ms延迟
-        }
-
-        console.log(`📊 Backed up ${allData.length} records from ${tableName}`);
-      }
-
-      return allData;
+      const result = await this.env.DB.prepare(`SELECT * FROM ${tableName}`).all();
+      return result.results || [];
     } catch (error) {
       console.error(`Failed to get data for table ${tableName}:`, error);
       return [];
     }
-  }
-
-  /**
-   * 睡眠函数，用于在批次处理之间添加延迟
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
