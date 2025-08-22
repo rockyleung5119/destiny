@@ -33,14 +33,14 @@ echo "info@info.indicate.top" | wrangler secret put RESEND_FROM_EMAIL
 Write-Host "Setting RESEND_FROM_NAME..." -ForegroundColor Yellow
 echo "indicate.top" | wrangler secret put RESEND_FROM_NAME
 
-Write-Host "Setting STRIPE_PUBLISHABLE_KEY..." -ForegroundColor Yellow
-echo "sk_test_your_stripe_secret_key_here" | wrangler secret put STRIPE_PUBLISHABLE_KEY
-
 Write-Host "Setting STRIPE_SECRET_KEY..." -ForegroundColor Yellow
-echo "pk_test_your_stripe_publishable_key_here" | wrangler secret put STRIPE_SECRET_KEY
+echo "sk_test_51RySLYBb9puAdbwB81Y1L0zQ3XB5AG4yCxJNvGhub5tJzfbCqRGGjtnOzhii5HJ4FOsuQRcvhAG97GwBNjW6ONOw00hrmdAdQ5" | wrangler secret put STRIPE_SECRET_KEY
+
+Write-Host "Setting STRIPE_PUBLISHABLE_KEY..." -ForegroundColor Yellow
+echo "pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um" | wrangler secret put STRIPE_PUBLISHABLE_KEY
 
 Write-Host "Setting STRIPE_WEBHOOK_SECRET..." -ForegroundColor Yellow
-echo "whsec_your_webhook_secret_here" | wrangler secret put STRIPE_WEBHOOK_SECRET
+echo "whsec_test_placeholder" | wrangler secret put STRIPE_WEBHOOK_SECRET
 
 Write-Host "Setting EMAIL_SERVICE..." -ForegroundColor Yellow
 echo "resend" | wrangler secret put EMAIL_SERVICE

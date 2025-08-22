@@ -14,10 +14,15 @@ export default {
     process.env.EMAIL_SERVICE = env.EMAIL_SERVICE;
     process.env.FRONTEND_URL = env.FRONTEND_URL;
     process.env.CORS_ORIGIN = env.CORS_ORIGIN;
-    
+
+    // Stripe支付配置
+    process.env.STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
+    process.env.STRIPE_PUBLISHABLE_KEY = env.STRIPE_PUBLISHABLE_KEY;
+    process.env.STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET;
+
     // 绑定D1数据库
     global.DB = env.DB;
-    
+
     return app.fetch(request, env, ctx);
   }
 };
