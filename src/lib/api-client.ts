@@ -45,7 +45,7 @@ class ApiClient {
   constructor() {
     // 在浏览器环境中，根据环境使用不同的API地址
     this.baseUrl = import.meta.env.VITE_API_BASE_URL ||
-      (import.meta.env.PROD ? 'https://destiny-backend.jerryliang5119.workers.dev' : 'http://localhost:3001');
+      (import.meta.env.PROD ? 'https://api.indicate.top' : 'http://localhost:3001');
   }
 
   async performAnalysis(request: AnalysisRequest): Promise<AnalysisResponse> {
