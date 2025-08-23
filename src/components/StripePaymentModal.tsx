@@ -9,21 +9,35 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { stripeAPI } from '../services/api';
 
-// 获取Stripe公钥
+// 懒加载诊断组件
+const StripeConfigDiagnostic = React.lazy(() => import('./StripeConfigDiagnostic'));
+
+// 获取Stripe公钥 - 支持多种环境变量格式
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
-                 import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+                 import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
+                 // 生产环境备用密钥
+                 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um';
 
 console.log('🔑 StripePaymentModal Key Check:', {
   stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
   length: stripeKey?.length || 0,
-  startsWithPk: stripeKey?.startsWith('pk_') || false
+  startsWithPk: stripeKey?.startsWith('pk_') || false,
+  environment: import.meta.env.MODE || 'unknown',
+  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
+  reactKey: import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing'
 });
 
-// 检查支付功能是否启用
+// 检查支付功能是否启用 - 更宽松的检测逻辑
+const invalidKeys = [
+  'pk_test_placeholder',
+  'your-stripe-publishable-key-here',
+  'sk_test_REPLACE_WITH_YOUR_STRIPE_SECRET_KEY'
+];
+
 const isPaymentEnabled = stripeKey &&
   stripeKey.length > 20 &&
   stripeKey.startsWith('pk_') &&
-  stripeKey !== 'pk_test_placeholder';
+  !invalidKeys.includes(stripeKey);
 
 // 初始化Stripe - 添加错误处理
 const stripePromise = isPaymentEnabled && stripeKey
@@ -258,26 +272,56 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onSuccess, onCancel }
 
 const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSuccess, onCancel }) => {
   const [stripeError, setStripeError] = useState<string | null>(null);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
 
   // 检查支付功能是否启用和Stripe是否可用
   React.useEffect(() => {
+    console.log('🔍 Stripe Payment Modal - Initialization Check:', {
+      isPaymentEnabled,
+      stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
+      keyLength: stripeKey?.length || 0,
+      startsWithPk: stripeKey?.startsWith('pk_') || false,
+      environment: import.meta.env.MODE || 'unknown'
+    });
+
     if (!isPaymentEnabled) {
-      console.error('Payment not enabled:', {
+      const errorDetails = {
         stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
         length: stripeKey?.length || 0,
-        startsWithPk: stripeKey?.startsWith('pk_') || false
-      });
-      setStripeError('支付功能暂时不可用。请检查Stripe配置或联系客服获取帮助。');
+        startsWithPk: stripeKey?.startsWith('pk_') || false,
+        viteEnv: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
+        reactEnv: import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing'
+      };
+
+      console.error('❌ Payment not enabled:', errorDetails);
+
+      // 提供更详细的错误信息
+      let errorMessage = '支付功能暂时不可用。';
+      if (!stripeKey) {
+        errorMessage += ' 原因：未找到Stripe公钥配置。';
+      } else if (!stripeKey.startsWith('pk_')) {
+        errorMessage += ' 原因：Stripe密钥格式无效。';
+      } else if (stripeKey.length <= 20) {
+        errorMessage += ' 原因：Stripe密钥长度不足。';
+      } else {
+        errorMessage += ' 原因：Stripe密钥可能是占位符。';
+      }
+      errorMessage += ' 请联系客服获取帮助。';
+
+      setStripeError(errorMessage);
       return;
     }
 
+    // 测试Stripe初始化
     stripePromise.then(stripe => {
       if (!stripe) {
-        console.error('Stripe initialization failed');
+        console.error('❌ Stripe initialization failed');
         setStripeError('Stripe服务初始化失败，请刷新页面重试或联系客服。');
+      } else {
+        console.log('✅ Stripe initialized successfully');
       }
     }).catch(error => {
-      console.error('Stripe promise error:', error);
+      console.error('❌ Stripe promise error:', error);
       setStripeError(`支付服务初始化失败：${error.message || '未知错误'}`);
     });
   }, []);
@@ -308,25 +352,48 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
             支付功能暂时不可用
           </h2>
           <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280' }}>
-            请稍后再试或联系客服获取帮助
+            {stripeError || '请稍后再试或联系客服获取帮助'}
           </p>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: 'pointer',
-              fontSize: '1rem'
-            }}
-          >
-            关闭
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+            <button
+              onClick={() => setShowDiagnostic(true)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              诊断问题
+            </button>
+            <button
+              onClick={onCancel}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              关闭
+            </button>
+          </div>
         </div>
       </div>
-    );
+
+      {/* 诊断工具 */}
+      {showDiagnostic && (
+        <React.Suspense fallback={<div>加载诊断工具...</div>}>
+          <StripeConfigDiagnostic />
+        </React.Suspense>
+      )}
+    </>;
   }
 
   return (
