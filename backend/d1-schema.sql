@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   timezone TEXT DEFAULT 'Asia/Shanghai',
   is_email_verified INTEGER DEFAULT 0,
   profile_updated_count INTEGER DEFAULT 0,
+  stripe_customer_id TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -28,6 +29,8 @@ CREATE TABLE IF NOT EXISTS memberships (
   is_active INTEGER DEFAULT 1,
   expires_at TEXT,
   remaining_credits INTEGER,
+  stripe_subscription_id TEXT,
+  stripe_customer_id TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE

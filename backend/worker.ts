@@ -74,7 +74,317 @@ type Env = {
     NODE_ENV: string;
     STRIPE_SECRET_KEY: string;
     STRIPE_PUBLISHABLE_KEY: string;
+    STRIPE_WEBHOOK_SECRET: string;
   }
+}
+
+// Stripe订阅计划配置
+const SUBSCRIPTION_PLANS = {
+  single: {
+    name: 'Single Reading',
+    price: 1.99,
+    type: 'one_time'
+  },
+  monthly: {
+    name: 'Monthly Plan',
+    price: 19.9,
+    type: 'subscription',
+    interval: 'month'
+  },
+  yearly: {
+    name: 'Yearly Plan',
+    price: 188,
+    type: 'subscription',
+    interval: 'year'
+  }
+};
+
+// Cloudflare Workers Stripe服务类
+class CloudflareStripeService {
+  private env: any;
+  private stripe: any;
+
+  constructor(env: any) {
+    this.env = env;
+  }
+
+  private async getStripeClient() {
+    if (!this.stripe) {
+      // 动态导入Stripe
+      const { default: Stripe } = await import('stripe');
+      this.stripe = new Stripe(this.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2024-06-20',
+      });
+    }
+    return this.stripe;
+  }
+
+  async createSubscription(request: {
+    userId: string;
+    planId: string;
+    paymentMethodId: string;
+    customerEmail: string;
+    customerName: string;
+  }) {
+    const stripe = await this.getStripeClient();
+    const plan = SUBSCRIPTION_PLANS[request.planId];
+
+    if (!plan) {
+      throw new Error(`Invalid plan: ${request.planId}`);
+    }
+
+    try {
+      // 创建或获取客户
+      const customer = await this.createOrGetCustomer(
+        request.userId,
+        request.customerEmail,
+        request.customerName
+      );
+
+      // 为一次性付费创建支付意图
+      if (plan.type === 'one_time') {
+        return this.createOneTimePayment(customer.id, request.userId, request.paymentMethodId, plan);
+      }
+
+      // 创建订阅
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: plan.name,
+              description: `${plan.name} subscription plan`
+            },
+            unit_amount: Math.round(plan.price * 100),
+            recurring: {
+              interval: plan.interval
+            }
+          }
+        }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: {
+          save_default_payment_method: 'on_subscription'
+        },
+        expand: ['latest_invoice.payment_intent'],
+        metadata: {
+          userId: request.userId,
+          planId: request.planId
+        }
+      });
+
+      const invoice = subscription.latest_invoice;
+      const paymentIntent = invoice.payment_intent;
+
+      return {
+        subscriptionId: subscription.id,
+        clientSecret: paymentIntent.client_secret,
+        status: paymentIntent.status
+      };
+
+    } catch (error) {
+      console.error('Failed to create subscription', error);
+      return {
+        status: 'failed',
+        error: error.message || 'Unknown error'
+      };
+    }
+  }
+
+  private async createOrGetCustomer(userId: string, email: string, name: string) {
+    const stripe = await this.getStripeClient();
+
+    // 尝试从数据库获取现有的Stripe客户ID
+    const user = await this.env.DB.prepare(
+      'SELECT stripe_customer_id FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (user?.stripe_customer_id) {
+      try {
+        const customer = await stripe.customers.retrieve(user.stripe_customer_id);
+        if (!customer.deleted) {
+          return customer;
+        }
+      } catch (error) {
+        console.log('Existing customer not found, creating new one');
+      }
+    }
+
+    // 创建新客户
+    const customer = await stripe.customers.create({
+      email,
+      name,
+      metadata: {
+        userId
+      }
+    });
+
+    // 更新用户记录
+    await this.env.DB.prepare(
+      'UPDATE users SET stripe_customer_id = ? WHERE id = ?'
+    ).bind(customer.id, userId).run();
+
+    return customer;
+  }
+
+  private async createOneTimePayment(customerId: string, userId: string, paymentMethodId: string, plan: any) {
+    const stripe = await this.getStripeClient();
+
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(plan.price * 100),
+        currency: 'usd',
+        customer: customerId,
+        payment_method: paymentMethodId,
+        confirmation_method: 'manual',
+        confirm: true,
+        return_url: `${this.env.FRONTEND_URL || 'https://destiny-frontend.pages.dev'}/subscription/success`,
+        metadata: {
+          userId,
+          planId: 'single'
+        }
+      });
+
+      return {
+        clientSecret: paymentIntent.client_secret,
+        status: paymentIntent.status
+      };
+
+    } catch (error) {
+      console.error('Failed to create one-time payment', error);
+      return {
+        status: 'failed',
+        error: error.message || 'Unknown error'
+      };
+    }
+  }
+
+  async handleWebhook(body: string, signature: string) {
+    const stripe = await this.getStripeClient();
+    const webhookSecret = this.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      throw new Error('Stripe webhook secret not configured');
+    }
+
+    try {
+      const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+
+      switch (event.type) {
+        case 'invoice.payment_succeeded':
+          await this.handlePaymentSucceeded(event.data.object);
+          break;
+
+        case 'invoice.payment_failed':
+          await this.handlePaymentFailed(event.data.object);
+          break;
+
+        case 'customer.subscription.deleted':
+          await this.handleSubscriptionDeleted(event.data.object);
+          break;
+
+        case 'payment_intent.succeeded':
+          await this.handleOneTimePaymentSucceeded(event.data.object);
+          break;
+
+        default:
+          console.log('Unhandled webhook event', { type: event.type });
+      }
+
+    } catch (error) {
+      console.error('Webhook handling failed', error);
+      throw error;
+    }
+  }
+
+  private async handlePaymentSucceeded(invoice: any) {
+    const subscriptionId = invoice.subscription;
+    const customerId = invoice.customer;
+
+    if (subscriptionId) {
+      const stripe = await this.getStripeClient();
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const userId = subscription.metadata.userId;
+      const planId = subscription.metadata.planId;
+
+      if (userId && planId) {
+        await updateUserMembership(this.env.DB, parseInt(userId), planId, subscriptionId);
+      }
+    }
+  }
+
+  private async handlePaymentFailed(invoice: any) {
+    console.log('Payment failed for invoice:', invoice.id);
+    // 可以在这里添加失败处理逻辑
+  }
+
+  private async handleSubscriptionDeleted(subscription: any) {
+    const userId = subscription.metadata.userId;
+
+    if (userId) {
+      await this.env.DB.prepare(`
+        UPDATE memberships
+        SET is_active = 0, updated_at = ?
+        WHERE user_id = ? AND stripe_subscription_id = ?
+      `).bind(
+        new Date().toISOString(),
+        userId,
+        subscription.id
+      ).run();
+    }
+  }
+
+  private async handleOneTimePaymentSucceeded(paymentIntent: any) {
+    const userId = paymentIntent.metadata.userId;
+    const planId = paymentIntent.metadata.planId;
+
+    if (userId && planId) {
+      await updateUserMembership(this.env.DB, parseInt(userId), planId, null);
+    }
+  }
+
+  async cancelSubscription(subscriptionId: string) {
+    const stripe = await this.getStripeClient();
+    return await stripe.subscriptions.cancel(subscriptionId);
+  }
+}
+
+// 更新用户会员状态的辅助函数
+async function updateUserMembership(db: D1Database, userId: number, planId: string, subscriptionId?: string) {
+  const now = new Date();
+  let expiresAt: Date;
+
+  // 根据计划类型设置过期时间
+  switch (planId) {
+    case 'single':
+      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24小时
+      break;
+    case 'monthly':
+      expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30天
+      break;
+    case 'yearly':
+      expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 365天
+      break;
+    default:
+      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 默认24小时
+  }
+
+  // 插入或更新会员记录
+  await db.prepare(`
+    INSERT OR REPLACE INTO memberships (
+      user_id, plan_id, is_active, expires_at, stripe_subscription_id,
+      remaining_credits, created_at, updated_at
+    ) VALUES (?, ?, 1, ?, ?, 1000, ?, ?)
+  `).bind(
+    userId,
+    planId,
+    expiresAt.toISOString(),
+    subscriptionId || null,
+    now.toISOString(),
+    now.toISOString()
+  ).run();
+
+  console.log(`✅ Updated membership for user ${userId}: ${planId} until ${expiresAt.toISOString()}`);
 }
 
 // 使用类型别名创建Hono应用实例
@@ -1229,6 +1539,208 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   } catch (error) {
     console.error('Membership status error:', error);
     return c.json({ success: false, message: 'Failed to get membership status' }, 500);
+  }
+});
+
+// Stripe支付API端点
+app.post('/api/stripe/create-payment', jwtMiddleware, async (c) => {
+  try {
+    console.log('💳 Creating Stripe payment...');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    const { planId, paymentMethodId, customerEmail, customerName } = await c.req.json();
+
+    if (!planId || !paymentMethodId || !customerEmail || !customerName) {
+      return c.json({
+        success: false,
+        message: 'Missing required payment data'
+      }, 400);
+    }
+
+    // 验证计划ID
+    const validPlans = ['single', 'monthly', 'yearly'];
+    if (!validPlans.includes(planId)) {
+      return c.json({
+        success: false,
+        message: 'Invalid plan ID'
+      }, 400);
+    }
+
+    // 检查Stripe环境变量
+    if (!c.env.STRIPE_SECRET_KEY) {
+      console.error('❌ Stripe secret key not configured');
+      return c.json({
+        success: false,
+        message: 'Payment system not configured'
+      }, 500);
+    }
+
+    // 创建Stripe支付
+    const stripeService = new CloudflareStripeService(c.env);
+    const result = await stripeService.createSubscription({
+      userId: userId.toString(),
+      planId,
+      paymentMethodId,
+      customerEmail,
+      customerName
+    });
+
+    if (result.status === 'succeeded') {
+      // 支付成功，更新用户会员状态
+      await updateUserMembership(c.env.DB, userId, planId, result.subscriptionId);
+
+      return c.json({
+        success: true,
+        message: 'Payment successful',
+        subscriptionId: result.subscriptionId
+      });
+    } else if (result.status === 'requires_confirmation') {
+      // 需要客户端确认
+      return c.json({
+        success: true,
+        requiresConfirmation: true,
+        clientSecret: result.clientSecret,
+        subscriptionId: result.subscriptionId
+      });
+    } else {
+      // 支付失败
+      return c.json({
+        success: false,
+        error: result.error || 'Payment failed'
+      }, 400);
+    }
+  } catch (error) {
+    console.error('❌ Payment creation error:', error);
+    return c.json({
+      success: false,
+      error: error.message || 'Internal server error'
+    }, 500);
+  }
+});
+
+// Stripe Webhook处理
+app.post('/api/stripe/webhook', async (c) => {
+  try {
+    const signature = c.req.header('stripe-signature');
+    const body = await c.req.text();
+
+    if (!signature) {
+      return c.json({ error: 'Missing signature' }, 400);
+    }
+
+    if (!c.env.STRIPE_WEBHOOK_SECRET) {
+      console.error('❌ Stripe webhook secret not configured');
+      return c.json({ error: 'Webhook not configured' }, 500);
+    }
+
+    const stripeService = new CloudflareStripeService(c.env);
+    await stripeService.handleWebhook(body, signature);
+
+    return c.json({ received: true });
+  } catch (error) {
+    console.error('❌ Webhook error:', error);
+    return c.json({ error: 'Webhook handling failed' }, 400);
+  }
+});
+
+// 获取订阅状态
+app.get('/api/stripe/subscription-status', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    // 从数据库获取用户的订阅信息
+    const subscription = await c.env.DB.prepare(`
+      SELECT plan_id, is_active, expires_at, stripe_subscription_id, created_at
+      FROM memberships
+      WHERE user_id = ? AND is_active = 1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(userId).first();
+
+    if (!subscription) {
+      return c.json({
+        success: true,
+        data: {
+          hasSubscription: false,
+          planId: null,
+          isActive: false,
+          expiresAt: null
+        }
+      });
+    }
+
+    // 检查订阅是否过期
+    const now = new Date();
+    const expiresAt = new Date(subscription.expires_at);
+    const isActive = subscription.is_active && expiresAt > now;
+
+    return c.json({
+      success: true,
+      data: {
+        hasSubscription: true,
+        planId: subscription.plan_id,
+        isActive: isActive,
+        expiresAt: subscription.expires_at,
+        subscriptionId: subscription.stripe_subscription_id
+      }
+    });
+  } catch (error) {
+    console.error('❌ Subscription status error:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+});
+
+// 取消订阅
+app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
+  try {
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    // 获取用户的活跃订阅
+    const subscription = await c.env.DB.prepare(`
+      SELECT stripe_subscription_id, plan_id
+      FROM memberships
+      WHERE user_id = ? AND is_active = 1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(userId).first();
+
+    if (!subscription || !subscription.stripe_subscription_id) {
+      return c.json({
+        success: false,
+        message: 'No active subscription found'
+      }, 404);
+    }
+
+    const stripeService = new CloudflareStripeService(c.env);
+    await stripeService.cancelSubscription(subscription.stripe_subscription_id);
+
+    // 更新数据库中的订阅状态
+    await c.env.DB.prepare(`
+      UPDATE memberships
+      SET is_active = 0, updated_at = ?
+      WHERE user_id = ? AND stripe_subscription_id = ?
+    `).bind(
+      new Date().toISOString(),
+      userId,
+      subscription.stripe_subscription_id
+    ).run();
+
+    return c.json({
+      success: true,
+      message: 'Subscription cancelled successfully'
+    });
+  } catch (error) {
+    console.error('❌ Cancel subscription error:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
   }
 });
 
