@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { jwt } from 'hono/jwt';
-import { DatabaseBackupService } from './database-backup-service';
+// import { DatabaseBackupService } from './database-backup-service';
 import bcrypt from 'bcryptjs';
 import { HTTPException } from 'hono/http-exception';
 
@@ -1131,6 +1131,8 @@ app.post('/api/auth/register', async (c) => {
       timezone
     } = requestBody;
 
+    console.log('🔍 Extracted timezone from request:', timezone);
+
     if (!email || !password || !name) {
       console.log('❌ Missing required fields');
       return c.json({ success: false, message: 'Missing required fields' }, 400);
@@ -1155,6 +1157,18 @@ app.post('/api/auth/register', async (c) => {
     const hashedPassword = await hashPassword(password);
 
     console.log('💾 Creating new user with profile data...');
+    console.log('🔍 Profile data to be saved:', {
+      email,
+      name,
+      gender,
+      birth_year,
+      birth_month,
+      birth_day,
+      birth_hour,
+      birth_minute,
+      birth_place,
+      timezone: timezone || 'Asia/Shanghai (default)'
+    });
     const currentTime = new Date().toISOString();
 
     // 构建插入语句，包含所有个人资料字段

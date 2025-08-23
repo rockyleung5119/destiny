@@ -34,7 +34,7 @@ function checkEnvVariable(envContent, varName, description) {
   const match = envContent.match(regex);
   
   if (match && match[1] && match[1].trim() !== '') {
-    const value = match[1].trim();
+    let value = match[1].trim();
     if (value.startsWith('"') && value.endsWith('"')) {
       value = value.slice(1, -1);
     }
