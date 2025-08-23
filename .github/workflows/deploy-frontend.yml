@@ -7,18 +7,18 @@ on:
   push:
     branches:
       - main
-    paths:
-      # 监控所有前端相关的文件和目录
-      - 'src/**'
-      - 'public/**'
-      - 'index.html'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.ts'
-      - 'tsconfig.json'
-      - '.env'
-      - '.env.production'
-      - '.github/workflows/deploy-frontend.yml'
+    # 暂时移除路径过滤，确保工作流能被触发
+    # paths:
+    #   - 'src/**'
+    #   - 'public/**'
+    #   - 'index.html'
+    #   - 'package.json'
+    #   - 'package-lock.json'
+    #   - 'vite.config.ts'
+    #   - 'tsconfig.json'
+    #   - '.env'
+    #   - '.env.production'
+    #   - '.github/workflows/deploy-frontend.yml'
 
   # 允许您在 GitHub Actions 页面手动触发此工作流
   workflow_dispatch:
@@ -56,8 +56,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 注意这里的命令是 pages deploy
-          command: pages deploy dist --project-name=destiny-frontend --compatibility-date=2024-08-01
+          # 简化命令，移除可能不支持的参数
+          command: pages deploy dist --project-name=destiny-frontend
 
       - name: Verify Frontend Deployment
         run: |
