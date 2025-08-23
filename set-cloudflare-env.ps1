@@ -10,7 +10,7 @@ Write-Host "Setting CORS_ORIGIN..." -ForegroundColor Yellow
 echo "https://destiny-frontend.pages.dev" | wrangler secret put CORS_ORIGIN
 
 Write-Host "Setting DEEPSEEK_API_KEY..." -ForegroundColor Yellow
-echo "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn" | wrangler secret put DEEPSEEK_API_KEY
+echo "YOUR_DEEPSEEK_API_KEY_HERE" | wrangler secret put DEEPSEEK_API_KEY
 
 Write-Host "Setting DEEPSEEK_BASE_URL..." -ForegroundColor Yellow
 echo "https://api.siliconflow.cn/v1/chat/completions" | wrangler secret put DEEPSEEK_BASE_URL
@@ -22,10 +22,10 @@ Write-Host "Setting FRONTEND_URL..." -ForegroundColor Yellow
 echo "https://destiny-frontend.pages.dev" | wrangler secret put FRONTEND_URL
 
 Write-Host "Setting JWT_SECRET..." -ForegroundColor Yellow
-echo "wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA" | wrangler secret put JWT_SECRET
+echo "YOUR_JWT_SECRET_HERE" | wrangler secret put JWT_SECRET
 
 Write-Host "Setting RESEND_API_KEY..." -ForegroundColor Yellow
-echo "re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP" | wrangler secret put RESEND_API_KEY
+echo "YOUR_RESEND_API_KEY_HERE" | wrangler secret put RESEND_API_KEY
 
 Write-Host "Setting RESEND_FROM_EMAIL..." -ForegroundColor Yellow
 echo "info@info.indicate.top" | wrangler secret put RESEND_FROM_EMAIL
@@ -34,10 +34,10 @@ Write-Host "Setting RESEND_FROM_NAME..." -ForegroundColor Yellow
 echo "indicate.top" | wrangler secret put RESEND_FROM_NAME
 
 Write-Host "Setting STRIPE_SECRET_KEY..." -ForegroundColor Yellow
-echo "sk_test_51RySLYBb9puAdbwB81Y1L0zQ3XB5AG4yCxJNvGhub5tJzfbCqRGGjtnOzhii5HJ4FOsuQRcvhAG97GwBNjW6ONOw00hrmdAdQ5" | wrangler secret put STRIPE_SECRET_KEY
+echo "YOUR_STRIPE_SECRET_KEY_HERE" | wrangler secret put STRIPE_SECRET_KEY
 
 Write-Host "Setting STRIPE_PUBLISHABLE_KEY..." -ForegroundColor Yellow
-echo "pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um" | wrangler secret put STRIPE_PUBLISHABLE_KEY
+echo "YOUR_STRIPE_PUBLISHABLE_KEY_HERE" | wrangler secret put STRIPE_PUBLISHABLE_KEY
 
 Write-Host "Setting STRIPE_WEBHOOK_SECRET..." -ForegroundColor Yellow
 echo "whsec_test_placeholder" | wrangler secret put STRIPE_WEBHOOK_SECRET

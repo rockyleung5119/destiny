@@ -11,6 +11,14 @@ lerna-debug.log*
 .env
 .env*.local
 .dev.vars
+.env.production.local
+.env.development.local
+
+# Sensitive configuration files
+**/secrets.json
+**/config.production.json
+**/*-secrets.*
+**/*-keys.*
 
 # Node modules
 node_modules
@@ -45,3 +53,11 @@ backend/node_modules
 backend/.wrangler
 backend/database.db
 backend/.dev.vars
+backend/.env.production.local
+backend/.env.development.local
+
+# Test files with sensitive data
+test-*-config.*
+*-test.html
+stripe-test.*
+test-stripe-*

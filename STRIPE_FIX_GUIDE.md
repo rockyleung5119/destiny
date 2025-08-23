@@ -19,11 +19,13 @@
 - 更新了 `.env.production` 文件中的Stripe公钥
 - 确保前端使用正确的测试密钥
 
-### 2. 使用的Stripe密钥
+### 2. Stripe密钥配置
+
+⚠️ **安全提醒**: 请使用您自己的Stripe密钥，不要使用示例中的密钥。
 
 ```
-Secret Key: sk_test_51RySLYBb9puAdbwB81Y1L0zQ3XB5AG4yCxJNvGhub5tJzfbCqRGGjtnOzhii5HJ4FOsuQRcvhAG97GwBNjW6ONOw00hrmdAdQ5
-Publishable Key: pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um
+Secret Key: 您的Stripe密钥 (sk_test_... 或 sk_live_...)
+Publishable Key: 您的Stripe公钥 (pk_test_... 或 pk_live_...)
 ```
 
 ## 部署步骤
@@ -36,13 +38,13 @@ Publishable Key: pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAs
 .\set-stripe-env.ps1
 ```
 
-或者手动设置：
+或者手动设置（请替换为您的真实密钥）：
 
 ```powershell
 cd backend
-echo "sk_test_51RySLYBb9puAdbwB81Y1L0zQ3XB5AG4yCxJNvGhub5tJzfbCqRGGjtnOzhii5HJ4FOsuQRcvhAG97GwBNjW6ONOw00hrmdAdQ5" | wrangler secret put STRIPE_SECRET_KEY
-echo "pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um" | wrangler secret put STRIPE_PUBLISHABLE_KEY
-echo "whsec_test_placeholder" | wrangler secret put STRIPE_WEBHOOK_SECRET
+echo "您的Stripe密钥" | wrangler secret put STRIPE_SECRET_KEY
+echo "您的Stripe公钥" | wrangler secret put STRIPE_PUBLISHABLE_KEY
+echo "您的Stripe Webhook密钥" | wrangler secret put STRIPE_WEBHOOK_SECRET
 ```
 
 ### 步骤2: 部署后端
@@ -54,11 +56,11 @@ wrangler deploy
 
 ### 步骤3: 设置前端环境变量
 
-在Cloudflare Pages项目设置中添加以下环境变量：
+在Cloudflare Pages项目设置中添加以下环境变量（请替换为您的真实公钥）：
 
 ```
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um
-REACT_APP_STRIPE_PUBLISHABLE_KEY=pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um
+VITE_STRIPE_PUBLISHABLE_KEY=您的Stripe公钥
+REACT_APP_STRIPE_PUBLISHABLE_KEY=您的Stripe公钥
 ENABLE_PAYMENTS=true
 ```
 

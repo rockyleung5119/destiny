@@ -14,19 +14,19 @@ Write-Host ""
 
 # 设置机密变量（敏感信息）
 Write-Host "🔑 Setting DEEPSEEK_API_KEY..." -ForegroundColor Cyan
-echo "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn" | wrangler secret put DEEPSEEK_API_KEY
+echo "YOUR_DEEPSEEK_API_KEY_HERE" | wrangler secret put DEEPSEEK_API_KEY
 
 Write-Host "🔑 Setting JWT_SECRET..." -ForegroundColor Cyan
-echo "wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA" | wrangler secret put JWT_SECRET
+echo "YOUR_JWT_SECRET_HERE" | wrangler secret put JWT_SECRET
 
 Write-Host "📧 Setting RESEND_API_KEY..." -ForegroundColor Cyan
-echo "re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP" | wrangler secret put RESEND_API_KEY
+echo "YOUR_RESEND_API_KEY_HERE" | wrangler secret put RESEND_API_KEY
 
 Write-Host "💳 Setting STRIPE_SECRET_KEY..." -ForegroundColor Cyan
-echo "sk_test_your_stripe_secret_key_here" | wrangler secret put STRIPE_SECRET_KEY
+echo "YOUR_STRIPE_SECRET_KEY_HERE" | wrangler secret put STRIPE_SECRET_KEY
 
 Write-Host "💳 Setting STRIPE_PUBLISHABLE_KEY..." -ForegroundColor Cyan
-echo "pk_test_your_stripe_publishable_key_here" | wrangler secret put STRIPE_PUBLISHABLE_KEY
+echo "YOUR_STRIPE_PUBLISHABLE_KEY_HERE" | wrangler secret put STRIPE_PUBLISHABLE_KEY
 
 Write-Host "🔗 Setting STRIPE_WEBHOOK_SECRET..." -ForegroundColor Cyan
 echo "whsec_your_webhook_secret_here" | wrangler secret put STRIPE_WEBHOOK_SECRET

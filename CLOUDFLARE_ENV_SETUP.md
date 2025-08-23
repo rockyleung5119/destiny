@@ -44,20 +44,20 @@ DATABASE_URL=file:./database/destiny.db
 JWT_SECRET=destiny-super-secret-jwt-key-for-development-only
 
 # DeepSeek AI配置
-DEEPSEEK_API_KEY=sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
 DEEPSEEK_BASE_URL=https://api.siliconflow.cn/v1/chat/completions
 DEEPSEEK_MODEL=Pro/deepseek-ai/DeepSeek-R1
 
 # 邮件服务配置 - Resend
 EMAIL_SERVICE=resend
-RESEND_API_KEY=re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP
+RESEND_API_KEY=your-resend-api-key-here
 RESEND_FROM_EMAIL=info@info.indicate.top
 RESEND_FROM_NAME=Indicate.Top
 
 # Stripe支付配置 (测试环境)
-STRIPE_SECRET_KEY=sk_test_51234567890abcdef
-STRIPE_PUBLISHABLE_KEY=pk_test_51234567890abcdef
-STRIPE_WEBHOOK_SECRET=whsec_test_1234567890abcdef
+STRIPE_SECRET_KEY=your-stripe-secret-key-here
+STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key-here
+STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret-here
 
 # 应用配置
 FRONTEND_URL=http://localhost:5173
