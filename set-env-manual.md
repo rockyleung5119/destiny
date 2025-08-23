@@ -12,26 +12,26 @@
 ## 需要设置的环境变量
 
 ### AI服务配置
-- **DEEPSEEK_API_KEY**: `sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn`
+- **DEEPSEEK_API_KEY**: `your-deepseek-api-key-here`
 - **DEEPSEEK_BASE_URL**: `https://api.siliconflow.cn/v1/chat/completions`
 - **DEEPSEEK_MODEL**: `Pro/deepseek-ai/DeepSeek-R1`
 
 ### 应用配置
-- **JWT_SECRET**: `wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA`
+- **JWT_SECRET**: `your-jwt-secret-here`
 - **CORS_ORIGIN**: `https://destiny-frontend.pages.dev`
 - **FRONTEND_URL**: `https://destiny-frontend.pages.dev`
 - **NODE_ENV**: `production`
 
 ### 邮件服务配置
-- **RESEND_API_KEY**: `re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP`
+- **RESEND_API_KEY**: `your-resend-api-key-here`
 - **RESEND_FROM_EMAIL**: `info@info.indicate.top`
 - **RESEND_FROM_NAME**: `indicate.top`
 - **EMAIL_SERVICE**: `resend`
 
 ### Stripe配置（测试用）
-- **STRIPE_SECRET_KEY**: `pk_test_your_stripe_publishable_key_here`
-- **STRIPE_PUBLISHABLE_KEY**: `sk_test_your_stripe_secret_key_here`
-- **STRIPE_WEBHOOK_SECRET**: `whsec_your_webhook_secret_here`
+- **STRIPE_SECRET_KEY**: `your-stripe-secret-key-here`
+- **STRIPE_PUBLISHABLE_KEY**: `your-stripe-publishable-key-here`
+- **STRIPE_WEBHOOK_SECRET**: `your-stripe-webhook-secret-here`
 
 ## 设置步骤
 

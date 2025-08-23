@@ -51,10 +51,10 @@ wrangler deploy
 
 ```env
 JWT_SECRET=your-super-secure-jwt-secret-key-here
-DEEPSEEK_API_KEY=sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
 DEEPSEEK_BASE_URL=https://api.siliconflow.cn/v1/chat/completions
 DEEPSEEK_MODEL=Pro/deepseek-ai/DeepSeek-R1
-RESEND_API_KEY=re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP
+RESEND_API_KEY=your-resend-api-key-here
 RESEND_FROM_EMAIL=info@info.indicate.top
 RESEND_FROM_NAME=Indicate.Top
 EMAIL_SERVICE=resend

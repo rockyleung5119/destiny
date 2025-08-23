@@ -9,17 +9,17 @@
 请准备以下信息：
 
 ### 1. AI服务配置
-- **DEEPSEEK_API_KEY**: `sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn`
+- **DEEPSEEK_API_KEY**: `your-deepseek-api-key-here`
 - **DEEPSEEK_BASE_URL**: `https://api.siliconflow.cn/v1/chat/completions`
 - **DEEPSEEK_MODEL**: `Pro/deepseek-ai/DeepSeek-R1`
 
 ### 2. 应用配置
-- **JWT_SECRET**: `wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA`
+- **JWT_SECRET**: `your-jwt-secret-here`
 - **CORS_ORIGIN**: `https://destiny-frontend.pages.dev`
 - **FRONTEND_URL**: `https://destiny-frontend.pages.dev`
 
 ### 3. 邮件服务配置
-- **RESEND_API_KEY**: `re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP`
+- **RESEND_API_KEY**: `your-resend-api-key-here`
 - **RESEND_FROM_EMAIL**: `info@info.indicate.top`
 - **RESEND_FROM_NAME**: `indicate.top`
 
@@ -93,13 +93,13 @@ wrangler queues list
 ```bash
 # 方式1：交互式设置（推荐）
 wrangler secret put DEEPSEEK_API_KEY
-# 然后输入：sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+# 然后输入：your-deepseek-api-key-here
 
 wrangler secret put JWT_SECRET
-# 然后输入：wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA
+# 然后输入：your-jwt-secret-here
 
 wrangler secret put RESEND_API_KEY
-# 然后输入：re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP
+# 然后输入：your-resend-api-key-here
 
 # 方式2：使用管道（如果交互式有问题）
 echo "sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn" | wrangler secret put DEEPSEEK_API_KEY

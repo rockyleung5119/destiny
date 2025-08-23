@@ -8,7 +8,7 @@
 
 ### 🔧 已配置的信息：
 - **邮件服务**: Resend
-- **API Key**: re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP
+- **API Key**: your-resend-api-key-here
 - **发送邮箱**: info@info.indicate.top
 - **发送者名称**: indicate.top
 
@@ -53,7 +53,7 @@
 ```env
 # 邮件服务配置 - Resend
 EMAIL_SERVICE=resend
-RESEND_API_KEY=re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP
+RESEND_API_KEY=your-resend-api-key-here
 RESEND_FROM_EMAIL=info@info.indicate.top
 RESEND_FROM_NAME=indicate.top
 
@@ -61,8 +61,8 @@ RESEND_FROM_NAME=indicate.top
 EMAIL_HOST=smtp.qq.com
 EMAIL_PORT=587
 EMAIL_SECURE=false
-EMAIL_USER=indicate.top@foxmail.com
-EMAIL_PASS=oidulwiygxccbjbe
+EMAIL_USER=your-email@foxmail.com
+EMAIL_PASS=your-email-password-here
 ```
 
 ## 🔄 服务切换

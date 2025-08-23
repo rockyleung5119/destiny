@@ -29,7 +29,7 @@
 ```typescript
 // 修复前
 const jwtMiddleware = jwt({
-  secret: (c) => c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA',
+  secret: (c) => c.env.JWT_SECRET || 'your-jwt-secret-here',
 });
 
 // 修复后
@@ -55,7 +55,7 @@ const jwtMiddleware = async (c, next) => {
       }, 401);
     }
 
-    const jwtSecret = c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA';
+    const jwtSecret = c.env.JWT_SECRET || 'your-jwt-secret-here';
     console.log('🔑 Using JWT Secret (first 10 chars):', jwtSecret.substring(0, 10) + '...');
 
     try {
@@ -172,7 +172,7 @@ async getProfile(): Promise<{ success: boolean; user: User; message?: string }> 
 
 确保Cloudflare Workers环境中设置了正确的JWT_SECRET：
 ```
-JWT_SECRET=wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA
+JWT_SECRET=your-jwt-secret-here
 ```
 
 ## 预期结果

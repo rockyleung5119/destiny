@@ -8,7 +8,7 @@
 wrangler secret put DEEPSEEK_API_KEY
 
 # 当提示时，输入你的API密钥，例如：
-# sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+# your-deepseek-api-key-here
 ```
 
 ### 2. 设置其他环境变量

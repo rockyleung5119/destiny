@@ -144,7 +144,7 @@ CREATE TABLE api_usage (
 ### 环境变量配置
 ```env
 # DeepSeek AI配置
-DEEPSEEK_API_KEY=sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
 DEEPSEEK_BASE_URL=https://api.siliconflow.cn/v1/chat/completions
 DEEPSEEK_MODEL=Pro/deepseek-ai/DeepSeek-R1
 DEMO_MODE=true  # 开发环境使用模拟响应

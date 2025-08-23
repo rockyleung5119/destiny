@@ -699,7 +699,7 @@ const jwtMiddleware = async (c, next) => {
     }
 
     // 使用环境变量中的JWT_SECRET，如果没有则使用默认值
-    const jwtSecret = c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA';
+    const jwtSecret = c.env.JWT_SECRET || 'default-jwt-secret-please-change';
     console.log('🔑 Using JWT Secret (first 10 chars):', jwtSecret.substring(0, 10) + '...');
 
     // 手动验证JWT token
@@ -801,7 +801,7 @@ app.post('/api/auth/register', async (c) => {
 
     const userId = result.meta.last_row_id;
     console.log('🎫 Generating JWT token for user ID:', userId);
-    const token = await generateJWT(userId, c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA');
+    const token = await generateJWT(userId, c.env.JWT_SECRET || 'default-jwt-secret-please-change');
 
     console.log('✅ Registration successful with profile data');
     return c.json({
@@ -865,7 +865,7 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ success: false, message: 'Invalid credentials' }, 401);
     }
 
-    const token = await generateJWT(user.id, c.env.JWT_SECRET || 'wlk8s6v9y$B&E)H@McQfjWnZr4u7xlA');
+    const token = await generateJWT(user.id, c.env.JWT_SECRET || 'default-jwt-secret-please-change');
 
     return c.json({
       success: true,

@@ -41,7 +41,7 @@
 NODE_ENV=production
 DEMO_MODE=false
 PORT=3001
-DEEPSEEK_API_KEY=sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
 DEEPSEEK_BASE_URL=https://api.siliconflow.cn/v1/chat/completions
 DEEPSEEK_MODEL=Pro/deepseek-ai/DeepSeek-R1
 ```

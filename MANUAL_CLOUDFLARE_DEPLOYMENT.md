@@ -44,16 +44,16 @@
 
 ### 3.1 必需的环境变量
 ```
-JWT_SECRET = destiny-super-secret-jwt-key-for-production
-DEEPSEEK_API_KEY = sk-nnbbhnefkzmdawkfohjsqtqdeelbygvrihbafpppupvfpfxn
+JWT_SECRET = your-jwt-secret-here
+DEEPSEEK_API_KEY = your-deepseek-api-key-here
 DEEPSEEK_BASE_URL = https://api.siliconflow.cn/v1/chat/completions
 DEEPSEEK_MODEL = Pro/deepseek-ai/DeepSeek-R1
-RESEND_API_KEY = re_DsCfph4T_PPAMJQnhoSiAv3AjYUy5f9HP
+RESEND_API_KEY = your-resend-api-key-here
 RESEND_FROM_EMAIL = info@info.indicate.top
 RESEND_FROM_NAME = Indicate.Top
 EMAIL_SERVICE = resend
-FRONTEND_URL = https://fb824531.destiny-360.pages.dev
-CORS_ORIGIN = https://fb824531.destiny-360.pages.dev
+FRONTEND_URL = https://your-pages-domain.pages.dev
+CORS_ORIGIN = https://your-pages-domain.pages.dev
 NODE_ENV = production
 ```
 
