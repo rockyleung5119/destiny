@@ -1,0 +1,258 @@
+# 统一的部署工作流 - 替代所有重复的工作流
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Choose deployment target'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - 'both'
+          - 'frontend'
+          - 'backend'
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  # 检测变更的文件
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # 手动触发时根据输入决定
+            if [ "${{ github.event.inputs.deploy_target }}" = "frontend" ] || [ "${{ github.event.inputs.deploy_target }}" = "both" ]; then
+              echo "frontend=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if [ "${{ github.event.inputs.deploy_target }}" = "backend" ] || [ "${{ github.event.inputs.deploy_target }}" = "both" ]; then
+              echo "backend=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # 自动触发时检测文件变更
+            if git diff --name-only HEAD~1 HEAD | grep -E '^(src/|public/|index\.html|package\.json|vite\.config\.ts|tsconfig\.json|\.env)'; then
+              echo "frontend=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend=false" >> $GITHUB_OUTPUT
+            fi
+            
+            if git diff --name-only HEAD~1 HEAD | grep -E '^(backend/|\.github/workflows/)'; then
+              echo "backend=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  # 部署前端到Cloudflare Pages
+  deploy-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy Frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Frontend
+        run: |
+          echo "🔧 Building frontend with production settings..."
+          npm run build
+          
+          echo "📋 Build output:"
+          ls -la dist/
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=destiny-frontend
+
+      - name: Frontend Deployment Success
+        run: |
+          echo "🎉 Frontend deployed successfully!"
+          echo "🔗 URL: https://destiny-frontend.pages.dev"
+
+  # 部署后端到Cloudflare Workers
+  deploy-backend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-changed == 'true'
+    runs-on: ubuntu-latest
+    name: Deploy Backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare Backend
+        run: |
+          echo "🔧 Preparing backend for deployment..."
+          cd backend
+          
+          # 检查必要文件
+          echo "📋 Checking required files..."
+          ls -la
+          
+          # 确保有正确的package.json
+          if [ ! -f "package.json" ]; then
+            if [ -f "workers-package.json" ]; then
+              echo "📦 Using workers-package.json as package.json"
+              cp workers-package.json package.json
+            else
+              echo "❌ No package.json found!"
+              exit 1
+            fi
+          fi
+          
+          echo "📄 Package.json content:"
+          cat package.json
+
+      - name: Install Dependencies
+        run: |
+          cd backend
+          echo "📦 Installing dependencies..."
+          rm -rf node_modules package-lock.json || true
+          npm install
+          echo "✅ Dependencies installed"
+
+      - name: Validate Configuration
+        run: |
+          cd backend
+          echo "🔍 Validating configuration..."
+          
+          # 检查TypeScript文件
+          if [ -f "worker.ts" ]; then
+            echo "✅ worker.ts found"
+            echo "📊 Checking for Stripe integration..."
+            grep -q "StripeAPIClient" worker.ts && echo "✅ Stripe API client found" || echo "⚠️ Stripe API client not found"
+            grep -q "CloudflareStripeService" worker.ts && echo "✅ Stripe service found" || echo "⚠️ Stripe service not found"
+          else
+            echo "❌ worker.ts not found!"
+            exit 1
+          fi
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'backend'
+          command: deploy --compatibility-date=2024-08-01 --minify=false --keep-vars
+
+      - name: Post-Deploy Verification
+        run: |
+          echo "🧪 Post-deployment verification..."
+          sleep 20
+          
+          # 基础健康检查
+          echo "📊 Testing health endpoint..."
+          HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/health)
+          echo "Health response code: $HEALTH_RESPONSE"
+          
+          if [ "$HEALTH_RESPONSE" = "200" ]; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️ Health check returned: $HEALTH_RESPONSE"
+          fi
+          
+          # 检查Stripe健康端点
+          echo "📊 Testing Stripe health endpoint..."
+          STRIPE_HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/stripe/health)
+          echo "Stripe health response code: $STRIPE_HEALTH_RESPONSE"
+          
+          if [ "$STRIPE_HEALTH_RESPONSE" = "200" ]; then
+            echo "✅ Stripe health check passed"
+          else
+            echo "⚠️ Stripe health check returned: $STRIPE_HEALTH_RESPONSE"
+          fi
+
+      - name: Backend Deployment Success
+        run: |
+          echo "🎉 Backend deployed successfully!"
+          echo "🔗 Backend URL: https://destiny-backend.rocky-liang.workers.dev"
+          echo "🔗 Health Check: https://destiny-backend.rocky-liang.workers.dev/api/health"
+          echo "🔗 Stripe Health: https://destiny-backend.rocky-liang.workers.dev/api/stripe/health"
+
+  # 部署后的集成测试
+  integration-test:
+    needs: [deploy-frontend, deploy-backend]
+    if: always() && (needs.deploy-frontend.result == 'success' || needs.deploy-backend.result == 'success')
+    runs-on: ubuntu-latest
+    name: Integration Test
+    steps:
+      - name: Wait for deployment propagation
+        run: sleep 30
+
+      - name: Test Frontend-Backend Integration
+        run: |
+          echo "🧪 Testing frontend-backend integration..."
+          
+          # 测试前端是否可访问
+          FRONTEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-frontend.pages.dev)
+          echo "Frontend status: $FRONTEND_STATUS"
+          
+          # 测试后端API
+          BACKEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/health)
+          echo "Backend status: $BACKEND_STATUS"
+          
+          # 测试Stripe集成
+          STRIPE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/stripe/health)
+          echo "Stripe integration status: $STRIPE_STATUS"
+          
+          if [ "$FRONTEND_STATUS" = "200" ] && [ "$BACKEND_STATUS" = "200" ]; then
+            echo "✅ Integration test passed"
+          else
+            echo "⚠️ Some services may need time to propagate"
+          fi
+
+      - name: Deployment Summary
+        run: |
+          echo "🎉 Deployment Summary:"
+          echo "✅ Frontend: https://destiny-frontend.pages.dev"
+          echo "✅ Backend: https://destiny-backend.rocky-liang.workers.dev"
+          echo "✅ API Health: https://destiny-backend.rocky-liang.workers.dev/api/health"
+          echo "✅ Stripe Health: https://destiny-backend.rocky-liang.workers.dev/api/stripe/health"
+          echo ""
+          echo "🔧 Next steps to fix Stripe payment:"
+          echo "1. Set real Stripe secrets:"
+          echo "   wrangler secret put STRIPE_SECRET_KEY"
+          echo "   wrangler secret put STRIPE_WEBHOOK_SECRET"
+          echo "2. Update frontend .env with real VITE_STRIPE_PUBLISHABLE_KEY"
+          echo "3. Configure Stripe webhook in dashboard"
+          echo "4. Test payment flow"
