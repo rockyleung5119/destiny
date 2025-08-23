@@ -7,10 +7,16 @@ import StripePaymentModal from './StripePaymentModal';
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
                  import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
 
+console.log('🔑 Stripe Key Check:', {
+  stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
+  length: stripeKey?.length || 0,
+  startsWithPk: stripeKey?.startsWith('pk_') || false
+});
+
 const isPaymentEnabled = stripeKey &&
-  stripeKey !== 'pk_test_51234567890abcdef' &&
-  stripeKey !== 'pk_test_placeholder' &&
-  stripeKey.startsWith('pk_');
+  stripeKey.length > 20 &&
+  stripeKey.startsWith('pk_') &&
+  stripeKey !== 'pk_test_placeholder';
 
 interface MembershipPlansProps {
   onSelectPlan?: (planId: string) => void;
@@ -30,6 +36,14 @@ const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
 
     // 检查支付功能是否启用
     if (!isPaymentEnabled) {
+      console.error('❌ Payment not enabled:', {
+        stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
+        isPaymentEnabled,
+        reason: !stripeKey ? 'No Stripe key' :
+                stripeKey.length <= 20 ? 'Key too short' :
+                !stripeKey.startsWith('pk_') ? 'Invalid key format' :
+                stripeKey === 'pk_test_placeholder' ? 'Placeholder key' : 'Unknown'
+      });
       alert('支付功能暂时不可用，请稍后再试或联系客服获取帮助。');
       return;
     }
@@ -216,7 +230,7 @@ const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
               fontWeight: 'bold',
               color: '#1f2937',
               display: 'block'
-            }}>$9.99</span>
+            }}>$19.90</span>
             <span className="period" style={{
               color: '#6b7280',
               fontSize: '1rem'
@@ -336,7 +350,7 @@ const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
               fontWeight: 'bold',
               color: '#1f2937',
               display: 'block'
-            }}>$99.99</span>
+            }}>$188</span>
             <span className="period" style={{
               color: '#6b7280',
               fontSize: '1rem'

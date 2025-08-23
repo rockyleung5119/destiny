@@ -1,5 +1,13 @@
-// 检查部署状态的脚本
-const WORKER_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+#!/usr/bin/env node
+
+/**
+ * 检查部署状态和Stripe配置
+ */
+
+import https from 'https';
+
+const FRONTEND_URL = 'https://destiny-frontend.pages.dev';
+const BACKEND_URL = 'https://destiny-backend.rocky-liang.workers.dev';
 
 async function checkDeploymentStatus() {
   console.log('🔍 检查部署状态...');
@@ -91,16 +99,10 @@ async function checkDeploymentStatus() {
   }
 }
 
-// 如果作为脚本直接运行
-if (require.main === module) {
-  checkDeploymentStatus()
-    .then(success => {
-      process.exit(success ? 0 : 1);
-    })
-    .catch(error => {
-      console.error('❌ 检查过程失败:', error);
-      process.exit(1);
-    });
-}
+// 运行主函数
+main().catch(error => {
+  console.error('💥 检查失败:', error);
+  process.exit(1);
+});
 
 module.exports = { checkDeploymentStatus };

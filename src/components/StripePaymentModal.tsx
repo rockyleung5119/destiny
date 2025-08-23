@@ -13,11 +13,17 @@ import { stripeAPI } from '../services/api';
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
                  import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
 
+console.log('🔑 StripePaymentModal Key Check:', {
+  stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
+  length: stripeKey?.length || 0,
+  startsWithPk: stripeKey?.startsWith('pk_') || false
+});
+
 // 检查支付功能是否启用
 const isPaymentEnabled = stripeKey &&
-  stripeKey !== 'pk_test_51234567890abcdef' &&
-  stripeKey !== 'pk_test_placeholder' &&
-  stripeKey.startsWith('pk_');
+  stripeKey.length > 20 &&
+  stripeKey.startsWith('pk_') &&
+  stripeKey !== 'pk_test_placeholder';
 
 // 初始化Stripe - 添加错误处理
 const stripePromise = isPaymentEnabled && stripeKey
@@ -49,7 +55,7 @@ const PLAN_INFO = {
   },
   monthly: {
     name: '月度套餐',
-    price: '$19.9',
+    price: '$19.90',
     description: '无限算命功能，每月自动续费',
     type: 'subscription'
   },
