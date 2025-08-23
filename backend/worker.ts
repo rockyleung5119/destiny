@@ -599,7 +599,11 @@ app.post('/api/admin/backup-database', async (c) => {
     console.log('🔄 Manual database backup requested');
 
     // const backupService = new DatabaseBackupService(c.env);
-    const result = // await backupService.performBackup();
+    // const result = await backupService.performBackup();
+    const result = {
+      success: false,
+      message: 'Backup service temporarily disabled'
+    };
 
     return c.json(result);
   } catch (error) {
@@ -615,7 +619,8 @@ app.post('/api/admin/backup-database', async (c) => {
 app.get('/api/admin/backups', async (c) => {
   try {
     // const backupService = new DatabaseBackupService(c.env);
-    const backups = // await backupService.listBackups();
+    // const backups = await backupService.listBackups();
+    const backups = [];
 
     return c.json({
       success: true,
@@ -645,7 +650,11 @@ app.post('/api/admin/restore-database', async (c) => {
     console.log(`🔄 Database restore requested: ${backupFileName}`);
 
     // const backupService = new DatabaseBackupService(c.env);
-    const result = // await backupService.restoreFromBackup(backupFileName);
+    // const result = await backupService.restoreFromBackup(backupFileName);
+    const result = {
+      success: false,
+      message: 'Restore service temporarily disabled'
+    };
 
     return c.json(result);
   } catch (error) {
@@ -4944,7 +4953,8 @@ export default {
         try {
           if (env.BACKUP_STORAGE) {
             const backupService = new DatabaseBackupService(env);
-            const backupResult = // await backupService.performBackup();
+            // const backupResult = await backupService.performBackup();
+            const backupResult = { success: false, message: 'Backup service disabled' };
 
             if (backupResult.success) {
               console.log('✅ Daily database backup completed successfully');
