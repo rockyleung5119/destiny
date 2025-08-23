@@ -4,9 +4,13 @@ import { useAuth } from '../hooks/useAuth';
 import StripePaymentModal from './StripePaymentModal';
 
 // 检查支付功能是否启用
-const isPaymentEnabled = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY &&
-  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY !== 'pk_test_51234567890abcdef' &&
-  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY !== 'pk_test_placeholder';
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
+                 import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+
+const isPaymentEnabled = stripeKey &&
+  stripeKey !== 'pk_test_51234567890abcdef' &&
+  stripeKey !== 'pk_test_placeholder' &&
+  stripeKey.startsWith('pk_');
 
 interface MembershipPlansProps {
   onSelectPlan?: (planId: string) => void;

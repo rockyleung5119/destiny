@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-08-23T06:31:05.412Z",
+  "issues": [
+    {
+      "message": "前端缺少Stripe公钥配置",
+      "fix": "在前端.env文件中添加VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...",
+      "timestamp": "2025-08-23T06:31:05.409Z"
+    }
+  ],
+  "warnings": [],
+  "summary": {
+    "totalIssues": 1,
+    "totalWarnings": 0,
+    "status": "NEEDS_ATTENTION"
+  }
+}

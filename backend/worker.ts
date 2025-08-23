@@ -166,8 +166,26 @@ class StripeAPIClient {
         }
       };
     } catch (error) {
+      console.error('Webhook payload parsing error:', error);
       throw new Error('Invalid webhook payload');
     }
+  }
+
+  // 添加健康检查方法
+  async healthCheck() {
+    return {
+      status: 'ok',
+      stripe: {
+        apiClient: 'StripeAPIClient',
+        endpoints: [
+          '/api/stripe/create-payment',
+          '/api/stripe/webhook',
+          '/api/stripe/subscription-status',
+          '/api/stripe/cancel-subscription'
+        ]
+      },
+      timestamp: new Date().toISOString()
+    };
   }
 }
 
@@ -1586,6 +1604,36 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   }
 });
 
+// Stripe健康检查端点
+app.get('/api/stripe/health', async (c) => {
+  try {
+    const hasStripeKey = !!c.env.STRIPE_SECRET_KEY;
+    const hasWebhookSecret = !!c.env.STRIPE_WEBHOOK_SECRET;
+
+    return c.json({
+      success: true,
+      status: 'ok',
+      stripe: {
+        secretKeyConfigured: hasStripeKey,
+        webhookSecretConfigured: hasWebhookSecret,
+        apiClientType: 'StripeAPIClient (Custom)',
+        endpoints: [
+          '/api/stripe/create-payment',
+          '/api/stripe/webhook',
+          '/api/stripe/subscription-status',
+          '/api/stripe/cancel-subscription'
+        ]
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+});
+
 // Stripe支付API端点
 app.post('/api/stripe/create-payment', jwtMiddleware, async (c) => {
   try {
@@ -1616,9 +1664,12 @@ app.post('/api/stripe/create-payment', jwtMiddleware, async (c) => {
       console.error('❌ Stripe secret key not configured');
       return c.json({
         success: false,
-        message: 'Payment system not configured'
+        message: 'Payment system not configured',
+        debug: 'STRIPE_SECRET_KEY environment variable is missing'
       }, 500);
     }
+
+    console.log(`🔧 Creating payment for user ${userId}, plan: ${planId}`);
 
     // 创建Stripe支付
     const stripeService = new CloudflareStripeService(c.env);
@@ -1629,6 +1680,8 @@ app.post('/api/stripe/create-payment', jwtMiddleware, async (c) => {
       customerEmail,
       customerName
     });
+
+    console.log('💳 Stripe payment result:', result);
 
     if (result.status === 'succeeded') {
       // 支付成功，更新用户会员状态

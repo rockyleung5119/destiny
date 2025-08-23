@@ -9,8 +9,12 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { stripeAPI } from '../services/api';
 
-// 测试用的Stripe公钥
-const stripePromise = loadStripe('pk_test_51234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz');
+// 从环境变量读取Stripe公钥
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
+                            import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
+                            'pk_test_51234567890abcdef'; // 后备测试密钥
+
+const stripePromise = loadStripe(stripePublishableKey);
 
 interface PaymentTestFormProps {
   onResult: (result: any) => void;

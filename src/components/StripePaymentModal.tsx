@@ -9,14 +9,19 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { stripeAPI } from '../services/api';
 
+// 获取Stripe公钥
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
+                 import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+
 // 检查支付功能是否启用
-const isPaymentEnabled = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY &&
-  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY !== 'pk_test_51234567890abcdef' &&
-  process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY !== 'pk_test_placeholder';
+const isPaymentEnabled = stripeKey &&
+  stripeKey !== 'pk_test_51234567890abcdef' &&
+  stripeKey !== 'pk_test_placeholder' &&
+  stripeKey.startsWith('pk_');
 
 // 初始化Stripe - 添加错误处理
-const stripePromise = isPaymentEnabled
-  ? loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!).catch(error => {
+const stripePromise = isPaymentEnabled && stripeKey
+  ? loadStripe(stripeKey).catch(error => {
       console.warn('Stripe initialization failed:', error);
       return null;
     })
