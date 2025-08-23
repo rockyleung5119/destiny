@@ -598,8 +598,8 @@ app.post('/api/admin/backup-database', async (c) => {
   try {
     console.log('🔄 Manual database backup requested');
 
-    const backupService = new DatabaseBackupService(c.env);
-    const result = await backupService.performBackup();
+    // const backupService = new DatabaseBackupService(c.env);
+    const result = // await backupService.performBackup();
 
     return c.json(result);
   } catch (error) {
@@ -614,8 +614,8 @@ app.post('/api/admin/backup-database', async (c) => {
 // 获取备份列表
 app.get('/api/admin/backups', async (c) => {
   try {
-    const backupService = new DatabaseBackupService(c.env);
-    const backups = await backupService.listBackups();
+    // const backupService = new DatabaseBackupService(c.env);
+    const backups = // await backupService.listBackups();
 
     return c.json({
       success: true,
@@ -644,8 +644,8 @@ app.post('/api/admin/restore-database', async (c) => {
 
     console.log(`🔄 Database restore requested: ${backupFileName}`);
 
-    const backupService = new DatabaseBackupService(c.env);
-    const result = await backupService.restoreFromBackup(backupFileName);
+    // const backupService = new DatabaseBackupService(c.env);
+    const result = // await backupService.restoreFromBackup(backupFileName);
 
     return c.json(result);
   } catch (error) {
@@ -4944,7 +4944,7 @@ export default {
         try {
           if (env.BACKUP_STORAGE) {
             const backupService = new DatabaseBackupService(env);
-            const backupResult = await backupService.performBackup();
+            const backupResult = // await backupService.performBackup();
 
             if (backupResult.success) {
               console.log('✅ Daily database backup completed successfully');

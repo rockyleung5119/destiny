@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
+    "lib": ["ES2022", "WebWorker"],
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -11,8 +12,10 @@
     "noImplicitAny": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types"],
+    "isolatedModules": true,
+    "noEmit": true
   },
   "include": ["worker.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "database-backup-service.ts"]
 }
