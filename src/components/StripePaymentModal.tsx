@@ -328,7 +328,8 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
 
   if (stripeError) {
     return (
-      <div className="modal-overlay" style={{
+      <>
+        <div className="modal-overlay" style={{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -385,15 +386,16 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* 诊断工具 */}
-      {showDiagnostic && (
-        <React.Suspense fallback={<div>加载诊断工具...</div>}>
-          <StripeConfigDiagnostic />
-        </React.Suspense>
-      )}
-    </>;
+        {/* 诊断工具 */}
+        {showDiagnostic && (
+          <React.Suspense fallback={<div>加载诊断工具...</div>}>
+            <StripeConfigDiagnostic />
+          </React.Suspense>
+        )}
+      </>
+    );
   }
 
   return (

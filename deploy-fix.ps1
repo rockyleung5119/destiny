@@ -3,8 +3,8 @@
 
 param(
     [string]$Target = "both",  # frontend, backend, both
-    [switch]$Test = $false,    # 仅测试，不实际部署
-    [switch]$Verbose = $false  # 详细输出
+    [switch]$Test = $false,    # Only test, do not deploy
+    [switch]$Verbose = $false  # Verbose output
 )
 
 Write-Host "🚀 部署修复脚本启动" -ForegroundColor Green
