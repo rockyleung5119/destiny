@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authAPI, userAPI } from '../services/api';
 
+// 安全的事件分发函数
+const safeDispatchEvent = (eventName: string) => {
+  try {
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new Event(eventName));
+    }
+  } catch (error) {
+    console.warn(`Error dispatching ${eventName} event:`, error);
+  }
+};
+
 interface User {
   id: number;
   email: string;
@@ -51,66 +62,77 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Define logout function first to avoid dependency issues
   const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+    try {
+      setUser(null);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
 
-    // 强制触发重新渲染
-    setTimeout(() => {
-      window.dispatchEvent(new Event('auth-state-changed'));
-      // 强制刷新页面状态
-      window.location.hash = '';
-      window.location.hash = '#';
-    }, 100);
+      // 强制触发重新渲染
+      setTimeout(() => {
+        safeDispatchEvent('auth-state-changed');
+      }, 100);
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   }, []);
 
   // Check for existing auth on mount
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('authToken');
-      const savedUser = localStorage.getItem('user');
+      try {
+        const token = localStorage.getItem('authToken');
+        const savedUser = localStorage.getItem('user');
 
-      if (token && savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
-
-          // 先设置用户数据，避免空白页
-          setUser(userData);
-
-          // 异步验证token，但不阻塞UI
+        if (token && savedUser) {
           try {
-            // 设置超时时间，避免长时间等待
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Token verification timeout')), 5000)
-            );
+            const userData = JSON.parse(savedUser);
 
-            const verifyPromise = authAPI.verifyToken();
-            const response = await Promise.race([verifyPromise, timeoutPromise]);
+            // 先设置用户数据，避免空白页
+            setUser(userData);
 
-            if (response && response.valid && response.user) {
-              // Update user data from server
-              setUser(response.user);
-              localStorage.setItem('user', JSON.stringify(response.user));
-            } else if (response && !response.valid) {
-              // Token is invalid, clear auth
-              console.warn('Token is invalid, clearing auth');
-              logout();
+            // 异步验证token，但不阻塞UI
+            // 使用setTimeout来避免阻塞主线程
+            setTimeout(async () => {
+              try {
+                const response = await authAPI.verifyToken();
+
+                if (response && response.valid && response.user) {
+                  // Update user data from server
+                  setUser(response.user);
+                  localStorage.setItem('user', JSON.stringify(response.user));
+                } else if (response && !response.valid) {
+                  // Token is invalid, clear auth
+                  console.warn('Token is invalid, clearing auth');
+                  logout();
+                }
+              } catch (verifyError) {
+                console.warn('Token verification failed, using cached user data:', verifyError.message);
+                // 验证失败时不清除用户数据，继续使用缓存的数据
+                // 这样可以避免网络问题导致的意外登出
+              }
+            }, 100);
+          } catch (error) {
+            console.error('Error parsing saved user data:', error);
+            // 清理损坏的数据
+            try {
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('user');
+            } catch (cleanupError) {
+              console.error('Error cleaning up corrupted auth data:', cleanupError);
             }
-          } catch (verifyError) {
-            console.warn('Token verification failed, using cached user data:', verifyError.message);
-            // 验证失败时不清除用户数据，继续使用缓存的数据
-            // 这样可以避免网络问题导致的意外登出
           }
-        } catch (error) {
-          console.error('Error parsing saved user data:', error);
-          logout();
         }
+      } catch (error) {
+        console.error('Error during auth initialization:', error);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
-    initAuth();
+    initAuth().catch(error => {
+      console.error('Unhandled error in initAuth:', error);
+      setIsLoading(false);
+    });
   }, [logout]);
 
   const login = async (email: string, password: string) => {
@@ -124,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // 强制触发重新渲染
         setTimeout(() => {
-          window.dispatchEvent(new Event('auth-state-changed'));
+          safeDispatchEvent('auth-state-changed');
         }, 100);
       }
 

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生产环境错误修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+        button {
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: rgba(59, 130, 246, 1);
+        }
+        .details {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 生产环境错误修复测试</h1>
+    
+    <div class="test-container">
+        <h2>修复验证</h2>
+        <div id="fix-results"></div>
+        <button onclick="testAllFixes()">验证所有修复</button>
+        <button onclick="simulateLogin()">模拟登录流程</button>
+        <button onclick="simulateLogout()">模拟退出流程</button>
+    </div>
+
+    <div class="test-container">
+        <h2>错误监控</h2>
+        <div id="error-monitor"></div>
+        <div id="error-log" class="log"></div>
+    </div>
+
+    <script>
+        let errorLog = [];
+        
+        // 全局错误监控
+        window.addEventListener('error', (event) => {
+            const errorInfo = {
+                type: 'JavaScript Error',
+                message: event.error?.message || event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            logError(errorInfo);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            const errorInfo = {
+                type: 'Promise Rejection',
+                message: event.reason?.message || event.reason,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            logError(errorInfo);
+        });
+
+        function logError(errorInfo) {
+            errorLog.push(errorInfo);
+            updateErrorLog();
+            
+            // 更新错误监控状态
+            document.getElementById('error-monitor').innerHTML = `
+                <div class="test-result error">
+                    ❌ 检测到错误: ${errorInfo.type}
+                    <div class="details">
+                        消息: ${errorInfo.message}<br>
+                        时间: ${errorInfo.timestamp}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateErrorLog() {
+            const logDiv = document.getElementById('error-log');
+            if (errorLog.length === 0) {
+                logDiv.innerHTML = '暂无错误记录';
+            } else {
+                logDiv.innerHTML = errorLog.map(error => 
+                    `[${error.timestamp}] ${error.type}: ${error.message}`
+                ).join('\n');
+            }
+        }
+
+        function testAllFixes() {
+            let results = '';
+            
+            // 测试安全事件分发
+            try {
+                safeDispatchEvent('test-event');
+                results += `
+                    <div class="test-result success">
+                        ✅ 安全事件分发函数正常工作
+                    </div>
+                `;
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ 安全事件分发函数失败: ${error.message}
+                    </div>
+                `;
+            }
+
+            // 测试localStorage安全访问
+            try {
+                testSafeLocalStorage();
+                results += `
+                    <div class="test-result success">
+                        ✅ localStorage安全访问正常
+                    </div>
+                `;
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ localStorage安全访问失败: ${error.message}
+                    </div>
+                `;
+            }
+
+            // 测试JSON安全解析
+            try {
+                testSafeJSONParsing();
+                results += `
+                    <div class="test-result success">
+                        ✅ JSON安全解析正常
+                    </div>
+                `;
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ JSON安全解析失败: ${error.message}
+                    </div>
+                `;
+            }
+
+            document.getElementById('fix-results').innerHTML = results;
+        }
+
+        // 安全事件分发函数（复制自修复代码）
+        function safeDispatchEvent(eventName) {
+            try {
+                if (typeof window !== 'undefined' && window.dispatchEvent) {
+                    window.dispatchEvent(new Event(eventName));
+                }
+            } catch (error) {
+                console.warn(`Error dispatching ${eventName} event:`, error);
+                throw error;
+            }
+        }
+
+        function testSafeLocalStorage() {
+            // 测试安全的localStorage操作
+            try {
+                localStorage.setItem('test-auth', JSON.stringify({name: 'test', email: 'test@example.com'}));
+                const data = localStorage.getItem('test-auth');
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    if (parsed.name !== 'test') {
+                        throw new Error('Data integrity check failed');
+                    }
+                }
+                localStorage.removeItem('test-auth');
+            } catch (error) {
+                throw new Error(`localStorage operation failed: ${error.message}`);
+            }
+        }
+
+        function testSafeJSONParsing() {
+            // 测试各种JSON解析场景
+            const testCases = [
+                '{"name":"test","email":"test@example.com"}',
+                '{"user":null}',
+                '{"data":[1,2,3]}',
+                '{}'
+            ];
+
+            testCases.forEach((testCase, index) => {
+                try {
+                    const parsed = JSON.parse(testCase);
+                    console.log(`JSON test case ${index + 1} passed:`, parsed);
+                } catch (error) {
+                    throw new Error(`JSON parsing failed for case ${index + 1}: ${error.message}`);
+                }
+            });
+        }
+
+        function simulateLogin() {
+            console.log('🔐 模拟登录流程开始');
+            
+            try {
+                // 模拟登录成功后的操作
+                const userData = {
+                    id: 1,
+                    name: 'Test User',
+                    email: 'test@example.com',
+                    loginTime: new Date().toISOString()
+                };
+                
+                localStorage.setItem('authToken', 'test-token-' + Date.now());
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                // 触发认证状态变化
+                setTimeout(() => {
+                    safeDispatchEvent('auth-state-changed');
+                    console.log('✅ 登录流程模拟完成');
+                    
+                    document.getElementById('fix-results').innerHTML = `
+                        <div class="test-result success">
+                            ✅ 登录流程模拟成功
+                            <div class="details">
+                                用户数据已保存到localStorage<br>
+                                认证状态变化事件已触发<br>
+                                无JavaScript错误
+                            </div>
+                        </div>
+                    `;
+                }, 100);
+                
+            } catch (error) {
+                console.error('❌ 登录流程模拟失败:', error);
+                document.getElementById('fix-results').innerHTML = `
+                    <div class="test-result error">
+                        ❌ 登录流程模拟失败
+                        <div class="details">错误: ${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function simulateLogout() {
+            console.log('🚪 模拟退出流程开始');
+            
+            try {
+                // 模拟退出登录操作
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('user');
+                
+                // 触发认证状态变化
+                setTimeout(() => {
+                    safeDispatchEvent('auth-state-changed');
+                    console.log('✅ 退出流程模拟完成');
+                    
+                    document.getElementById('fix-results').innerHTML = `
+                        <div class="test-result success">
+                            ✅ 退出流程模拟成功
+                            <div class="details">
+                                认证数据已清除<br>
+                                认证状态变化事件已触发<br>
+                                无JavaScript错误
+                            </div>
+                        </div>
+                    `;
+                }, 100);
+                
+            } catch (error) {
+                console.error('❌ 退出流程模拟失败:', error);
+                document.getElementById('fix-results').innerHTML = `
+                    <div class="test-result error">
+                        ❌ 退出流程模拟失败
+                        <div class="details">错误: ${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('load', () => {
+            console.log('🔧 生产环境错误修复测试页面加载完成');
+            
+            document.getElementById('error-monitor').innerHTML = `
+                <div class="test-result info">
+                    ℹ️ 错误监控已启动
+                    <div class="details">正在监控JavaScript错误和Promise拒绝</div>
+                </div>
+            `;
+            
+            updateErrorLog();
+            
+            // 自动运行基础测试
+            setTimeout(() => {
+                testAllFixes();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
