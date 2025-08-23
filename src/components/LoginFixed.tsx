@@ -4,17 +4,6 @@ import { User, Lock, Mail, Eye, EyeOff, Star, Moon, Sun, Settings } from 'lucide
 import { authAPI, RegisterData, LoginData } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
-// 安全的事件分发函数
-const safeDispatchEvent = (eventName: string) => {
-  try {
-    if (typeof window !== 'undefined' && window.dispatchEvent) {
-      window.dispatchEvent(new Event(eventName));
-    }
-  } catch (error) {
-    console.warn(`Error dispatching ${eventName} event:`, error);
-  }
-};
-
 interface LoginFixedProps {
   onShowSettings?: () => void;
 }
@@ -66,11 +55,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
             birthHour: '',
           });
 
-          // 登录成功后强制触发页面更新
-          setTimeout(() => {
-            console.log('🎉 Login successful, triggering page refresh');
-            safeDispatchEvent('auth-state-changed');
-          }, 500);
+          // 登录成功，AuthContext会自动更新状态
         } else {
           setMessage(`❌ ${response.message}`);
         }
@@ -96,11 +81,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
 
         if (response.success) {
           setMessage(`✅ ${response.message}`);
-          // 注册成功后强制触发页面更新
-          setTimeout(() => {
-            console.log('🎉 Registration successful, triggering page refresh');
-            safeDispatchEvent('auth-state-changed');
-          }, 500);
+          // 注册成功，AuthContext会自动更新状态
         } else {
           setMessage(`❌ ${response.message}`);
         }
@@ -128,12 +109,6 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
       birthDay: '',
       birthHour: '',
     });
-
-    // 退出登录后强制触发页面更新
-    setTimeout(() => {
-      console.log('👋 Logout successful, triggering page refresh');
-      safeDispatchEvent('auth-state-changed');
-    }, 100);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

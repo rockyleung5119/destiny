@@ -22,40 +22,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 // 内部组件，使用AuthContext
 function AppContent() {
   const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact'>('main');
-  const [forceRender, setForceRender] = useState(0);
   const { user, isAuthenticated, logout } = useAuth();
 
   console.log('🔍 App render - currentView:', currentView, 'isAuthenticated:', isAuthenticated, 'user:', user);
-
-  // 监听认证状态变化
-  useEffect(() => {
-    const handleAuthStateChange = () => {
-      try {
-        console.log('🔄 Auth state changed, forcing re-render');
-        setForceRender(prev => prev + 1);
-        // 如果在设置页面且用户已登出，返回主页
-        if (!isAuthenticated && currentView === 'settings') {
-          setCurrentView('main');
-        }
-      } catch (error) {
-        console.error('Error handling auth state change:', error);
-      }
-    };
-
-    try {
-      window.addEventListener('auth-state-changed', handleAuthStateChange);
-    } catch (error) {
-      console.error('Error adding auth state change listener:', error);
-    }
-
-    return () => {
-      try {
-        window.removeEventListener('auth-state-changed', handleAuthStateChange);
-      } catch (error) {
-        console.error('Error removing auth state change listener:', error);
-      }
-    };
-  }, [isAuthenticated, currentView]);
 
   const handleShowSettings = () => {
     setCurrentView('settings');
@@ -90,17 +59,9 @@ function AppContent() {
   };
 
   const handleLogout = () => {
-    try {
-      console.log('🚪 Logout initiated');
-      logout();
-      setCurrentView('main');
-      // 强制重新渲染
-      setForceRender(prev => prev + 1);
-    } catch (error) {
-      console.error('Error during logout:', error);
-      // 即使出错也要确保回到主页
-      setCurrentView('main');
-    }
+    console.log('🚪 Logout initiated');
+    logout();
+    setCurrentView('main');
   };
 
   const handleLoginSuccess = (userData: any) => {

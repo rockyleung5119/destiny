@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简化认证系统测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+        button {
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: rgba(59, 130, 246, 1);
+        }
+        .details {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 简化认证系统测试</h1>
+    
+    <div class="test-container">
+        <h2>简化验证</h2>
+        <div id="simple-results"></div>
+        <button onclick="testSimpleAuth()">测试简化认证</button>
+        <button onclick="clearAll()">清除所有数据</button>
+    </div>
+
+    <div class="test-container">
+        <h2>基础功能测试</h2>
+        <div id="basic-results"></div>
+        <button onclick="testBasicFunctions()">测试基础功能</button>
+    </div>
+
+    <div class="test-container">
+        <h2>域名兼容性测试</h2>
+        <div id="domain-results"></div>
+        <button onclick="testDomainCompatibility()">测试域名兼容性</button>
+    </div>
+
+    <script>
+        function testSimpleAuth() {
+            let results = '';
+            
+            // 测试1: 基本localStorage操作
+            try {
+                localStorage.setItem('test-token', 'simple-test-token');
+                localStorage.setItem('test-user', JSON.stringify({
+                    id: 1,
+                    name: 'Test User',
+                    email: 'test@example.com'
+                }));
+                
+                const token = localStorage.getItem('test-token');
+                const user = JSON.parse(localStorage.getItem('test-user'));
+                
+                if (token && user && user.name === 'Test User') {
+                    results += `
+                        <div class="test-result success">
+                            ✅ localStorage基本操作正常
+                            <div class="details">
+                                Token: ${token}<br>
+                                用户: ${user.name} (${user.email})
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    results += `
+                        <div class="test-result error">
+                            ❌ localStorage操作异常
+                        </div>
+                    `;
+                }
+                
+                // 清理测试数据
+                localStorage.removeItem('test-token');
+                localStorage.removeItem('test-user');
+                
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ localStorage测试失败: ${error.message}
+                    </div>
+                `;
+            }
+            
+            // 测试2: React状态模拟
+            try {
+                let mockState = null;
+                const mockSetState = (newState) => {
+                    mockState = newState;
+                };
+                
+                // 模拟登录
+                mockSetState({
+                    id: 1,
+                    name: 'Mock User',
+                    email: 'mock@example.com'
+                });
+                
+                if (mockState && mockState.name === 'Mock User') {
+                    results += `
+                        <div class="test-result success">
+                            ✅ 状态管理模拟正常
+                            <div class="details">
+                                模拟用户: ${mockState.name}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    results += `
+                        <div class="test-result error">
+                            ❌ 状态管理模拟失败
+                        </div>
+                    `;
+                }
+                
+                // 模拟登出
+                mockSetState(null);
+                
+                if (mockState === null) {
+                    results += `
+                        <div class="test-result success">
+                            ✅ 登出状态模拟正常
+                        </div>
+                    `;
+                } else {
+                    results += `
+                        <div class="test-result error">
+                            ❌ 登出状态模拟失败
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ 状态管理测试失败: ${error.message}
+                    </div>
+                `;
+            }
+            
+            document.getElementById('simple-results').innerHTML = results;
+        }
+
+        function testBasicFunctions() {
+            let results = '';
+            
+            // 测试JSON操作
+            try {
+                const testData = {
+                    user: {
+                        id: 1,
+                        name: 'Test User',
+                        email: 'test@example.com',
+                        loginTime: new Date().toISOString()
+                    },
+                    token: 'test-token-123'
+                };
+                
+                const jsonString = JSON.stringify(testData);
+                const parsedData = JSON.parse(jsonString);
+                
+                if (parsedData.user.name === 'Test User' && parsedData.token === 'test-token-123') {
+                    results += `
+                        <div class="test-result success">
+                            ✅ JSON序列化/反序列化正常
+                        </div>
+                    `;
+                } else {
+                    results += `
+                        <div class="test-result error">
+                            ❌ JSON处理异常
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ JSON处理失败: ${error.message}
+                    </div>
+                `;
+            }
+            
+            // 测试控制台输出
+            try {
+                console.log('🧪 测试控制台输出');
+                console.warn('⚠️ 测试警告输出');
+                console.error('❌ 测试错误输出');
+                
+                results += `
+                    <div class="test-result success">
+                        ✅ 控制台输出正常
+                        <div class="details">检查浏览器控制台查看输出</div>
+                    </div>
+                `;
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ 控制台输出失败: ${error.message}
+                    </div>
+                `;
+            }
+            
+            document.getElementById('basic-results').innerHTML = results;
+        }
+
+        function testDomainCompatibility() {
+            let results = '';
+            
+            // 获取当前域名信息
+            const currentDomain = window.location.hostname;
+            const currentProtocol = window.location.protocol;
+            const currentPort = window.location.port;
+            
+            results += `
+                <div class="test-result info">
+                    ℹ️ 当前域名信息
+                    <div class="details">
+                        域名: ${currentDomain}<br>
+                        协议: ${currentProtocol}<br>
+                        端口: ${currentPort || '默认'}<br>
+                        完整URL: ${window.location.href}
+                    </div>
+                </div>
+            `;
+            
+            // 测试域名特定功能
+            if (currentDomain === 'indicate.top') {
+                results += `
+                    <div class="test-result info">
+                        🌐 检测到自定义域名 (indicate.top)
+                        <div class="details">
+                            这是用户的自定义域名<br>
+                            应该与Cloudflare子域名行为一致
+                        </div>
+                    </div>
+                `;
+            } else if (currentDomain.includes('pages.dev')) {
+                results += `
+                    <div class="test-result info">
+                        ☁️ 检测到Cloudflare Pages域名
+                        <div class="details">
+                            这是Cloudflare的默认域名<br>
+                            通常工作正常
+                        </div>
+                    </div>
+                `;
+            } else {
+                results += `
+                    <div class="test-result info">
+                        🖥️ 检测到本地或其他域名
+                        <div class="details">
+                            域名: ${currentDomain}<br>
+                            可能是开发环境
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 测试跨域相关
+            try {
+                const apiUrl = currentDomain === 'indicate.top' ? 
+                    'https://api.indicate.top' : 
+                    'https://destiny-backend.jerryliang5119.workers.dev';
+                
+                results += `
+                    <div class="test-result info">
+                        🔗 API端点配置
+                        <div class="details">
+                            当前域名: ${currentDomain}<br>
+                            API端点: ${apiUrl}<br>
+                            跨域状态: ${currentDomain === 'indicate.top' ? '同域' : '跨域'}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ API配置检测失败: ${error.message}
+                    </div>
+                `;
+            }
+            
+            document.getElementById('domain-results').innerHTML = results;
+        }
+
+        function clearAll() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                document.getElementById('simple-results').innerHTML = `
+                    <div class="test-result success">
+                        ✅ 所有存储数据已清除
+                        <div class="details">
+                            localStorage和sessionStorage已清空
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('simple-results').innerHTML = `
+                    <div class="test-result error">
+                        ❌ 清除数据失败: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 页面加载时自动运行测试
+        window.addEventListener('load', () => {
+            console.log('🔧 简化认证系统测试页面加载完成');
+            testDomainCompatibility();
+        });
+    </script>
+</body>
+</html>
