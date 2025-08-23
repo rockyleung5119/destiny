@@ -92,9 +92,9 @@ jobs:
 
           # 测试健康检查端点
           echo "📊 Testing health endpoint..."
-          HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/health)
+          HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.jerryliang5119.workers.dev/api/health)
           echo "Health response code: $HEALTH_RESPONSE"
-          
+
           if [ "$HEALTH_RESPONSE" = "200" ]; then
             echo "✅ Health check passed"
           else
@@ -103,9 +103,9 @@ jobs:
 
           # 测试Stripe健康检查端点
           echo "📊 Testing Stripe health endpoint..."
-          STRIPE_HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/stripe/health)
+          STRIPE_HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.jerryliang5119.workers.dev/api/stripe/health)
           echo "Stripe health response code: $STRIPE_HEALTH_RESPONSE"
-          
+
           if [ "$STRIPE_HEALTH_RESPONSE" = "200" ]; then
             echo "✅ Stripe health check passed"
           else
@@ -118,9 +118,9 @@ jobs:
         run: |
           echo "🎉 Backend deployment completed successfully!"
           echo ""
-          echo "🔗 Backend URL: https://destiny-backend.rocky-liang.workers.dev"
-          echo "🔗 Health Check: https://destiny-backend.rocky-liang.workers.dev/api/health"
-          echo "🔗 Stripe Health: https://destiny-backend.rocky-liang.workers.dev/api/stripe/health"
+          echo "🔗 Backend URL: https://destiny-backend.jerryliang5119.workers.dev"
+          echo "🔗 Health Check: https://destiny-backend.jerryliang5119.workers.dev/api/health"
+          echo "🔗 Stripe Health: https://destiny-backend.jerryliang5119.workers.dev/api/stripe/health"
           echo ""
           echo "📋 Next steps:"
           echo "1. Configure Stripe environment variables if needed"
