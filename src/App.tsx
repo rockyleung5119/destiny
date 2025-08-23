@@ -17,13 +17,32 @@ import MemberSettings from './components/MemberSettings';
 import TestBaziDisplay from './components/TestBaziDisplay';
 
 import HealthCheck from './components/HealthCheck';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // 内部组件，使用AuthContext
 function AppContent() {
   const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact'>('main');
+  const [forceRender, setForceRender] = useState(0);
   const { user, isAuthenticated, logout } = useAuth();
 
   console.log('🔍 App render - currentView:', currentView, 'isAuthenticated:', isAuthenticated, 'user:', user);
+
+  // 监听认证状态变化
+  useEffect(() => {
+    const handleAuthStateChange = () => {
+      console.log('🔄 Auth state changed, forcing re-render');
+      setForceRender(prev => prev + 1);
+      // 如果在设置页面且用户已登出，返回主页
+      if (!isAuthenticated && currentView === 'settings') {
+        setCurrentView('main');
+      }
+    };
+
+    window.addEventListener('auth-state-changed', handleAuthStateChange);
+    return () => {
+      window.removeEventListener('auth-state-changed', handleAuthStateChange);
+    };
+  }, [isAuthenticated, currentView]);
 
   const handleShowSettings = () => {
     setCurrentView('settings');
@@ -58,8 +77,11 @@ function AppContent() {
   };
 
   const handleLogout = () => {
+    console.log('🚪 Logout initiated');
     logout();
     setCurrentView('main');
+    // 强制重新渲染
+    setForceRender(prev => prev + 1);
   };
 
   const handleLoginSuccess = (userData: any) => {
@@ -168,11 +190,13 @@ function AppContent() {
 // 主App组件，提供AuthProvider
 function App() {
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <AppContent />
-      </LanguageProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <LanguageProvider>
+          <AppContent />
+        </LanguageProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

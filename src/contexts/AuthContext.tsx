@@ -54,6 +54,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+
+    // 强制触发重新渲染
+    setTimeout(() => {
+      window.dispatchEvent(new Event('auth-state-changed'));
+      // 强制刷新页面状态
+      window.location.hash = '';
+      window.location.hash = '#';
+    }, 100);
   }, []);
 
   // Check for existing auth on mount
@@ -66,21 +74,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const userData = JSON.parse(savedUser);
 
-          // Verify token with server
+          // 先设置用户数据，避免空白页
+          setUser(userData);
+
+          // 异步验证token，但不阻塞UI
           try {
-            const response = await authAPI.verifyToken();
-            if (response.valid && response.user) {
+            // 设置超时时间，避免长时间等待
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Token verification timeout')), 5000)
+            );
+
+            const verifyPromise = authAPI.verifyToken();
+            const response = await Promise.race([verifyPromise, timeoutPromise]);
+
+            if (response && response.valid && response.user) {
               // Update user data from server
               setUser(response.user);
               localStorage.setItem('user', JSON.stringify(response.user));
-            } else {
+            } else if (response && !response.valid) {
               // Token is invalid, clear auth
+              console.warn('Token is invalid, clearing auth');
               logout();
             }
           } catch (verifyError) {
-            console.error('Token verification failed:', verifyError);
-            // If verification fails, clear auth
-            logout();
+            console.warn('Token verification failed, using cached user data:', verifyError.message);
+            // 验证失败时不清除用户数据，继续使用缓存的数据
+            // 这样可以避免网络问题导致的意外登出
           }
         } catch (error) {
           console.error('Error parsing saved user data:', error);
@@ -97,13 +116,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await authAPI.login({ email, password });
-      
+
       if (response.success && response.user) {
         setUser(response.user);
         localStorage.setItem('authToken', response.token || '');
         localStorage.setItem('user', JSON.stringify(response.user));
+
+        // 强制触发重新渲染
+        setTimeout(() => {
+          window.dispatchEvent(new Event('auth-state-changed'));
+        }, 100);
       }
-      
+
       return response;
     } catch (error) {
       console.error('Login error:', error);

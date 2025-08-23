@@ -55,7 +55,11 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
             birthHour: '',
           });
 
-          // 登录成功，不需要刷新页面，AuthContext会自动更新状态
+          // 登录成功后强制触发页面更新
+          setTimeout(() => {
+            console.log('🎉 Login successful, triggering page refresh');
+            window.dispatchEvent(new Event('auth-state-changed'));
+          }, 500);
         } else {
           setMessage(`❌ ${response.message}`);
         }
@@ -81,7 +85,11 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
 
         if (response.success) {
           setMessage(`✅ ${response.message}`);
-          // 注册成功，不需要刷新页面，AuthContext会自动更新状态
+          // 注册成功后强制触发页面更新
+          setTimeout(() => {
+            console.log('🎉 Registration successful, triggering page refresh');
+            window.dispatchEvent(new Event('auth-state-changed'));
+          }, 500);
         } else {
           setMessage(`❌ ${response.message}`);
         }
@@ -95,6 +103,7 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
   };
 
   const handleLogout = () => {
+    console.log('🚪 Logout initiated from LoginFixed');
     logout();
     setMessage('');
     setFormData({
@@ -108,6 +117,12 @@ const LoginFixed: React.FC<LoginFixedProps> = ({ onShowSettings }) => {
       birthDay: '',
       birthHour: '',
     });
+
+    // 退出登录后强制触发页面更新
+    setTimeout(() => {
+      console.log('👋 Logout successful, triggering page refresh');
+      window.dispatchEvent(new Event('auth-state-changed'));
+    }, 100);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

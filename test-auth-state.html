@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证状态测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+        button {
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: rgba(59, 130, 246, 1);
+        }
+        .details {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 认证状态测试工具</h1>
+    
+    <div class="test-container">
+        <h2>当前认证状态</h2>
+        <div id="auth-status"></div>
+        <button onclick="checkAuthStatus()">检查认证状态</button>
+        <button onclick="clearAuthData()">清除认证数据</button>
+    </div>
+
+    <div class="test-container">
+        <h2>登录/退出测试</h2>
+        <div id="login-test-results"></div>
+        <button onclick="testLogin()">测试登录流程</button>
+        <button onclick="testLogout()">测试退出流程</button>
+    </div>
+
+    <div class="test-container">
+        <h2>页面状态监控</h2>
+        <div id="page-status"></div>
+        <button onclick="startMonitoring()">开始监控</button>
+        <button onclick="stopMonitoring()">停止监控</button>
+        <div id="monitoring-log" class="log"></div>
+    </div>
+
+    <script>
+        let monitoringInterval = null;
+        let logEntries = [];
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            logEntries.push(entry);
+            
+            // 保持最新的50条日志
+            if (logEntries.length > 50) {
+                logEntries.shift();
+            }
+            
+            const logDiv = document.getElementById('monitoring-log');
+            if (logDiv) {
+                logDiv.innerHTML = logEntries.join('\n');
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+            
+            console.log(entry);
+        }
+
+        function checkAuthStatus() {
+            const statusDiv = document.getElementById('auth-status');
+            
+            const token = localStorage.getItem('authToken');
+            const user = localStorage.getItem('user');
+            
+            let status = '';
+            
+            if (token && user) {
+                try {
+                    const userData = JSON.parse(user);
+                    status += `
+                        <div class="test-result success">
+                            ✅ 用户已登录
+                            <div class="details">
+                                用户: ${userData.name || userData.email}<br>
+                                邮箱: ${userData.email}<br>
+                                Token: ${token.substring(0, 20)}...<br>
+                                登录时间: ${userData.loginTime || '未知'}
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    status += `
+                        <div class="test-result error">
+                            ❌ 用户数据解析失败
+                            <div class="details">错误: ${error.message}</div>
+                        </div>
+                    `;
+                }
+            } else {
+                status += `
+                    <div class="test-result info">
+                        ℹ️ 用户未登录
+                        <div class="details">
+                            Token: ${token ? '存在但无用户数据' : '不存在'}<br>
+                            用户数据: ${user ? '存在但无Token' : '不存在'}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            statusDiv.innerHTML = status;
+            log('检查认证状态完成');
+        }
+
+        function clearAuthData() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            
+            document.getElementById('auth-status').innerHTML = `
+                <div class="test-result success">
+                    ✅ 认证数据已清除
+                </div>
+            `;
+            
+            log('认证数据已清除');
+        }
+
+        async function testLogin() {
+            const resultsDiv = document.getElementById('login-test-results');
+            resultsDiv.innerHTML = '<div class="test-result info">正在测试登录流程...</div>';
+            
+            try {
+                // 模拟登录API调用
+                const response = await fetch('https://api.indicate.top/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'demo@example.com',
+                        password: 'demo123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultsDiv.innerHTML = `
+                        <div class="test-result success">
+                            ✅ 登录API调用成功
+                            <div class="details">
+                                响应: ${JSON.stringify(data, null, 2)}
+                            </div>
+                        </div>
+                    `;
+                    log('登录API调用成功');
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="test-result error">
+                            ❌ 登录API调用失败
+                            <div class="details">
+                                状态码: ${response.status}<br>
+                                状态文本: ${response.statusText}
+                            </div>
+                        </div>
+                    `;
+                    log(`登录API调用失败: ${response.status}`);
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="test-result error">
+                        ❌ 登录测试失败
+                        <div class="details">错误: ${error.message}</div>
+                    </div>
+                `;
+                log(`登录测试失败: ${error.message}`);
+            }
+        }
+
+        async function testLogout() {
+            const resultsDiv = document.getElementById('login-test-results');
+            
+            // 模拟退出登录
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            
+            resultsDiv.innerHTML = `
+                <div class="test-result success">
+                    ✅ 退出登录完成
+                    <div class="details">
+                        本地存储已清除<br>
+                        状态应该已更新
+                    </div>
+                </div>
+            `;
+            
+            log('退出登录完成');
+            
+            // 触发状态变化事件
+            window.dispatchEvent(new Event('auth-state-changed'));
+        }
+
+        function startMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+            }
+            
+            log('开始监控页面状态');
+            
+            // 监听认证状态变化事件
+            window.addEventListener('auth-state-changed', () => {
+                log('🔄 检测到认证状态变化事件');
+            });
+            
+            // 定期检查状态
+            monitoringInterval = setInterval(() => {
+                const token = localStorage.getItem('authToken');
+                const user = localStorage.getItem('user');
+                const hasAuth = !!(token && user);
+                
+                document.getElementById('page-status').innerHTML = `
+                    <div class="test-result ${hasAuth ? 'success' : 'info'}">
+                        ${hasAuth ? '✅ 已认证' : 'ℹ️ 未认证'}
+                        <div class="details">
+                            检查时间: ${new Date().toLocaleTimeString()}<br>
+                            Token: ${token ? '存在' : '不存在'}<br>
+                            用户数据: ${user ? '存在' : '不存在'}
+                        </div>
+                    </div>
+                `;
+            }, 2000);
+        }
+
+        function stopMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+            }
+            log('停止监控页面状态');
+        }
+
+        // 页面加载时自动检查状态
+        window.addEventListener('load', () => {
+            checkAuthStatus();
+            log('页面加载完成，开始测试');
+        });
+    </script>
+</body>
+</html>
