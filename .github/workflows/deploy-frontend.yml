@@ -16,6 +16,7 @@ on:
       - 'package-lock.json'
       - 'vite.config.ts'
       - 'tsconfig.json'
+      - '.env'
       - '.env.production'
       - '.github/workflows/deploy-frontend.yml'
 
