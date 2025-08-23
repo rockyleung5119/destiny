@@ -602,7 +602,17 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                     className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     <option value="">{t('selectTimezone')}</option>
-                    {/* 使用IANA时区格式匹配数据库存储 */}
+
+                    {/* 兼容旧格式的时区选项（用于现有用户数据） */}
+                    <option value="UTC+8">UTC+8 (Beijing, Shanghai) - 中国标准时间</option>
+                    <option value="UTC+9">UTC+9 (Tokyo, Seoul) - 日本韩国时间</option>
+                    <option value="UTC+7">UTC+7 (Bangkok, Jakarta) - 东南亚时间</option>
+                    <option value="UTC+5:30">UTC+5:30 (Mumbai, Delhi) - 印度时间</option>
+                    <option value="UTC+0">UTC+0 (London, Dublin) - 格林威治时间</option>
+                    <option value="UTC-5">UTC-5 (New York, Toronto) - 美国东部时间</option>
+                    <option value="UTC-8">UTC-8 (Los Angeles, Vancouver) - 美国西部时间</option>
+
+                    {/* 标准IANA时区格式（推荐用于新用户） */}
                     <option value="Asia/Shanghai">Asia/Shanghai (北京, 上海, 香港, 台北, 新加坡) - 中国标准时间</option>
                     <option value="Asia/Tokyo">Asia/Tokyo (东京) - 日本标准时间</option>
                     <option value="Asia/Seoul">Asia/Seoul (首尔) - 韩国标准时间</option>

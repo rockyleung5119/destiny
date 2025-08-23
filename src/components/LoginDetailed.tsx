@@ -536,13 +536,17 @@ const LoginDetailed: React.FC<LoginDetailedProps> = ({ onLoginSuccess, onShowSet
                           className="w-full py-3 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         >
                           <option value="">{t('selectTimezone')}</option>
-                          <option value="UTC+8">UTC+8 (Beijing, Shanghai)</option>
-                          <option value="UTC+9">UTC+9 (Tokyo, Seoul)</option>
-                          <option value="UTC+7">UTC+7 (Bangkok, Jakarta)</option>
-                          <option value="UTC+5:30">UTC+5:30 (Mumbai, Delhi)</option>
-                          <option value="UTC+0">UTC+0 (London, Dublin)</option>
-                          <option value="UTC-5">UTC-5 (New York, Toronto)</option>
-                          <option value="UTC-8">UTC-8 (Los Angeles, Vancouver)</option>
+                          {/* 使用标准IANA时区格式 */}
+                          <option value="Asia/Shanghai">Asia/Shanghai (北京, 上海, 香港, 台北, 新加坡)</option>
+                          <option value="Asia/Tokyo">Asia/Tokyo (东京)</option>
+                          <option value="Asia/Seoul">Asia/Seoul (首尔)</option>
+                          <option value="Asia/Bangkok">Asia/Bangkok (曼谷, 雅加达)</option>
+                          <option value="Asia/Kolkata">Asia/Kolkata (孟买, 德里)</option>
+                          <option value="Europe/London">Europe/London (伦敦, 都柏林)</option>
+                          <option value="Europe/Paris">Europe/Paris (巴黎, 柏林)</option>
+                          <option value="America/New_York">America/New_York (纽约, 多伦多)</option>
+                          <option value="America/Los_Angeles">America/Los_Angeles (洛杉矶, 旧金山)</option>
+                          <option value="Australia/Sydney">Australia/Sydney (悉尼, 墨尔本)</option>
                         </select>
                       </div>
                     </>
