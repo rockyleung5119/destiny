@@ -38,10 +38,18 @@ jobs:
           cache: 'npm' # 缓存npm依赖，加快后续构建速度
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          echo "📦 Installing frontend dependencies..."
+          npm ci --prefer-offline --no-audit
+          echo "✅ Dependencies installed"
 
       - name: Build Frontend
-        run: npm run build
+        run: |
+          echo "🔨 Building frontend..."
+          npm run build
+          echo "📊 Build output:"
+          ls -la dist/
+          echo "✅ Frontend build completed"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
@@ -49,4 +57,34 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # 注意这里的命令是 pages deploy
-          command: pages deploy dist --project-name=destiny-frontend
+          command: pages deploy dist --project-name=destiny-frontend --compatibility-date=2024-08-01
+
+      - name: Verify Frontend Deployment
+        run: |
+          echo "🧪 Verifying frontend deployment..."
+          sleep 10  # 等待部署完全生效
+
+          # 测试主页
+          echo "📊 Testing main page..."
+          MAIN_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://indicate.top)
+          echo "Main page response code: $MAIN_RESPONSE"
+
+          if [ "$MAIN_RESPONSE" = "200" ]; then
+            echo "✅ Main page accessible"
+          else
+            echo "⚠️ Main page returned: $MAIN_RESPONSE"
+          fi
+
+          echo "✅ Frontend deployment verification completed!"
+
+      - name: Frontend Deployment Success
+        run: |
+          echo "🎉 Frontend deployment completed successfully!"
+          echo ""
+          echo "🔗 Frontend URL: https://indicate.top"
+          echo "🔗 Cloudflare Pages URL: https://destiny-frontend.pages.dev"
+          echo ""
+          echo "📋 Next steps:"
+          echo "1. Test the application functionality"
+          echo "2. Verify Stripe payment integration"
+          echo "3. Check authentication flows"

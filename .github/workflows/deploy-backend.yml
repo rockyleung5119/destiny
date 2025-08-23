@@ -56,9 +56,11 @@ jobs:
           echo "📦 Installing dependencies..."
           # 清理可能的缓存问题
           rm -rf node_modules package-lock.json || true
-          # 安装依赖
-          npm install
+          # 安装依赖，使用更稳定的方式
+          npm ci --prefer-offline --no-audit || npm install
           echo "✅ Dependencies installed"
+          echo "📊 Installed packages:"
+          npm list --depth=0
 
       - name: Validate Configuration
         run: |
@@ -82,8 +84,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 使用完整配置文件部署（包含Durable Objects和Queues）
-          command: deploy --compatibility-date=2024-08-01 --minify=false --keep-vars
+          # 使用简化部署配置，避免复杂特性导致的部署失败
+          command: deploy --compatibility-date=2024-08-01 --minify=false --keep-vars --no-bundle
 
       - name: Verify Deployment
         run: |

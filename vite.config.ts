@@ -24,6 +24,24 @@ export default defineConfig(({ command, mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: mode === 'development',
+      // 优化构建配置，避免部署时的内存问题
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            stripe: ['@stripe/stripe-js', '@stripe/react-stripe-js']
+          }
+        }
+      },
+      // 确保构建稳定性
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: mode === 'production',
+          drop_debugger: true
+        }
+      }
     },
   };
 });
