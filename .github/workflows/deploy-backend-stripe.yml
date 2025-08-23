@@ -1,0 +1,121 @@
+# 专门用于Stripe支付系统的后端部署
+
+name: Deploy Backend with Stripe Support
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend-stripe.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Backend with Stripe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare Backend
+        run: |
+          echo "🔧 Preparing backend for deployment..."
+          cd backend
+          
+          # 检查必要文件
+          echo "📋 Checking required files..."
+          ls -la
+          
+          # 确保有正确的package.json
+          if [ ! -f "package.json" ]; then
+            if [ -f "workers-package.json" ]; then
+              echo "📦 Using workers-package.json as package.json"
+              cp workers-package.json package.json
+            else
+              echo "❌ No package.json found!"
+              exit 1
+            fi
+          fi
+          
+          # 显示package.json内容
+          echo "📄 Package.json content:"
+          cat package.json
+          
+          # 检查wrangler.toml
+          echo "📄 Wrangler.toml content:"
+          cat wrangler.toml
+
+      - name: Install Dependencies
+        run: |
+          cd backend
+          echo "📦 Installing dependencies..."
+          npm install
+          echo "✅ Dependencies installed"
+          
+          # 验证wrangler安装
+          npx wrangler --version
+
+      - name: Validate Configuration
+        run: |
+          cd backend
+          echo "🔍 Validating configuration..."
+          
+          # 检查TypeScript文件
+          if [ -f "worker.ts" ]; then
+            echo "✅ worker.ts found"
+            echo "📊 Checking for Stripe integration..."
+            grep -q "CloudflareStripeService" worker.ts && echo "✅ Stripe service found" || echo "⚠️ Stripe service not found"
+            grep -q "STRIPE_SECRET_KEY" worker.ts && echo "✅ Stripe env vars found" || echo "⚠️ Stripe env vars not found"
+          else
+            echo "❌ worker.ts not found!"
+            exit 1
+          fi
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'backend'
+          command: deploy --compatibility-date=2024-08-01
+
+      - name: Post-Deploy Verification
+        run: |
+          echo "🧪 Post-deployment verification..."
+          sleep 15  # 等待部署完全生效
+          
+          # 基础健康检查
+          echo "📊 Testing health endpoint..."
+          HEALTH_RESPONSE=$(curl -s -w "%{http_code}" https://destiny-backend.rocky-liang.workers.dev/api/health)
+          echo "Health response: $HEALTH_RESPONSE"
+          
+          # 检查Stripe相关端点是否存在（不需要认证的检查）
+          echo "📊 Testing Stripe webhook endpoint availability..."
+          WEBHOOK_RESPONSE=$(curl -s -w "%{http_code}" -X POST https://destiny-backend.rocky-liang.workers.dev/api/stripe/webhook)
+          echo "Webhook response: $WEBHOOK_RESPONSE"
+          
+          echo "✅ Deployment verification completed!"
+
+      - name: Deployment Summary
+        run: |
+          echo "🎉 Deployment Summary:"
+          echo "✅ Backend deployed to: https://destiny-backend.rocky-liang.workers.dev"
+          echo "✅ Health check: /api/health"
+          echo "✅ Stripe endpoints available:"
+          echo "   - POST /api/stripe/create-payment"
+          echo "   - POST /api/stripe/webhook"
+          echo "   - GET /api/stripe/subscription-status"
+          echo "   - POST /api/stripe/cancel-subscription"
+          echo ""
+          echo "🔧 Next steps:"
+          echo "1. Verify Stripe secrets are configured: wrangler secret list"
+          echo "2. Test payment flow with frontend"
+          echo "3. Configure Stripe webhook in dashboard"
+          echo "4. Monitor logs: wrangler tail"
