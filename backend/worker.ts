@@ -452,10 +452,12 @@ async function updateUserMembership(db: D1Database, userId: number, planId: stri
 // 使用类型别名创建Hono应用实例
 const app = new Hono<Env>();
 
-// CORS 配置
+// CORS 配置 - 支持自定义域名和pages.dev域名
 app.use('*', cors({
   origin: [
     'https://destiny-frontend.pages.dev',
+    'https://indicate.top',
+    'https://www.indicate.top',
     'http://localhost:3000',
     'http://localhost:5173', // Vite's default
     'http://127.0.0.1:3000',

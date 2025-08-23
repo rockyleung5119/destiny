@@ -118,27 +118,36 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onSuccess, onCancel }
         customerName: user.name,
       });
 
+      console.log('Payment creation response:', response);
+
       if (!response.success) {
-        setError(response.error || 'Payment creation failed');
+        const errorMsg = response.error || response.message || 'Payment creation failed';
+        console.error('Payment creation failed:', errorMsg);
+        setError(`支付创建失败：${errorMsg}`);
         setIsProcessing(false);
         return;
       }
 
       // 处理支付确认
       if (response.clientSecret) {
+        console.log('Confirming payment with client secret');
         const { error: confirmError } = await stripe.confirmCardPayment(response.clientSecret);
-        
+
         if (confirmError) {
-          setError(confirmError.message || 'Payment confirmation failed');
+          console.error('Payment confirmation failed:', confirmError);
+          setError(`支付确认失败：${confirmError.message || '未知错误'}`);
           setIsProcessing(false);
           return;
         }
       }
 
       // 支付成功
+      console.log('Payment successful for plan:', planId);
       onSuccess(planId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      console.error('Payment process error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(`支付处理失败：${errorMsg}`);
       setIsProcessing(false);
     }
   };
@@ -253,17 +262,23 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
   // 检查支付功能是否启用和Stripe是否可用
   React.useEffect(() => {
     if (!isPaymentEnabled) {
-      setStripeError('支付功能暂时不可用，请稍后再试');
+      console.error('Payment not enabled:', {
+        stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
+        length: stripeKey?.length || 0,
+        startsWithPk: stripeKey?.startsWith('pk_') || false
+      });
+      setStripeError('支付功能暂时不可用。请检查Stripe配置或联系客服获取帮助。');
       return;
     }
 
     stripePromise.then(stripe => {
       if (!stripe) {
-        setStripeError('Stripe服务暂时不可用，请稍后再试');
+        console.error('Stripe initialization failed');
+        setStripeError('Stripe服务初始化失败，请刷新页面重试或联系客服。');
       }
     }).catch(error => {
-      setStripeError('支付服务初始化失败');
-      console.error('Stripe error:', error);
+      console.error('Stripe promise error:', error);
+      setStripeError(`支付服务初始化失败：${error.message || '未知错误'}`);
     });
   }, []);
 

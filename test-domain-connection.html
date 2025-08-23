@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>域名连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+        .loading {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+        button {
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: rgba(59, 130, 246, 1);
+        }
+        .details {
+            font-size: 14px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔗 域名连接测试工具</h1>
+    
+    <div class="test-container">
+        <h2>API 连接测试</h2>
+        <button onclick="testApiConnections()">开始测试</button>
+        <div id="api-results"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>支付系统测试</h2>
+        <button onclick="testPaymentSystem()">测试支付配置</button>
+        <div id="payment-results"></div>
+    </div>
+
+    <script>
+        // 测试不同域名的API连接
+        async function testApiConnections() {
+            const resultsDiv = document.getElementById('api-results');
+            resultsDiv.innerHTML = '<div class="test-result loading">正在测试API连接...</div>';
+            
+            const endpoints = [
+                { name: '自定义域名 (api.indicate.top)', url: 'https://api.indicate.top/api/health' },
+                { name: 'Pages.dev域名 (destiny-frontend.pages.dev)', url: 'https://destiny-backend.jerryliang5119.workers.dev/api/health' }
+            ];
+            
+            let results = '';
+            
+            for (const endpoint of endpoints) {
+                try {
+                    console.log(`Testing ${endpoint.name}: ${endpoint.url}`);
+                    const startTime = Date.now();
+                    
+                    const response = await fetch(endpoint.url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const endTime = Date.now();
+                    const responseTime = endTime - startTime;
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        results += `
+                            <div class="test-result success">
+                                ✅ ${endpoint.name} - 连接成功
+                                <div class="details">
+                                    响应时间: ${responseTime}ms<br>
+                                    状态码: ${response.status}<br>
+                                    响应: ${JSON.stringify(data, null, 2)}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        results += `
+                            <div class="test-result error">
+                                ❌ ${endpoint.name} - 连接失败
+                                <div class="details">
+                                    状态码: ${response.status}<br>
+                                    响应时间: ${responseTime}ms<br>
+                                    错误: ${response.statusText}
+                                </div>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    results += `
+                        <div class="test-result error">
+                            ❌ ${endpoint.name} - 连接错误
+                            <div class="details">
+                                错误信息: ${error.message}<br>
+                                可能原因: CORS错误、网络问题或服务不可用
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            resultsDiv.innerHTML = results;
+        }
+
+        // 测试支付系统配置
+        async function testPaymentSystem() {
+            const resultsDiv = document.getElementById('payment-results');
+            resultsDiv.innerHTML = '<div class="test-result loading">正在测试支付系统配置...</div>';
+            
+            let results = '';
+            
+            // 检查Stripe公钥配置
+            const stripeKey = 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um';
+            
+            if (stripeKey && stripeKey.startsWith('pk_') && stripeKey.length > 20) {
+                results += `
+                    <div class="test-result success">
+                        ✅ Stripe公钥配置正确
+                        <div class="details">
+                            密钥: ${stripeKey.substring(0, 20)}...<br>
+                            长度: ${stripeKey.length} 字符<br>
+                            类型: ${stripeKey.startsWith('pk_test_') ? '测试环境' : '生产环境'}
+                        </div>
+                    </div>
+                `;
+            } else {
+                results += `
+                    <div class="test-result error">
+                        ❌ Stripe公钥配置错误
+                        <div class="details">
+                            当前值: ${stripeKey || '未设置'}<br>
+                            问题: 密钥格式不正确或未设置
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 测试支付API端点
+            try {
+                const apiUrl = 'https://api.indicate.top/api/stripe/subscription-status';
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token' // 这会失败，但能测试端点是否存在
+                    }
+                });
+                
+                if (response.status === 401) {
+                    results += `
+                        <div class="test-result success">
+                            ✅ 支付API端点可访问
+                            <div class="details">
+                                端点: ${apiUrl}<br>
+                                状态: 需要认证 (正常)<br>
+                                说明: API端点正常工作，返回401表示需要有效token
+                            </div>
+                        </div>
+                    `;
+                } else if (response.ok) {
+                    results += `
+                        <div class="test-result success">
+                            ✅ 支付API端点正常
+                            <div class="details">端点: ${apiUrl}</div>
+                        </div>
+                    `;
+                } else {
+                    results += `
+                        <div class="test-result error">
+                            ❌ 支付API端点异常
+                            <div class="details">
+                                端点: ${apiUrl}<br>
+                                状态码: ${response.status}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                results += `
+                    <div class="test-result error">
+                        ❌ 支付API连接失败
+                        <div class="details">
+                            错误: ${error.message}<br>
+                            可能原因: 网络问题或CORS配置错误
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultsDiv.innerHTML = results;
+        }
+
+        // 页面加载时自动运行测试
+        window.addEventListener('load', () => {
+            console.log('页面加载完成，可以开始测试');
+        });
+    </script>
+</body>
+</html>

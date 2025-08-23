@@ -150,9 +150,26 @@ class StripeService {
 
     } catch (error) {
       console.error('Failed to create subscription', error);
+
+      // 提供更详细的错误信息
+      let errorMessage = 'Unknown error';
+      if (error.type === 'StripeCardError') {
+        errorMessage = `银行卡错误: ${error.message}`;
+      } else if (error.type === 'StripeInvalidRequestError') {
+        errorMessage = `请求无效: ${error.message}`;
+      } else if (error.type === 'StripeAPIError') {
+        errorMessage = `支付服务暂时不可用，请稍后重试`;
+      } else if (error.type === 'StripeConnectionError') {
+        errorMessage = `网络连接错误，请检查网络后重试`;
+      } else if (error.type === 'StripeAuthenticationError') {
+        errorMessage = `支付配置错误，请联系客服`;
+      } else {
+        errorMessage = error.message || '支付处理失败，请重试';
+      }
+
       return {
         status: 'failed',
-        error: error.message || 'Unknown error'
+        error: errorMessage
       };
     }
   }
@@ -183,9 +200,26 @@ class StripeService {
 
     } catch (error) {
       console.error('Failed to create one-time payment', error);
+
+      // 提供更详细的错误信息
+      let errorMessage = 'Unknown error';
+      if (error.type === 'StripeCardError') {
+        errorMessage = `银行卡错误: ${error.message}`;
+      } else if (error.type === 'StripeInvalidRequestError') {
+        errorMessage = `请求无效: ${error.message}`;
+      } else if (error.type === 'StripeAPIError') {
+        errorMessage = `支付服务暂时不可用，请稍后重试`;
+      } else if (error.type === 'StripeConnectionError') {
+        errorMessage = `网络连接错误，请检查网络后重试`;
+      } else if (error.type === 'StripeAuthenticationError') {
+        errorMessage = `支付配置错误，请联系客服`;
+      } else {
+        errorMessage = error.message || '支付处理失败，请重试';
+      }
+
       return {
         status: 'failed',
-        error: error.message || 'Unknown error'
+        error: errorMessage
       };
     }
   }

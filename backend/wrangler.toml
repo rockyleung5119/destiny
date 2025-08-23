@@ -9,8 +9,8 @@ compatibility_date = "2024-08-01"
 # 环境变量配置（非敏感信息）
 [vars]
 NODE_ENV = "production"
-CORS_ORIGIN = "https://destiny-frontend.pages.dev"
-FRONTEND_URL = "https://destiny-frontend.pages.dev"
+CORS_ORIGIN = "https://indicate.top,https://destiny-frontend.pages.dev"
+FRONTEND_URL = "https://indicate.top"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
 EMAIL_SERVICE = "resend"

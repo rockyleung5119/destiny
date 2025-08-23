@@ -65,9 +65,27 @@ router.post('/create-payment', authenticateToken, requireEmailVerification, asyn
     }
   } catch (error) {
     console.error('Payment creation error:', error);
-    res.status(500).json({
+
+    // 提供更详细的错误信息
+    let errorMessage = 'Internal server error';
+    let statusCode = 500;
+
+    if (error.message.includes('Stripe')) {
+      errorMessage = '支付服务暂时不可用，请稍后重试';
+      statusCode = 503;
+    } else if (error.message.includes('Invalid plan')) {
+      errorMessage = '无效的套餐选择，请重新选择';
+      statusCode = 400;
+    } else if (error.message.includes('authentication')) {
+      errorMessage = '支付配置错误，请联系客服';
+      statusCode = 500;
+    } else {
+      errorMessage = error.message || '支付处理失败，请重试';
+    }
+
+    res.status(statusCode).json({
       success: false,
-      error: error.message || 'Internal server error'
+      error: errorMessage
     });
   }
 }));
