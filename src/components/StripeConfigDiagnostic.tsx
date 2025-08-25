@@ -20,19 +20,20 @@ const StripeConfigDiagnostic: React.FC = () => {
     const stripeKey = viteKey; // 生产环境只使用VITE_前缀
     const isProduction = import.meta.env.MODE === 'production';
 
-    // 生产环境标准检查
+    // 生产环境放宽检查：允许测试密钥用于功能测试
     const keyStatus = viteKey &&
-                     viteKey.length > 50 &&
-                     viteKey.startsWith('pk_') &&
+                     viteKey.length > 20 && // 放宽长度要求
+                     viteKey.startsWith('pk_') && // 只要求pk开头
                      !viteKey.includes('placeholder') &&
-                     !viteKey.includes('your-stripe') ? 'success' : 'error';
+                     !viteKey.includes('your-stripe') &&
+                     !viteKey.includes('MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD') ? 'success' : 'error';
 
     diagnosticResults.push({
       category: '前端环境变量',
       status: keyStatus,
       message: `VITE_STRIPE_PUBLISHABLE_KEY: ${viteKey ? '已配置' : '未配置'}`,
       details: viteKey ?
-        `值: ${viteKey.substring(0, 20)}...\n长度: ${viteKey.length}\n类型: ${viteKey.startsWith('pk_live_') ? '生产密钥' : viteKey.startsWith('pk_test_') ? '测试密钥' : '未知'}\n环境: ${isProduction ? '生产环境' : '开发环境'}` :
+        `值: ${viteKey.substring(0, 20)}...\n长度: ${viteKey.length}\n类型: ${viteKey.startsWith('pk_live_') ? '生产密钥' : viteKey.startsWith('pk_test_') ? '测试密钥' : '未知'}\n环境: ${isProduction ? '生产环境' : '开发环境'}\n状态: ${viteKey.startsWith('pk_test_') ? '测试模式 - 适用于功能测试' : viteKey.startsWith('pk_live_') ? '生产模式 - 真实支付' : '未知模式'}` :
         '环境变量未设置 - 请在Cloudflare Pages Dashboard中设置'
     });
 
@@ -282,11 +283,11 @@ const StripeConfigDiagnostic: React.FC = () => {
                     <li><strong>在Cloudflare Pages Dashboard中设置环境变量：</strong></li>
                     <li style={{ marginLeft: '20px' }}>访问 https://dash.cloudflare.com/</li>
                     <li style={{ marginLeft: '20px' }}>选择 Pages → destiny-frontend → Settings → Environment variables</li>
-                    <li style={{ marginLeft: '20px' }}>添加 VITE_STRIPE_PUBLISHABLE_KEY = pk_live_YOUR_PRODUCTION_KEY</li>
+                    <li style={{ marginLeft: '20px' }}>添加 VITE_STRIPE_PUBLISHABLE_KEY = pk_test_YOUR_STRIPE_KEY 或 pk_live_YOUR_STRIPE_KEY</li>
                     <li style={{ marginLeft: '20px' }}>环境选择 "Production"，保存后重新部署</li>
-                    <li><strong>使用生产级Stripe密钥（pk_live_开头）</strong></li>
-                    <li><strong>确保后端Workers也使用生产密钥</strong></li>
-                    <li>验证所有密钥都不是占位符或测试值</li>
+                    <li><strong>支持测试密钥（pk_test_）和生产密钥（pk_live_）</strong></li>
+                    <li><strong>确保后端Workers也使用对应的密钥</strong></li>
+                    <li>验证所有密钥都不是占位符</li>
                   </>
                 ) : (
                   <>
@@ -308,9 +309,11 @@ const StripeConfigDiagnostic: React.FC = () => {
                 }}>
                   <strong>⚠️ 生产环境注意事项：</strong>
                   <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '12px' }}>
-                    <li>不要在代码中硬编码生产密钥</li>
+                    <li>支持测试密钥(pk_test_)进行功能测试</li>
+                    <li>支持生产密钥(pk_live_)进行真实支付</li>
+                    <li>不要在代码中硬编码任何密钥</li>
                     <li>确保使用HTTPS和安全的环境变量</li>
-                    <li>定期轮换API密钥</li>
+                    <li>测试密钥只能处理测试支付，不会产生真实费用</li>
                     <li>监控Stripe Dashboard中的支付活动</li>
                   </ul>
                 </div>

@@ -23,17 +23,18 @@ console.log('🔑 StripePaymentModal Key Check:', {
   viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing'
 });
 
-// 生产环境标准：严格的Stripe密钥验证
+// 生产环境放宽验证：允许测试密钥用于功能测试
 const invalidKeys = [
   'pk_test_placeholder',
   'your-stripe-publishable-key-here',
   'your-stripe-publisha', // 截断的占位符
-  'sk_test_REPLACE_WITH_YOUR_STRIPE_SECRET_KEY'
+  'sk_test_REPLACE_WITH_YOUR_STRIPE_SECRET_KEY',
+  'MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD'
 ];
 
 const isPaymentEnabled = stripeKey &&
-  stripeKey.length > 50 && // 生产环境要求更长的密钥
-  stripeKey.startsWith('pk_') &&
+  stripeKey.length > 20 && // 基本长度要求
+  stripeKey.startsWith('pk_') && // 只要求pk开头
   !invalidKeys.some(invalid => stripeKey.includes(invalid)) && // 检查是否包含任何无效片段
   !stripeKey.includes('placeholder') && // 额外检查占位符
   !stripeKey.includes('your-stripe'); // 额外检查占位符模式
@@ -294,7 +295,7 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
 
       console.error('❌ Payment not enabled:', errorDetails);
 
-      // 生产环境标准错误信息
+      // 生产环境放宽验证：允许测试密钥用于功能测试
       let errorMessage = '支付功能配置错误。';
       const isProduction = import.meta.env.MODE === 'production';
 
@@ -305,19 +306,19 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
         }
       } else if (!stripeKey.startsWith('pk_')) {
         errorMessage += ' 原因：Stripe密钥格式无效，必须以 pk_ 开头。';
-      } else if (stripeKey.length <= 50) {
-        errorMessage += ' 原因：Stripe密钥长度不足，生产环境需要完整密钥。';
+      } else if (stripeKey.length <= 20) {
+        errorMessage += ' 原因：Stripe密钥长度不足。';
       } else if (stripeKey.includes('placeholder') || stripeKey.includes('your-stripe')) {
-        errorMessage += ' 原因：检测到占位符密钥，需要设置真实的生产密钥。';
+        errorMessage += ' 原因：检测到占位符密钥，需要设置真实的Stripe密钥。';
         if (isProduction) {
-          errorMessage += ' 请在Cloudflare Pages Dashboard中更新 VITE_STRIPE_PUBLISHABLE_KEY 为真实的生产密钥。';
+          errorMessage += ' 请在Cloudflare Pages Dashboard中更新 VITE_STRIPE_PUBLISHABLE_KEY 为真实的Stripe密钥（pk_test_ 或 pk_live_ 开头）。';
         }
       } else {
         errorMessage += ' 原因：密钥验证失败。';
       }
 
       if (isProduction) {
-        errorMessage += ' 这是生产环境，请确保使用 pk_live_ 开头的生产密钥。';
+        errorMessage += ' 生产环境支持测试密钥(pk_test_)和生产密钥(pk_live_)进行功能测试。';
       }
 
       setStripeError(errorMessage);
