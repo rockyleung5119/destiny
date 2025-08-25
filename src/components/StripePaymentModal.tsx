@@ -12,32 +12,31 @@ import { stripeAPI } from '../services/api';
 // 懒加载诊断组件
 const StripeConfigDiagnostic = React.lazy(() => import('./StripeConfigDiagnostic'));
 
-// 获取Stripe公钥 - 支持多种环境变量格式
-const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
-                 import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
-                 // 生产环境备用密钥
-                 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um';
+// 获取Stripe公钥 - 生产环境标准配置
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
 console.log('🔑 StripePaymentModal Key Check:', {
   stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
   length: stripeKey?.length || 0,
   startsWithPk: stripeKey?.startsWith('pk_') || false,
   environment: import.meta.env.MODE || 'unknown',
-  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
-  reactKey: import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing'
+  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing'
 });
 
-// 检查支付功能是否启用 - 更宽松的检测逻辑
+// 生产环境标准：严格的Stripe密钥验证
 const invalidKeys = [
   'pk_test_placeholder',
   'your-stripe-publishable-key-here',
+  'your-stripe-publisha', // 截断的占位符
   'sk_test_REPLACE_WITH_YOUR_STRIPE_SECRET_KEY'
 ];
 
 const isPaymentEnabled = stripeKey &&
-  stripeKey.length > 20 &&
+  stripeKey.length > 50 && // 生产环境要求更长的密钥
   stripeKey.startsWith('pk_') &&
-  !invalidKeys.includes(stripeKey);
+  !invalidKeys.some(invalid => stripeKey.includes(invalid)) && // 检查是否包含任何无效片段
+  !stripeKey.includes('placeholder') && // 额外检查占位符
+  !stripeKey.includes('your-stripe'); // 额外检查占位符模式
 
 // 初始化Stripe - 添加错误处理
 const stripePromise = isPaymentEnabled && stripeKey
@@ -295,18 +294,31 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
 
       console.error('❌ Payment not enabled:', errorDetails);
 
-      // 提供更详细的错误信息
-      let errorMessage = '支付功能暂时不可用。';
+      // 生产环境标准错误信息
+      let errorMessage = '支付功能配置错误。';
+      const isProduction = import.meta.env.MODE === 'production';
+
       if (!stripeKey) {
-        errorMessage += ' 原因：未找到Stripe公钥配置。';
+        errorMessage += ' 原因：未找到Stripe公钥环境变量。';
+        if (isProduction) {
+          errorMessage += ' 请在Cloudflare Pages Dashboard中设置 VITE_STRIPE_PUBLISHABLE_KEY 环境变量。';
+        }
       } else if (!stripeKey.startsWith('pk_')) {
-        errorMessage += ' 原因：Stripe密钥格式无效。';
-      } else if (stripeKey.length <= 20) {
-        errorMessage += ' 原因：Stripe密钥长度不足。';
+        errorMessage += ' 原因：Stripe密钥格式无效，必须以 pk_ 开头。';
+      } else if (stripeKey.length <= 50) {
+        errorMessage += ' 原因：Stripe密钥长度不足，生产环境需要完整密钥。';
+      } else if (stripeKey.includes('placeholder') || stripeKey.includes('your-stripe')) {
+        errorMessage += ' 原因：检测到占位符密钥，需要设置真实的生产密钥。';
+        if (isProduction) {
+          errorMessage += ' 请在Cloudflare Pages Dashboard中更新 VITE_STRIPE_PUBLISHABLE_KEY 为真实的生产密钥。';
+        }
       } else {
-        errorMessage += ' 原因：Stripe密钥可能是占位符。';
+        errorMessage += ' 原因：密钥验证失败。';
       }
-      errorMessage += ' 请联系客服获取帮助。';
+
+      if (isProduction) {
+        errorMessage += ' 这是生产环境，请确保使用 pk_live_ 开头的生产密钥。';
+      }
 
       setStripeError(errorMessage);
       return;

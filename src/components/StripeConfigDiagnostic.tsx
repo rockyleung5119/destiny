@@ -15,24 +15,37 @@ const StripeConfigDiagnostic: React.FC = () => {
     setIsRunning(true);
     const diagnosticResults: DiagnosticResult[] = [];
 
-    // 1. 检查前端环境变量
+    // 1. 检查前端环境变量 - 生产环境标准
     const viteKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-    const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
-    const stripeKey = viteKey || reactKey;
+    const stripeKey = viteKey; // 生产环境只使用VITE_前缀
+    const isProduction = import.meta.env.MODE === 'production';
+
+    // 生产环境标准检查
+    const keyStatus = viteKey &&
+                     viteKey.length > 50 &&
+                     viteKey.startsWith('pk_') &&
+                     !viteKey.includes('placeholder') &&
+                     !viteKey.includes('your-stripe') ? 'success' : 'error';
 
     diagnosticResults.push({
       category: '前端环境变量',
-      status: viteKey ? 'success' : 'warning',
+      status: keyStatus,
       message: `VITE_STRIPE_PUBLISHABLE_KEY: ${viteKey ? '已配置' : '未配置'}`,
-      details: viteKey ? `${viteKey.substring(0, 20)}...` : '环境变量未设置'
+      details: viteKey ?
+        `值: ${viteKey.substring(0, 20)}...\n长度: ${viteKey.length}\n类型: ${viteKey.startsWith('pk_live_') ? '生产密钥' : viteKey.startsWith('pk_test_') ? '测试密钥' : '未知'}\n环境: ${isProduction ? '生产环境' : '开发环境'}` :
+        '环境变量未设置 - 请在Cloudflare Pages Dashboard中设置'
     });
 
-    diagnosticResults.push({
-      category: '前端环境变量',
-      status: reactKey ? 'success' : 'warning',
-      message: `REACT_APP_STRIPE_PUBLISHABLE_KEY: ${reactKey ? '已配置' : '未配置'}`,
-      details: reactKey ? `${reactKey.substring(0, 20)}...` : '环境变量未设置'
-    });
+    // 生产环境不再检查REACT_APP_前缀（已弃用）
+    if (!isProduction) {
+      const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+      diagnosticResults.push({
+        category: '前端环境变量',
+        status: 'warning',
+        message: `REACT_APP_STRIPE_PUBLISHABLE_KEY: ${reactKey ? '已配置' : '未配置'}`,
+        details: '注意：生产环境建议使用VITE_前缀'
+      });
+    }
 
     // 2. 检查Stripe密钥格式
     if (stripeKey) {
@@ -256,18 +269,52 @@ const StripeConfigDiagnostic: React.FC = () => {
             <div style={{
               marginTop: '20px',
               padding: '12px',
-              backgroundColor: '#f3f4f6',
+              backgroundColor: isProduction ? '#fef3c7' : '#f3f4f6',
               borderRadius: '8px',
               fontSize: '14px',
-              color: '#374151'
+              color: '#374151',
+              border: isProduction ? '1px solid #f59e0b' : 'none'
             }}>
-              <strong>修复建议：</strong>
+              <strong>{isProduction ? '🏭 生产环境修复建议：' : '🔧 修复建议：'}</strong>
               <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                <li>如果前端环境变量未配置，请在Cloudflare Pages中设置 VITE_STRIPE_PUBLISHABLE_KEY</li>
-                <li>如果后端密钥未配置，请使用 wrangler secret put 命令设置密钥</li>
-                <li>确保使用的是真实的Stripe密钥，而不是占位符</li>
-                <li>检查网络连接和CORS配置</li>
+                {isProduction ? (
+                  <>
+                    <li><strong>在Cloudflare Pages Dashboard中设置环境变量：</strong></li>
+                    <li style={{ marginLeft: '20px' }}>访问 https://dash.cloudflare.com/</li>
+                    <li style={{ marginLeft: '20px' }}>选择 Pages → destiny-frontend → Settings → Environment variables</li>
+                    <li style={{ marginLeft: '20px' }}>添加 VITE_STRIPE_PUBLISHABLE_KEY = pk_live_YOUR_PRODUCTION_KEY</li>
+                    <li style={{ marginLeft: '20px' }}>环境选择 "Production"，保存后重新部署</li>
+                    <li><strong>使用生产级Stripe密钥（pk_live_开头）</strong></li>
+                    <li><strong>确保后端Workers也使用生产密钥</strong></li>
+                    <li>验证所有密钥都不是占位符或测试值</li>
+                  </>
+                ) : (
+                  <>
+                    <li>如果前端环境变量未配置，请在Cloudflare Pages中设置 VITE_STRIPE_PUBLISHABLE_KEY</li>
+                    <li>如果后端密钥未配置，请使用 wrangler secret put 命令设置密钥</li>
+                    <li>确保使用的是真实的Stripe密钥，而不是占位符</li>
+                    <li>检查网络连接和CORS配置</li>
+                  </>
+                )}
               </ul>
+
+              {isProduction && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '8px',
+                  backgroundColor: '#fef2f2',
+                  borderRadius: '4px',
+                  border: '1px solid #fecaca'
+                }}>
+                  <strong>⚠️ 生产环境注意事项：</strong>
+                  <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '12px' }}>
+                    <li>不要在代码中硬编码生产密钥</li>
+                    <li>确保使用HTTPS和安全的环境变量</li>
+                    <li>定期轮换API密钥</li>
+                    <li>监控Stripe Dashboard中的支付活动</li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
