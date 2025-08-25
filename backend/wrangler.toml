@@ -41,6 +41,7 @@ name = "BATCH_COORDINATOR"
 class_name = "BatchCoordinator"
 
 # Durable Objects迁移配置
+# 注意：迁移只在首次部署时需要，后续部署会自动跳过
 [[migrations]]
 tag = "v1"
 new_classes = ["AIProcessor", "BatchCoordinator"]

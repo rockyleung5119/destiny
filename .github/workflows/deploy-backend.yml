@@ -55,13 +55,27 @@ jobs:
         run: |
           cd backend
           echo "📦 Installing dependencies..."
+
+          # 检查当前Node版本
+          node --version
+          npm --version
+
           # 清理可能的缓存问题
           rm -rf node_modules package-lock.json || true
+
+          # 确保使用正确的package.json
+          if [ ! -f "package.json" ]; then
+            echo "❌ package.json not found!"
+            exit 1
+          fi
+
           # 安装依赖，使用更稳定的方式
-          npm ci --prefer-offline --no-audit || npm install
+          echo "Installing with npm install..."
+          npm install --no-optional --no-audit
+
           echo "✅ Dependencies installed"
           echo "📊 Installed packages:"
-          npm list --depth=0
+          npm list --depth=0 || echo "Package list may have warnings, continuing..."
 
       - name: Validate Configuration
         run: |
@@ -96,21 +110,63 @@ jobs:
           echo "📦 Checking R2 buckets..."
           wrangler r2 bucket list || echo "⚠️ R2 check failed, but continuing..."
 
-          # 干运行测试
+          # 干运行测试 - 使用GitHub专用配置
           echo "🧪 Testing deployment configuration..."
-          wrangler deploy --dry-run
+          wrangler deploy --dry-run --config wrangler-github.toml
           echo "✅ Pre-deployment checks completed"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy to Cloudflare Workers (Attempt 1)
+        id: deploy-attempt-1
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'backend'
+          # 保持完整功能的部署命令，使用GitHub专用配置
+          command: deploy --config wrangler-github.toml --compatibility-date=2024-08-01 --keep-vars --force
+
+      - name: Deploy to Cloudflare Workers (Attempt 2 - Fallback)
+        id: deploy-attempt-2
+        if: steps.deploy-attempt-1.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'backend'
+          # 备用部署：使用GitHub配置，不强制保留变量
+          command: deploy --config wrangler-github.toml --compatibility-date=2024-08-01 --force
+
+      - name: Deploy to Cloudflare Workers (Attempt 3 - Minimal)
+        id: deploy-attempt-3
+        if: steps.deploy-attempt-2.outcome == 'failure'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 保持完整功能的部署命令，包含所有必要的Durable Objects和Queues
-          command: deploy --compatibility-date=2024-08-01 --keep-vars --force
+          # 最小化部署：只使用基本配置
+          command: deploy --config wrangler-github.toml
+
+      - name: Handle Deployment Failure
+        if: failure()
+        run: |
+          echo "❌ 后端部署失败！"
+          echo "🔍 可能的原因："
+          echo "1. API Token权限不足"
+          echo "2. Durable Objects或Queues配置问题"
+          echo "3. 网络连接问题"
+          echo "4. wrangler版本兼容性问题"
+          echo ""
+          echo "🛠️ 建议的修复方法："
+          echo "1. 检查GitHub Secrets中的CLOUDFLARE_API_TOKEN权限"
+          echo "2. 确保API Token包含Workers、Queues、D1、R2权限"
+          echo "3. 手动部署: cd backend && wrangler deploy"
+          echo "4. 检查Cloudflare账户是否有足够的配额"
+          exit 1
 
       - name: Verify Deployment
         run: |

@@ -1,20 +1,61 @@
-# CI/CD友好的wrangler配置
+# GitHub Actions专用wrangler配置 - 保持所有功能
 name = "destiny-backend"
 main = "worker.ts"
 compatibility_date = "2024-08-01"
 
-# 基本环境变量
+# 环境变量配置（非敏感信息）
 [vars]
 NODE_ENV = "production"
-CORS_ORIGIN = "https://destiny-frontend.pages.dev"
-FRONTEND_URL = "https://destiny-frontend.pages.dev"
+CORS_ORIGIN = "https://indicate.top,https://destiny-frontend.pages.dev"
+FRONTEND_URL = "https://indicate.top"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
+EMAIL_SERVICE = "resend"
+RESEND_FROM_EMAIL = "info@info.indicate.top"
+RESEND_FROM_NAME = "indicate.top"
 
 # D1数据库绑定
 [[d1_databases]]
 binding = "DB"
 database_name = "destiny-db"
-database_id = "your-database-id"
+database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
 
-# 注意：敏感环境变量通过wrangler secret设置
-# STRIPE_SECRET_KEY (通过 wrangler secret put STRIPE_SECRET_KEY)
-# STRIPE_WEBHOOK_SECRET (通过 wrangler secret put STRIPE_WEBHOOK_SECRET)
+# R2存储绑定 - 数据库备份存储
+[[r2_buckets]]
+binding = "BACKUP_STORAGE"
+bucket_name = "destiny-backups"
+
+# Durable Objects配置 - AI异步处理和分布式锁
+[[durable_objects.bindings]]
+name = "AI_PROCESSOR"
+class_name = "AIProcessor"
+
+[[durable_objects.bindings]]
+name = "BATCH_COORDINATOR"
+class_name = "BatchCoordinator"
+
+# Cloudflare Queues配置 - AI异步处理队列
+[[queues.producers]]
+binding = "AI_QUEUE"
+queue = "ai-processing-queue"
+
+[[queues.consumers]]
+queue = "ai-processing-queue"
+max_batch_size = 1
+max_batch_timeout = 10
+max_retries = 2
+dead_letter_queue = "ai-processing-dlq"
+
+# 死信队列配置
+[[queues.producers]]
+binding = "AI_DLQ"
+queue = "ai-processing-dlq"
+
+# 定时任务配置 - 每2分钟自动处理卡住的任务
+[triggers]
+crons = ["*/2 * * * *"]
+
+# Durable Objects迁移配置 - CI/CD环境安全配置
+[[migrations]]
+tag = "v1"
+new_classes = ["AIProcessor", "BatchCoordinator"]
