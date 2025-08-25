@@ -3,14 +3,18 @@ import { useMembership } from '../hooks/useMembership';
 import { useAuth } from '../hooks/useAuth';
 import StripePaymentModal from './StripePaymentModal';
 
-// 检查支付功能是否启用
+// 检查支付功能是否启用 - 兼容多种环境变量配置
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
                  import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
 
-console.log('🔑 Stripe Key Check:', {
+console.log('🔑 MembershipPlans Stripe Key Check:', {
   stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
   length: stripeKey?.length || 0,
-  startsWithPk: stripeKey?.startsWith('pk_') || false
+  startsWithPk: stripeKey?.startsWith('pk_') || false,
+  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
+  reactKey: import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
+  source: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'VITE_' :
+          import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'REACT_APP_' : 'none'
 });
 
 const isPaymentEnabled = stripeKey &&

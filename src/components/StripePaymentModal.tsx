@@ -11,16 +11,28 @@ import { stripeAPI } from '../services/api';
 
 // 懒加载诊断组件
 const StripeConfigDiagnostic = React.lazy(() => import('./StripeConfigDiagnostic'));
+const StripeEnvironmentFix = React.lazy(() => import('./StripeEnvironmentFix'));
 
-// 获取Stripe公钥 - 生产环境标准配置
-const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+// 获取Stripe公钥 - 兼容多种环境变量配置，包括临时修复
+const getStripeKey = () => {
+  const viteKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+  const tempKey = localStorage.getItem('STRIPE_TEMP_KEY');
+
+  return viteKey || reactKey || tempKey;
+};
+
+const stripeKey = getStripeKey();
 
 console.log('🔑 StripePaymentModal Key Check:', {
   stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
   length: stripeKey?.length || 0,
   startsWithPk: stripeKey?.startsWith('pk_') || false,
   environment: import.meta.env.MODE || 'unknown',
-  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing'
+  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
+  reactKey: import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
+  source: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'VITE_' :
+          import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'REACT_APP_' : 'none'
 });
 
 // 生产环境放宽验证：允许测试密钥用于功能测试
@@ -400,6 +412,14 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
           </div>
         </div>
         </div>
+
+        {/* 环境修复工具 */}
+        <React.Suspense fallback={<div>加载修复工具...</div>}>
+          <StripeEnvironmentFix onKeyDetected={(key) => {
+            console.log('🔑 检测到有效的Stripe密钥，刷新组件...');
+            window.location.reload();
+          }} />
+        </React.Suspense>
 
         {/* 诊断工具 */}
         {showDiagnostic && (

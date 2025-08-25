@@ -15,26 +15,27 @@ const StripeConfigDiagnostic: React.FC = () => {
     setIsRunning(true);
     const diagnosticResults: DiagnosticResult[] = [];
 
-    // 1. 检查前端环境变量 - 生产环境标准
+    // 1. 检查前端环境变量 - 兼容多种配置
     const viteKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-    const stripeKey = viteKey; // 生产环境只使用VITE_前缀
+    const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+    const stripeKey = viteKey || reactKey; // 优先使用VITE_前缀，兼容REACT_APP_前缀
     const isProduction = import.meta.env.MODE === 'production';
 
     // 生产环境放宽检查：允许测试密钥用于功能测试
-    const keyStatus = viteKey &&
-                     viteKey.length > 20 && // 放宽长度要求
-                     viteKey.startsWith('pk_') && // 只要求pk开头
-                     !viteKey.includes('placeholder') &&
-                     !viteKey.includes('your-stripe') &&
-                     !viteKey.includes('MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD') ? 'success' : 'error';
+    const keyStatus = stripeKey &&
+                     stripeKey.length > 20 && // 放宽长度要求
+                     stripeKey.startsWith('pk_') && // 只要求pk开头
+                     !stripeKey.includes('placeholder') &&
+                     !stripeKey.includes('your-stripe') &&
+                     !stripeKey.includes('MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD') ? 'success' : 'error';
 
     diagnosticResults.push({
       category: '前端环境变量',
       status: keyStatus,
-      message: `VITE_STRIPE_PUBLISHABLE_KEY: ${viteKey ? '已配置' : '未配置'}`,
-      details: viteKey ?
-        `值: ${viteKey.substring(0, 20)}...\n长度: ${viteKey.length}\n类型: ${viteKey.startsWith('pk_live_') ? '生产密钥' : viteKey.startsWith('pk_test_') ? '测试密钥' : '未知'}\n环境: ${isProduction ? '生产环境' : '开发环境'}\n状态: ${viteKey.startsWith('pk_test_') ? '测试模式 - 适用于功能测试' : viteKey.startsWith('pk_live_') ? '生产模式 - 真实支付' : '未知模式'}` :
-        '环境变量未设置 - 请在Cloudflare Pages Dashboard中设置'
+      message: `Stripe密钥: ${stripeKey ? '已配置' : '未配置'}`,
+      details: stripeKey ?
+        `值: ${stripeKey.substring(0, 20)}...\n长度: ${stripeKey.length}\n类型: ${stripeKey.startsWith('pk_live_') ? '生产密钥' : stripeKey.startsWith('pk_test_') ? '测试密钥' : '未知'}\n环境: ${isProduction ? '生产环境' : '开发环境'}\n来源: ${viteKey ? 'VITE_STRIPE_PUBLISHABLE_KEY' : reactKey ? 'REACT_APP_STRIPE_PUBLISHABLE_KEY' : '未知'}\n状态: ${stripeKey.startsWith('pk_test_') ? '测试模式 - 适用于功能测试' : stripeKey.startsWith('pk_live_') ? '生产模式 - 真实支付' : '未知模式'}` :
+        '环境变量未设置 - 请在Cloudflare Pages Dashboard中设置 VITE_STRIPE_PUBLISHABLE_KEY 或 REACT_APP_STRIPE_PUBLISHABLE_KEY'
     });
 
     // 生产环境不再检查REACT_APP_前缀（已弃用）
