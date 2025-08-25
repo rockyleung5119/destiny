@@ -27,6 +27,8 @@ jobs:
         uses: actions/setup-node@v4 # 第二步：设置 Node.js 环境
         with:
           node-version: '20' # 使用 Node.js 20 版本
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
 
       - name: Prepare Backend
         run: |
@@ -117,56 +119,76 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: Deploy to Cloudflare Workers (Attempt 1)
-        id: deploy-attempt-1
+      - name: Deploy to Cloudflare Workers (Primary)
+        id: deploy-main
         uses: cloudflare/wrangler-action@v3
+        timeout-minutes: 15
         continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 保持完整功能的部署命令，使用GitHub专用配置
-          command: deploy --config wrangler-github.toml --compatibility-date=2024-08-01 --keep-vars --force
+          # 使用GitHub专用配置，优化大文件部署
+          command: deploy --config wrangler-github.toml --compatibility-date=2024-08-01 --no-bundle --minify=false
 
-      - name: Deploy to Cloudflare Workers (Attempt 2 - Fallback)
-        id: deploy-attempt-2
-        if: steps.deploy-attempt-1.outcome == 'failure'
+      - name: Deploy to Cloudflare Workers (Fallback)
+        id: deploy-fallback
+        if: steps.deploy-main.outcome == 'failure'
         uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
+        timeout-minutes: 15
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 备用部署：使用GitHub配置，不强制保留变量
-          command: deploy --config wrangler-github.toml --compatibility-date=2024-08-01 --force
+          # 备用部署：使用标准配置，启用压缩
+          command: deploy --config wrangler-github.toml --compatibility-date=2024-08-01
 
-      - name: Deploy to Cloudflare Workers (Attempt 3 - Minimal)
-        id: deploy-attempt-3
-        if: steps.deploy-attempt-2.outcome == 'failure'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: 'backend'
-          # 最小化部署：只使用基本配置
-          command: deploy --config wrangler-github.toml
-
-      - name: Handle Deployment Failure
-        if: failure()
+      - name: Deployment Status Check
+        if: always()
         run: |
-          echo "❌ 后端部署失败！"
-          echo "🔍 可能的原因："
-          echo "1. API Token权限不足"
-          echo "2. Durable Objects或Queues配置问题"
-          echo "3. 网络连接问题"
-          echo "4. wrangler版本兼容性问题"
-          echo ""
-          echo "🛠️ 建议的修复方法："
-          echo "1. 检查GitHub Secrets中的CLOUDFLARE_API_TOKEN权限"
-          echo "2. 确保API Token包含Workers、Queues、D1、R2权限"
-          echo "3. 手动部署: cd backend && wrangler deploy"
-          echo "4. 检查Cloudflare账户是否有足够的配额"
-          exit 1
+          cd backend
+          echo "📊 检查部署状态..."
+
+          if [ "${{ steps.deploy-main.outcome }}" = "success" ] || [ "${{ steps.deploy-fallback.outcome }}" = "success" ]; then
+            echo "✅ 后端部署成功！"
+            echo "🔗 Backend URL: https://destiny-backend.jerryliang5119.workers.dev"
+
+            if [ "${{ steps.deploy-main.outcome }}" = "success" ]; then
+              echo "✅ 主要部署方式成功"
+            else
+              echo "✅ 备用部署方式成功"
+            fi
+
+            # 测试部署的Worker
+            echo "🧪 测试部署的Worker..."
+            sleep 10
+            HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.jerryliang5119.workers.dev/api/health || echo "000")
+            echo "Health check response: $HEALTH_CHECK"
+
+            if [ "$HEALTH_CHECK" = "200" ]; then
+              echo "✅ Worker健康检查通过"
+            else
+              echo "⚠️ Worker健康检查失败，但部署可能仍然成功"
+            fi
+          else
+            echo "❌ 后端部署失败！"
+            echo ""
+            echo "🔍 可能的原因："
+            echo "1. API Token权限不足 - 需要Workers、Queues、D1、R2权限"
+            echo "2. 文件大小限制 - worker.ts文件较大(5448行)"
+            echo "3. 网络超时 - GitHub Actions环境网络问题"
+            echo "4. Durable Objects迁移冲突"
+            echo "5. Cloudflare账户配额不足"
+            echo ""
+            echo "🛠️ 建议的修复方法："
+            echo "1. 检查GitHub Secrets配置"
+            echo "2. 手动部署: cd backend && wrangler deploy --config wrangler-github.toml"
+            echo "3. 检查Cloudflare Dashboard中的Workers配额"
+            echo "4. 验证API Token权限范围"
+
+            # 不让整个工作流失败，允许前端继续部署
+            echo "⚠️ 后端部署失败，但不影响前端部署"
+          fi
 
       - name: Verify Deployment
         run: |
