@@ -1,0 +1,55 @@
+# 简化的Wrangler配置 - 用于解决GitHub Actions部署问题
+name = "destiny-backend"
+main = "worker.ts"
+compatibility_date = "2024-08-01"
+
+# 环境变量配置（非敏感信息）
+[vars]
+NODE_ENV = "production"
+CORS_ORIGIN = "https://indicate.top,https://destiny-frontend.pages.dev"
+FRONTEND_URL = "https://indicate.top"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
+EMAIL_SERVICE = "resend"
+RESEND_FROM_EMAIL = "info@info.indicate.top"
+RESEND_FROM_NAME = "indicate.top"
+
+# D1数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "destiny-db"
+database_id = "500716dc-3ac2-4b4a-a2ee-ad79b301228d"
+
+# R2存储绑定 - 数据库备份存储
+[[r2_buckets]]
+binding = "BACKUP_STORAGE"
+bucket_name = "destiny-backups"
+
+# 简化的Durable Objects配置 - 移除迁移以避免部署冲突
+[[durable_objects.bindings]]
+name = "AI_PROCESSOR"
+class_name = "AIProcessor"
+
+[[durable_objects.bindings]]
+name = "BATCH_COORDINATOR"
+class_name = "BatchCoordinator"
+
+# 简化的Queues配置
+[[queues.producers]]
+binding = "AI_QUEUE"
+queue = "ai-processing-queue"
+
+[[queues.consumers]]
+queue = "ai-processing-queue"
+max_batch_size = 1
+max_batch_timeout = 10
+max_retries = 2
+dead_letter_queue = "ai-processing-dlq"
+
+[[queues.producers]]
+binding = "AI_DLQ"
+queue = "ai-processing-dlq"
+
+# 定时任务配置
+[triggers]
+crons = ["*/2 * * * *"]

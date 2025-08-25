@@ -1,90 +1,29 @@
-# .github/workflows/deploy-frontend.yml
-
 name: Deploy Frontend to Cloudflare Pages
 
 on:
-  # 当代码被推送到 main 分支时触发
   push:
-    branches:
-      - main
-    # 暂时移除路径过滤，确保工作流能被触发
-    # paths:
-    #   - 'src/**'
-    #   - 'public/**'
-    #   - 'index.html'
-    #   - 'package.json'
-    #   - 'package-lock.json'
-    #   - 'vite.config.ts'
-    #   - 'tsconfig.json'
-    #   - '.env'
-    #   - '.env.production'
-    #   - '.github/workflows/deploy-frontend.yml'
-
-  # 允许您在 GitHub Actions 页面手动触发此工作流
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm' # 缓存npm依赖，加快后续构建速度
+          cache: 'npm'
 
-      - name: Install Dependencies
-        run: |
-          echo "📦 Installing frontend dependencies..."
-          npm ci --prefer-offline --no-audit
-          echo "✅ Dependencies installed"
+      - run: npm ci
 
-      - name: Build Frontend
-        run: |
-          echo "🔨 Building frontend..."
-          npm run build
-          echo "📊 Build output:"
-          ls -la dist/
-          echo "✅ Frontend build completed"
+      - run: npm run build
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 简化命令，移除可能不支持的参数
-          command: pages deploy dist --project-name=destiny-frontend
+          command: pages deploy dist --project-name destiny-frontend
 
-      - name: Verify Frontend Deployment
-        run: |
-          echo "🧪 Verifying frontend deployment..."
-          sleep 10  # 等待部署完全生效
 
-          # 测试主页
-          echo "📊 Testing main page..."
-          MAIN_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://indicate.top)
-          echo "Main page response code: $MAIN_RESPONSE"
-
-          if [ "$MAIN_RESPONSE" = "200" ]; then
-            echo "✅ Main page accessible"
-          else
-            echo "⚠️ Main page returned: $MAIN_RESPONSE"
-          fi
-
-          echo "✅ Frontend deployment verification completed!"
-
-      - name: Frontend Deployment Success
-        run: |
-          echo "🎉 Frontend deployment completed successfully!"
-          echo ""
-          echo "🔗 Frontend URL: https://indicate.top"
-          echo "🔗 Cloudflare Pages URL: https://destiny-frontend.pages.dev"
-          echo ""
-          echo "📋 Next steps:"
-          echo "1. Test the application functionality"
-          echo "2. Verify Stripe payment integration"
-          echo "3. Check authentication flows"

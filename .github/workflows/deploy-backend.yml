@@ -1,245 +1,33 @@
-# .github/workflows/deploy-backend.yml
-
 name: Deploy Backend to Cloudflare Workers
 
 on:
-  # 当代码被推送到 main 分支时触发
   push:
-    branches:
-      - main
-    # 暂时移除路径过滤，确保工作流能被触发
-    # paths:
-    #   - 'backend/**'
-    #   - '.github/workflows/deploy-backend.yml'
-
-  # 允许您在 GitHub Actions 页面手动触发此工作流
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest # 使用最新的 Ubuntu 运行环境
-    name: Deploy Backend
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4 # 第一步：拉取代码
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4 # 第二步：设置 Node.js 环境
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20' # 使用 Node.js 20 版本
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'backend/package-lock.json'
 
-      - name: Prepare Backend
-        run: |
-          echo "🔧 Preparing backend for deployment..."
-          cd backend
-          
-          # 检查必要文件
-          echo "📋 Checking required files..."
-          ls -la
-          
-          # 确保有正确的package.json
-          if [ ! -f "package.json" ]; then
-            if [ -f "workers-package.json" ]; then
-              echo "📦 Using workers-package.json as package.json"
-              cp workers-package.json package.json
-            else
-              echo "❌ No package.json found!"
-              exit 1
-            fi
-          fi
-          
-          echo "📄 Package.json content:"
-          cat package.json
-
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           cd backend
-          echo "📦 Installing dependencies..."
+          npm ci
 
-          # 检查当前Node版本
-          node --version
-          npm --version
-
-          # 清理可能的缓存问题
-          rm -rf node_modules package-lock.json || true
-
-          # 确保使用正确的package.json
-          if [ ! -f "package.json" ]; then
-            echo "❌ package.json not found!"
-            exit 1
-          fi
-
-          # 安装依赖，使用更稳定的方式
-          echo "Installing with npm install..."
-          npm install --no-optional --no-audit
-
-          echo "✅ Dependencies installed"
-          echo "📊 Installed packages:"
-          npm list --depth=0 || echo "Package list may have warnings, continuing..."
-
-      - name: Validate Configuration
-        run: |
-          cd backend
-          echo "🔍 Validating configuration..."
-          
-          # 检查TypeScript文件
-          if [ -f "worker.ts" ]; then
-            echo "✅ worker.ts found"
-            echo "📊 Checking for Stripe integration..."
-            grep -q "StripeAPIClient" worker.ts && echo "✅ Stripe API client found" || echo "⚠️ Stripe API client not found"
-            grep -q "CloudflareStripeService" worker.ts && echo "✅ Stripe service found" || echo "⚠️ Stripe service not found"
-          else
-            echo "❌ worker.ts not found!"
-            exit 1
-          fi
-
-      - name: Pre-deployment Resource Check
-        run: |
-          cd backend
-          echo "🔍 Checking Cloudflare resources before deployment..."
-
-          # 检查认证状态
-          echo "🔐 Checking authentication..."
-          wrangler whoami || echo "⚠️ Auth check failed, but continuing..."
-
-          # 检查队列
-          echo "📋 Checking queues..."
-          wrangler queues list || echo "⚠️ Queue check failed, but continuing..."
-
-          # 检查D1数据库
-          echo "🗄️ Checking D1 database..."
-          wrangler d1 list || echo "⚠️ D1 check failed, but continuing..."
-
-          # 检查R2存储桶
-          echo "📦 Checking R2 buckets..."
-          wrangler r2 bucket list || echo "⚠️ R2 check failed, but continuing..."
-
-          # 检查worker.ts文件大小
-          echo "📊 Checking worker.ts file size..."
-          WORKER_SIZE=$(wc -c < worker.ts)
-          echo "Worker file size: $WORKER_SIZE bytes"
-          if [ $WORKER_SIZE -gt 1000000 ]; then
-            echo "⚠️ Large worker file detected, using optimized deployment"
-          fi
-
-          # 干运行测试 - 使用标准配置（之前工作正常）
-          echo "🧪 Testing deployment configuration..."
-          wrangler deploy --dry-run
-          echo "✅ Pre-deployment checks completed"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy to Cloudflare Workers (Primary)
-        id: deploy-main
+      - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
-        timeout-minutes: 15
-        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 使用标准配置（之前工作正常），优化大文件部署
-          command: deploy --compatibility-date=2024-08-01 --no-bundle --minify=false --keep-vars
+          command: deploy --config wrangler-simple.toml
 
-      - name: Deploy to Cloudflare Workers (Fallback)
-        id: deploy-fallback
-        if: steps.deploy-main.outcome == 'failure'
-        uses: cloudflare/wrangler-action@v3
-        timeout-minutes: 15
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: 'backend'
-          # 备用部署：使用标准配置，启用压缩
-          command: deploy --compatibility-date=2024-08-01
 
-      - name: Deployment Status Check
-        if: always()
-        run: |
-          cd backend
-          echo "📊 检查部署状态..."
-
-          if [ "${{ steps.deploy-main.outcome }}" = "success" ] || [ "${{ steps.deploy-fallback.outcome }}" = "success" ]; then
-            echo "✅ 后端部署成功！"
-            echo "🔗 Backend URL: https://destiny-backend.jerryliang5119.workers.dev"
-
-            if [ "${{ steps.deploy-main.outcome }}" = "success" ]; then
-              echo "✅ 主要部署方式成功"
-            else
-              echo "✅ 备用部署方式成功"
-            fi
-
-            # 测试部署的Worker
-            echo "🧪 测试部署的Worker..."
-            sleep 10
-            HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.jerryliang5119.workers.dev/api/health || echo "000")
-            echo "Health check response: $HEALTH_CHECK"
-
-            if [ "$HEALTH_CHECK" = "200" ]; then
-              echo "✅ Worker健康检查通过"
-            else
-              echo "⚠️ Worker健康检查失败，但部署可能仍然成功"
-            fi
-          else
-            echo "❌ 后端部署失败！"
-            echo ""
-            echo "🔍 可能的原因："
-            echo "1. API Token权限不足 - 需要Workers、Queues、D1、R2权限"
-            echo "2. 文件大小限制 - worker.ts文件较大(5448行)"
-            echo "3. 网络超时 - GitHub Actions环境网络问题"
-            echo "4. Durable Objects迁移冲突"
-            echo "5. Cloudflare账户配额不足"
-            echo ""
-            echo "🛠️ 建议的修复方法："
-            echo "1. 检查GitHub Secrets配置"
-            echo "2. 手动部署: cd backend && wrangler deploy"
-            echo "3. 检查Cloudflare Dashboard中的Workers配额"
-            echo "4. 验证API Token权限范围"
-
-            # 不让整个工作流失败，允许前端继续部署
-            echo "⚠️ 后端部署失败，但不影响前端部署"
-          fi
-
-      - name: Verify Deployment
-        run: |
-          echo "🧪 Verifying deployment..."
-          sleep 15  # 等待部署完全生效
-
-          # 测试健康检查端点
-          echo "📊 Testing health endpoint..."
-          HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.jerryliang5119.workers.dev/api/health)
-          echo "Health response code: $HEALTH_RESPONSE"
-
-          if [ "$HEALTH_RESPONSE" = "200" ]; then
-            echo "✅ Health check passed"
-          else
-            echo "⚠️ Health check returned: $HEALTH_RESPONSE"
-          fi
-
-          # 测试Stripe健康检查端点
-          echo "📊 Testing Stripe health endpoint..."
-          STRIPE_HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://destiny-backend.jerryliang5119.workers.dev/api/stripe/health)
-          echo "Stripe health response code: $STRIPE_HEALTH_RESPONSE"
-
-          if [ "$STRIPE_HEALTH_RESPONSE" = "200" ]; then
-            echo "✅ Stripe health check passed"
-          else
-            echo "⚠️ Stripe health check returned: $STRIPE_HEALTH_RESPONSE"
-          fi
-
-          echo "✅ Deployment verification completed!"
-
-      - name: Deployment Success
-        run: |
-          echo "🎉 Backend deployment completed successfully!"
-          echo ""
-          echo "🔗 Backend URL: https://destiny-backend.jerryliang5119.workers.dev"
-          echo "🔗 Health Check: https://destiny-backend.jerryliang5119.workers.dev/api/health"
-          echo "🔗 Stripe Health: https://destiny-backend.jerryliang5119.workers.dev/api/stripe/health"
-          echo ""
-          echo "📋 Next steps:"
-          echo "1. Configure Stripe environment variables if needed"
-          echo "2. Test payment endpoints"
-          echo "3. Monitor application logs with: wrangler tail"
