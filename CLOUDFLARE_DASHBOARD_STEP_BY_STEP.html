@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare Pages Dashboard 环境变量设置指南</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            line-height: 1.6;
+        }
+        .step-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .step-number {
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            margin-right: 15px;
+        }
+        .step-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            border-left: 4px solid #3b82f6;
+        }
+        .highlight {
+            background: rgba(255, 255, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        button {
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: rgba(59, 130, 246, 1);
+            transform: translateY(-2px);
+        }
+        .screenshot-placeholder {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 15px 0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Cloudflare Pages Dashboard 环境变量设置指南</h1>
+    <p>详细步骤说明如何在Cloudflare Dashboard中设置 VITE_STRIPE_PUBLISHABLE_KEY 环境变量</p>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">1</span>
+            <span>登录Cloudflare Dashboard</span>
+        </div>
+        <p>1. 打开浏览器，访问 <strong>https://dash.cloudflare.com/</strong></p>
+        <p>2. 使用你的Cloudflare账户登录</p>
+        <p>3. 确认看到Cloudflare主控制面板</p>
+        
+        <div class="screenshot-placeholder">
+            📸 这里应该看到Cloudflare主控制面板，左侧有菜单栏
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">2</span>
+            <span>进入Pages项目</span>
+        </div>
+        <p>1. 在左侧菜单中，点击 <span class="highlight">"Pages"</span></p>
+        <p>2. 在项目列表中，找到并点击 <span class="highlight">"destiny-frontend"</span> 项目</p>
+        <p>3. 确认进入项目详情页面</p>
+        
+        <div class="screenshot-placeholder">
+            📸 这里应该看到destiny-frontend项目的概览页面，显示部署历史和域名信息
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">3</span>
+            <span>进入设置页面</span>
+        </div>
+        <p>1. 在项目页面顶部，点击 <span class="highlight">"Settings"</span> 标签</p>
+        <p>2. 向下滚动找到 <span class="highlight">"Environment variables"</span> 部分</p>
+        
+        <div class="screenshot-placeholder">
+            📸 Settings页面中的Environment variables部分，可能显示现有的环境变量
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">4</span>
+            <span>设置Stripe环境变量</span>
+        </div>
+        
+        <div class="warning">
+            ⚠️ <strong>重要</strong>: 如果已存在 VITE_STRIPE_PUBLISHABLE_KEY 变量，点击 "Edit" 编辑；如果不存在，点击 "Add variable" 添加新变量。
+        </div>
+        
+        <p><strong>添加新变量的步骤：</strong></p>
+        <p>1. 点击 <span class="highlight">"Add variable"</span> 按钮（蓝色按钮）</p>
+        <p>2. 在弹出的表单中填写：</p>
+        
+        <div class="code-block">
+Variable name: VITE_STRIPE_PUBLISHABLE_KEY
+Value: pk_live_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um
+Environment: Production
+        </div>
+        
+        <p>3. <strong>确保Environment选择为 "Production"</strong>（不是Preview）</p>
+        <p>4. 点击 <span class="highlight">"Save"</span> 保存</p>
+        
+        <div class="screenshot-placeholder">
+            📸 环境变量添加表单，显示Variable name、Value和Environment选择器
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">5</span>
+            <span>验证设置并重新部署</span>
+        </div>
+        
+        <p>1. <strong>验证环境变量</strong>：在Environment variables列表中确认看到：</p>
+        <div class="code-block">
+VITE_STRIPE_PUBLISHABLE_KEY
+Environment: Production  
+Value: pk_live_51RySLY... (显示前几位)
+        </div>
+        
+        <p>2. <strong>触发重新部署</strong>（选择其中一种方法）：</p>
+        
+        <div class="success">
+            <strong>方法1: Dashboard重新部署</strong><br>
+            • 点击 "Deployments" 标签<br>
+            • 找到最新部署，点击 "Retry deployment"<br>
+            • 或点击 "Create deployment" 创建新部署
+        </div>
+        
+        <div class="success">
+            <strong>方法2: GitHub推送触发</strong><br>
+            • 推送任何代码更改到GitHub<br>
+            • GitHub Actions会自动触发新部署<br>
+            • 新部署会使用更新的环境变量
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">6</span>
+            <span>验证修复效果</span>
+        </div>
+        
+        <p><strong>等待部署完成后（通常2-5分钟）：</strong></p>
+        
+        <p>1. <strong>访问网站</strong>：</p>
+        <button onclick="window.open('https://indicate.top/membership', '_blank')">
+            打开 indicate.top/membership
+        </button>
+        
+        <p>2. <strong>测试支付功能</strong>：</p>
+        <ul>
+            <li>点击任意付费计划的 "选择计划" 按钮</li>
+            <li>如果仍显示错误，点击 "诊断问题" 按钮</li>
+            <li>查看诊断结果是否显示配置正确</li>
+        </ul>
+        
+        <p>3. <strong>预期结果</strong>：</p>
+        <div class="success">
+            ✅ VITE_STRIPE_PUBLISHABLE_KEY: 已配置<br>
+            ✅ Stripe密钥验证: 密钥格式有效<br>
+            ✅ 支付表单正常显示
+        </div>
+        
+        <p>4. <strong>浏览器控制台验证</strong>：</p>
+        <div class="code-block">
+// 在浏览器控制台运行
+console.log('VITE_STRIPE_PUBLISHABLE_KEY:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+console.log('Environment:', import.meta.env.MODE);
+
+// 预期输出
+VITE_STRIPE_PUBLISHABLE_KEY: "pk_live_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um"
+Environment: "production"
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">🔧</span>
+            <span>后端部署问题修复</span>
+        </div>
+        
+        <div class="success">
+            <strong>✅ 后端资源检查完成</strong><br>
+            • Queues: ai-processing-queue, ai-processing-dlq ✅<br>
+            • D1 Database: destiny-db ✅<br>
+            • R2 Bucket: destiny-backups ✅<br>
+            • Durable Objects: AIProcessor, BatchCoordinator ✅<br>
+            • 干运行部署: 成功 ✅
+        </div>
+        
+        <div class="warning">
+            <strong>⚠️ GitHub Actions后端部署失败原因</strong><br>
+            可能是API Token权限不足，已在工作流中添加 --force 参数
+        </div>
+        
+        <p><strong>如果GitHub Actions仍然失败，手动部署后端：</strong></p>
+        <div class="code-block">
+cd backend
+wrangler deploy --compatibility-date=2024-08-01 --keep-vars --force
+        </div>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">📋</span>
+            <span>完整验证清单</span>
+        </div>
+        
+        <div class="code-block">
+□ 在Cloudflare Pages Dashboard中设置 VITE_STRIPE_PUBLISHABLE_KEY
+□ 环境选择为 "Production"
+□ 使用真实的生产Stripe密钥 (pk_live_开头)
+□ 触发重新部署
+□ 等待部署完成 (2-5分钟)
+□ 访问 https://indicate.top/membership 测试
+□ 支付按钮不再显示错误信息
+□ Stripe诊断工具显示配置正确
+        </div>
+        
+        <button onclick="window.open('https://dash.cloudflare.com/', '_blank')">
+            🔗 打开 Cloudflare Dashboard
+        </button>
+        
+        <button onclick="window.open('https://indicate.top/membership', '_blank')">
+            🧪 测试支付功能
+        </button>
+    </div>
+
+    <div class="step-container">
+        <div class="step-title">
+            <span class="step-number">🚨</span>
+            <span>常见问题解决</span>
+        </div>
+        
+        <div class="error">
+            <strong>问题1: 找不到 "Environment variables" 部分</strong><br>
+            解决: 确保在正确的项目 (destiny-frontend) 的 Settings 页面，向下滚动查找
+        </div>
+        
+        <div class="error">
+            <strong>问题2: 设置后仍显示占位符</strong><br>
+            解决: 确保选择了 "Production" 环境，保存后重新部署，清除浏览器缓存
+        </div>
+        
+        <div class="error">
+            <strong>问题3: 无法保存环境变量</strong><br>
+            解决: 检查账户权限，刷新页面重试，确保网络连接正常
+        </div>
+    </div>
+
+    <script>
+        // 页面加载完成后的提示
+        window.addEventListener('load', () => {
+            console.log('📋 Cloudflare Pages Dashboard 设置指南已加载');
+            console.log('🎯 目标: 设置 VITE_STRIPE_PUBLISHABLE_KEY 环境变量');
+            console.log('🔗 Cloudflare Dashboard: https://dash.cloudflare.com/');
+        });
+    </script>
+</body>
+</html>

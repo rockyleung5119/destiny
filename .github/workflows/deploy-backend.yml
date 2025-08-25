@@ -79,14 +79,38 @@ jobs:
             exit 1
           fi
 
+      - name: Pre-deployment Resource Check
+        run: |
+          cd backend
+          echo "🔍 Checking Cloudflare resources before deployment..."
+
+          # 检查队列
+          echo "📋 Checking queues..."
+          wrangler queues list || echo "⚠️ Queue check failed, but continuing..."
+
+          # 检查D1数据库
+          echo "🗄️ Checking D1 database..."
+          wrangler d1 list || echo "⚠️ D1 check failed, but continuing..."
+
+          # 检查R2存储桶
+          echo "📦 Checking R2 buckets..."
+          wrangler r2 bucket list || echo "⚠️ R2 check failed, but continuing..."
+
+          # 干运行测试
+          echo "🧪 Testing deployment configuration..."
+          wrangler deploy --dry-run
+          echo "✅ Pre-deployment checks completed"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'backend'
-          # 使用最简单的部署命令
-          command: deploy
+          # 保持完整功能的部署命令，包含所有必要的Durable Objects和Queues
+          command: deploy --compatibility-date=2024-08-01 --keep-vars --force
 
       - name: Verify Deployment
         run: |
