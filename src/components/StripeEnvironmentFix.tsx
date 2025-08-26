@@ -18,29 +18,57 @@ const StripeEnvironmentFix: React.FC<StripeEnvironmentFixProps> = ({ onKeyDetect
 
   const checkEnvironmentVariables = () => {
     console.log('🔍 检查Stripe环境变量...');
-    
+
     // 检查各种可能的环境变量
     const viteKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
     const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
     const tempKey = localStorage.getItem('STRIPE_TEMP_KEY');
-    
-    console.log('环境变量检查结果:', {
+
+    // 详细的环境变量调试信息
+    console.log('🔍 StripeEnvironmentFix - Environment Debug:', {
       viteKey: viteKey ? `${viteKey.substring(0, 20)}...` : 'undefined',
       reactKey: reactKey ? `${reactKey.substring(0, 20)}...` : 'undefined',
       tempKey: tempKey ? `${tempKey.substring(0, 20)}...` : 'undefined',
-      environment: import.meta.env.MODE
+      allEnvKeys: Object.keys(import.meta.env).filter(key => key.includes('STRIPE')),
+      mode: import.meta.env.MODE,
+      dev: import.meta.env.DEV,
+      prod: import.meta.env.PROD,
+      baseUrl: import.meta.env.BASE_URL,
+      viteKeyRaw: viteKey,
+      reactKeyRaw: reactKey
     });
 
     let finalKey = '';
     let source = '';
 
-    if (viteKey && viteKey !== 'MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD') {
+    // 更严格的密钥验证函数
+    const isValidKey = (key: string) => {
+      if (!key || typeof key !== 'string') return false;
+
+      const invalidValues = [
+        'MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD',
+        'your-stripe-publishable-key-here',
+        'pk_test_placeholder',
+        'undefined',
+        'null',
+        ''
+      ];
+
+      return key.length > 50 &&
+             key.startsWith('pk_') &&
+             !invalidValues.some(invalid => key.includes(invalid)) &&
+             !key.includes('placeholder') &&
+             !key.includes('your-stripe') &&
+             !key.includes('REPLACE_WITH');
+    };
+
+    if (isValidKey(viteKey)) {
       finalKey = viteKey;
       source = 'VITE_STRIPE_PUBLISHABLE_KEY';
-    } else if (reactKey && reactKey !== 'MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD') {
+    } else if (isValidKey(reactKey)) {
       finalKey = reactKey;
       source = 'REACT_APP_STRIPE_PUBLISHABLE_KEY';
-    } else if (tempKey) {
+    } else if (isValidKey(tempKey)) {
       finalKey = tempKey;
       source = 'localStorage (临时)';
     }
@@ -49,13 +77,20 @@ const StripeEnvironmentFix: React.FC<StripeEnvironmentFixProps> = ({ onKeyDetect
     setKeySource(source);
 
     // 验证密钥格式
-    if (finalKey && finalKey.startsWith('pk_') && finalKey.length > 50) {
+    if (finalKey && isValidKey(finalKey)) {
       setIsFixed(true);
       onKeyDetected?.(finalKey);
       console.log('✅ Stripe密钥检测成功:', { key: `${finalKey.substring(0, 20)}...`, source });
     } else {
       setIsFixed(false);
-      console.log('❌ Stripe密钥检测失败');
+      console.log('❌ Stripe密钥检测失败 - 详细信息:', {
+        viteKeyValid: isValidKey(viteKey),
+        reactKeyValid: isValidKey(reactKey),
+        tempKeyValid: isValidKey(tempKey),
+        viteKeyValue: viteKey,
+        reactKeyValue: reactKey,
+        reason: !finalKey ? 'No key found' : 'Invalid key format'
+      });
     }
   };
 

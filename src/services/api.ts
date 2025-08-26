@@ -21,6 +21,10 @@ export interface ApiResponse<T = any> {
   message?: string;
   error?: string;
   data?: T;
+  // Stripe支付相关字段
+  clientSecret?: string;
+  subscriptionId?: string;
+  requiresConfirmation?: boolean;
 }
 
 export interface User {

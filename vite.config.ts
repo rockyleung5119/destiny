@@ -15,6 +15,8 @@ export default defineConfig(({ command, mode }) => {
     define: {
       __APP_ENV__: JSON.stringify(env.APP_ENV),
     },
+    // 环境变量配置 - 确保Stripe密钥正确传递
+    envPrefix: ['VITE_', 'REACT_APP_'],
     // 开发服务器配置
     server: {
       port: 5173,

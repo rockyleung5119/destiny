@@ -8,48 +8,29 @@ import {
 } from '@stripe/react-stripe-js';
 import { useAuth } from '../hooks/useAuth';
 import { stripeAPI } from '../services/api';
+import { getStripePublishableKey, checkStripeEnvironment, applyTemporaryFix } from '../utils/stripe-env-checker';
 
 // 懒加载诊断组件
 const StripeConfigDiagnostic = React.lazy(() => import('./StripeConfigDiagnostic'));
 const StripeEnvironmentFix = React.lazy(() => import('./StripeEnvironmentFix'));
+const StripeProductionFix = React.lazy(() => import('./StripeProductionFix'));
+const StripeSystemStatus = React.lazy(() => import('./StripeSystemStatus'));
 
-// 获取Stripe公钥 - 兼容多种环境变量配置，包括临时修复
-const getStripeKey = () => {
-  const viteKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-  const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
-  const tempKey = localStorage.getItem('STRIPE_TEMP_KEY');
-
-  return viteKey || reactKey || tempKey;
-};
-
-const stripeKey = getStripeKey();
+// 使用统一的环境检查工具
+const stripeKey = getStripePublishableKey();
+const envStatus = checkStripeEnvironment();
 
 console.log('🔑 StripePaymentModal Key Check:', {
   stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
   length: stripeKey?.length || 0,
   startsWithPk: stripeKey?.startsWith('pk_') || false,
   environment: import.meta.env.MODE || 'unknown',
-  viteKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
-  reactKey: import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'present' : 'missing',
-  source: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'VITE_' :
-          import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'REACT_APP_' : 'none'
+  hasValidKey: envStatus.hasValidKey,
+  keySource: envStatus.keySource
 });
 
-// 生产环境放宽验证：允许测试密钥用于功能测试
-const invalidKeys = [
-  'pk_test_placeholder',
-  'your-stripe-publishable-key-here',
-  'your-stripe-publisha', // 截断的占位符
-  'sk_test_REPLACE_WITH_YOUR_STRIPE_SECRET_KEY',
-  'MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD'
-];
-
-const isPaymentEnabled = stripeKey &&
-  stripeKey.length > 20 && // 基本长度要求
-  stripeKey.startsWith('pk_') && // 只要求pk开头
-  !invalidKeys.some(invalid => stripeKey.includes(invalid)) && // 检查是否包含任何无效片段
-  !stripeKey.includes('placeholder') && // 额外检查占位符
-  !stripeKey.includes('your-stripe'); // 额外检查占位符模式
+// 使用环境检查结果
+const isPaymentEnabled = envStatus.hasValidKey && !!stripeKey;
 
 // 初始化Stripe - 添加错误处理
 const stripePromise = isPaymentEnabled && stripeKey
@@ -413,11 +394,16 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
         </div>
         </div>
 
-        {/* 环境修复工具 */}
-        <React.Suspense fallback={<div>加载修复工具...</div>}>
-          <StripeEnvironmentFix onKeyDetected={(key) => {
-            console.log('🔑 检测到有效的Stripe密钥，刷新组件...');
-            window.location.reload();
+        {/* 系统状态检查工具 */}
+        <React.Suspense fallback={<div>加载状态检查...</div>}>
+          <StripeSystemStatus onStatusChange={(isHealthy) => {
+            console.log('🔍 支付系统状态更新:', isHealthy);
+            if (isHealthy) {
+              // 如果系统状态正常，可以重新初始化Stripe
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            }
           }} />
         </React.Suspense>
 
