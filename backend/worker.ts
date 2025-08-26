@@ -1629,32 +1629,115 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   }
 });
 
-// Stripe健康检查端点
+// Stripe健康检查端点 - 统一支付系统API标准
 app.get('/api/stripe/health', async (c) => {
   try {
     const hasStripeKey = !!c.env.STRIPE_SECRET_KEY;
     const hasWebhookSecret = !!c.env.STRIPE_WEBHOOK_SECRET;
 
+    // 统一的支付系统状态响应格式
     return c.json({
       success: true,
-      status: 'ok',
+      status: 'healthy',
+      service: 'Stripe Payment System',
       stripe: {
-        secretKeyConfigured: hasStripeKey,
-        webhookSecretConfigured: hasWebhookSecret,
-        apiClientType: 'StripeAPIClient (Custom)',
+        // 后端配置状态
+        backend: {
+          secretKeyConfigured: hasStripeKey,
+          webhookSecretConfigured: hasWebhookSecret,
+          secretKeyLength: c.env.STRIPE_SECRET_KEY?.length || 0,
+          secretKeyPrefix: c.env.STRIPE_SECRET_KEY?.substring(0, 7) || 'none',
+          apiClientType: 'StripeAPIClient (Custom)'
+        },
+        // 前端配置指导
+        frontend: {
+          requiredEnvVar: 'VITE_STRIPE_PUBLISHABLE_KEY',
+          alternativeEnvVar: 'REACT_APP_STRIPE_PUBLISHABLE_KEY',
+          cloudflareSetupRequired: true,
+          testPublishableKey: 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um',
+          setupInstructions: 'Set VITE_STRIPE_PUBLISHABLE_KEY in Cloudflare Pages Dashboard'
+        },
+        // API端点列表
         endpoints: [
           '/api/stripe/create-payment',
           '/api/stripe/webhook',
           '/api/stripe/subscription-status',
-          '/api/stripe/cancel-subscription'
-        ]
+          '/api/stripe/cancel-subscription',
+          '/api/stripe/health'
+        ],
+        // 系统状态
+        systemStatus: {
+          backendReady: hasStripeKey,
+          frontendConfigRequired: true,
+          paymentSystemEnabled: hasStripeKey
+        }
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: c.env.ENVIRONMENT || 'production'
     });
   } catch (error) {
     return c.json({
       success: false,
-      error: error.message
+      status: 'error',
+      service: 'Stripe Payment System',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
+});
+
+// 前端配置检查端点 - 帮助诊断Cloudflare Pages环境变量问题
+app.get('/api/stripe/frontend-config', async (c) => {
+  try {
+    const hasStripeKey = !!c.env.STRIPE_SECRET_KEY;
+    const hasWebhookSecret = !!c.env.STRIPE_WEBHOOK_SECRET;
+
+    // 提供前端配置指导
+    const frontendConfig = {
+      success: true,
+      status: 'config-check',
+      service: 'Frontend Configuration Helper',
+      cloudflarePages: {
+        required: true,
+        envVarName: 'VITE_STRIPE_PUBLISHABLE_KEY',
+        envVarValue: 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um',
+        setupSteps: [
+          '1. 访问 https://dash.cloudflare.com/',
+          '2. 进入 Pages → destiny-frontend → Settings',
+          '3. 点击 Environment variables',
+          '4. 添加变量: VITE_STRIPE_PUBLISHABLE_KEY',
+          '5. 设置值为上面的测试公钥',
+          '6. 选择 Production 环境',
+          '7. 保存并等待重新部署'
+        ]
+      },
+      temporaryFix: {
+        available: true,
+        method: 'localStorage',
+        code: "localStorage.setItem('STRIPE_TEMP_KEY', 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um'); location.reload();",
+        description: '在生产网站浏览器控制台运行上述代码可立即修复'
+      },
+      backend: {
+        secretKeyConfigured: hasStripeKey,
+        webhookSecretConfigured: hasWebhookSecret,
+        ready: hasStripeKey
+      },
+      validation: {
+        keyFormat: 'pk_test_* or pk_live_*',
+        keyLength: '> 50 characters',
+        excludePatterns: ['placeholder', 'your-stripe', 'MUST_BE_SET']
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    return c.json(frontendConfig);
+  } catch (error) {
+    return c.json({
+      success: false,
+      status: 'error',
+      service: 'Frontend Configuration Helper',
+      error: error.message,
+      timestamp: new Date().toISOString()
     }, 500);
   }
 });

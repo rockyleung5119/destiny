@@ -8,6 +8,13 @@ export interface StripeEnvStatus {
   keySource: string;
   keyValue: string;
   isProduction: boolean;
+  environment: string;
+  allEnvKeys: string[];
+  stripeKeys: {
+    vite: string;
+    react: string;
+    temp: string;
+  };
   debugInfo: any;
 }
 
@@ -38,7 +45,7 @@ function isValidStripeKey(key: string | undefined): boolean {
 }
 
 /**
- * 获取Stripe公钥
+ * 获取Stripe公钥 - 优化Cloudflare Pages环境变量读取
  */
 export function getStripePublishableKey(): string | null {
   // 优先级：VITE_ > REACT_APP_ > localStorage临时修复
@@ -46,17 +53,43 @@ export function getStripePublishableKey(): string | null {
   const reactKey = import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
   const tempKey = localStorage.getItem('STRIPE_TEMP_KEY');
 
-  console.log('🔍 Stripe Key Detection:', {
+  // 详细的环境变量调试信息
+  const allEnvKeys = Object.keys(import.meta.env);
+  const stripeRelatedKeys = allEnvKeys.filter(key =>
+    key.includes('STRIPE') || key.includes('stripe')
+  );
+
+  console.log('🔍 Stripe Key Detection (Enhanced):', {
+    environment: import.meta.env.MODE || 'unknown',
+    isProd: import.meta.env.PROD || false,
     viteKey: viteKey ? `${viteKey.substring(0, 20)}...` : 'undefined',
+    viteKeyLength: viteKey?.length || 0,
     reactKey: reactKey ? `${reactKey.substring(0, 20)}...` : 'undefined',
+    reactKeyLength: reactKey?.length || 0,
     tempKey: tempKey ? `${tempKey.substring(0, 20)}...` : 'undefined',
-    allEnvKeys: Object.keys(import.meta.env).filter(key => key.includes('STRIPE'))
+    tempKeyLength: tempKey?.length || 0,
+    allEnvKeys: allEnvKeys.length,
+    stripeRelatedKeys,
+    cloudflareEnvVars: allEnvKeys.filter(key => key.startsWith('VITE_') || key.startsWith('REACT_APP_'))
   });
 
-  if (isValidStripeKey(viteKey)) return viteKey;
-  if (isValidStripeKey(reactKey)) return reactKey;
-  if (isValidStripeKey(tempKey)) return tempKey;
-  
+  // 验证并返回有效密钥
+  if (isValidStripeKey(viteKey)) {
+    console.log('✅ 使用 VITE_STRIPE_PUBLISHABLE_KEY');
+    return viteKey;
+  }
+
+  if (isValidStripeKey(reactKey)) {
+    console.log('✅ 使用 REACT_APP_STRIPE_PUBLISHABLE_KEY');
+    return reactKey;
+  }
+
+  if (isValidStripeKey(tempKey)) {
+    console.log('✅ 使用 localStorage 临时密钥');
+    return tempKey;
+  }
+
+  console.warn('❌ 未找到有效的Stripe公钥');
   return null;
 }
 
@@ -87,25 +120,47 @@ export function checkStripeEnvironment(): StripeEnvStatus {
     hasValidKey = true;
   }
 
+  // 增强的Cloudflare Pages环境分析
+  const allEnvKeys = Object.keys(import.meta.env);
+  const cloudflareEnvVars = allEnvKeys.filter(key =>
+    key.startsWith('VITE_') || key.startsWith('REACT_APP_')
+  );
+  const stripeRelatedKeys = allEnvKeys.filter(key =>
+    key.includes('STRIPE') || key.includes('stripe')
+  );
+
   const debugInfo = {
     viteKey: viteKey ? `${viteKey.substring(0, 20)}...` : 'undefined',
+    viteKeyLength: viteKey?.length || 0,
     reactKey: reactKey ? `${reactKey.substring(0, 20)}...` : 'undefined',
+    reactKeyLength: reactKey?.length || 0,
     tempKey: tempKey ? `${tempKey.substring(0, 20)}...` : 'undefined',
+    tempKeyLength: tempKey?.length || 0,
     mode: import.meta.env.MODE,
     dev: import.meta.env.DEV,
     prod: import.meta.env.PROD,
     baseUrl: import.meta.env.BASE_URL,
-    allEnvVars: Object.keys(import.meta.env),
+    allEnvVars: allEnvKeys.length,
+    cloudflareEnvVars: cloudflareEnvVars.length,
+    stripeRelatedKeys,
     userAgent: navigator.userAgent,
     location: window.location.href,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    // Cloudflare特定信息
+    cloudflarePages: {
+      detected: window.location.hostname.includes('pages.dev'),
+      envVarCount: cloudflareEnvVars.length,
+      hasStripeVars: stripeRelatedKeys.length > 0,
+      recommendedVar: 'VITE_STRIPE_PUBLISHABLE_KEY'
+    }
   };
 
-  console.log('🔍 Stripe Environment Status:', {
+  console.log('🔍 Stripe Environment Status (Cloudflare Enhanced):', {
     hasValidKey,
     keySource,
     keyValue: keyValue ? `${keyValue.substring(0, 20)}...` : 'none',
     isProduction,
+    cloudflareDetected: debugInfo.cloudflarePages.detected,
     debugInfo
   });
 
@@ -114,6 +169,13 @@ export function checkStripeEnvironment(): StripeEnvStatus {
     keySource,
     keyValue,
     isProduction,
+    environment: import.meta.env.MODE || 'development',
+    allEnvKeys,
+    stripeKeys: {
+      vite: viteKey || '',
+      react: reactKey || '',
+      temp: tempKey || ''
+    },
     debugInfo
   };
 }

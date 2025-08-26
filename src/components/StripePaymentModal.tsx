@@ -8,25 +8,36 @@ import {
 } from '@stripe/react-stripe-js';
 import { useAuth } from '../hooks/useAuth';
 import { stripeAPI } from '../services/api';
-import { getStripePublishableKey, checkStripeEnvironment, applyTemporaryFix } from '../utils/stripe-env-checker';
+import { getStripePublishableKey, checkStripeEnvironment } from '../utils/stripe-env-checker';
+import { getCloudflareStripeKey, checkCloudflareEnvironment, applyCloudflareTemporaryFix } from '../utils/cloudflare-env-helper';
 
 // 懒加载诊断组件
 const StripeConfigDiagnostic = React.lazy(() => import('./StripeConfigDiagnostic'));
-const StripeEnvironmentFix = React.lazy(() => import('./StripeEnvironmentFix'));
-const StripeProductionFix = React.lazy(() => import('./StripeProductionFix'));
-const StripeSystemStatus = React.lazy(() => import('./StripeSystemStatus'));
+const CloudflareStripeConfig = React.lazy(() => import('./CloudflareStripeConfig'));
 
-// 使用统一的环境检查工具
-const stripeKey = getStripePublishableKey();
+// 使用Cloudflare优化的环境检查工具
+const stripeKey = getCloudflareStripeKey() || getStripePublishableKey();
 const envStatus = checkStripeEnvironment();
+const cloudflareStatus = checkCloudflareEnvironment();
 
-console.log('🔑 StripePaymentModal Key Check:', {
+console.log('🔑 StripePaymentModal Key Check (Cloudflare Optimized):', {
   stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
   length: stripeKey?.length || 0,
   startsWithPk: stripeKey?.startsWith('pk_') || false,
   environment: import.meta.env.MODE || 'unknown',
+  isProd: import.meta.env.PROD || false,
   hasValidKey: envStatus.hasValidKey,
-  keySource: envStatus.keySource
+  keySource: envStatus.keySource,
+  // Cloudflare特定信息
+  isCloudflarePages: cloudflareStatus.isCloudflarePages,
+  cloudflareKeySource: cloudflareStatus.stripeKeySource,
+  cloudflareRecommendations: cloudflareStatus.recommendations.length,
+  cloudflareEnvVars: Object.keys(import.meta.env).filter(key =>
+    key.startsWith('VITE_') || key.startsWith('REACT_APP_')
+  ),
+  allStripeKeys: Object.keys(import.meta.env).filter(key =>
+    key.includes('STRIPE') || key.includes('stripe')
+  )
 });
 
 // 使用环境检查结果
@@ -356,12 +367,50 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
           textAlign: 'center'
         }}>
           <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem', fontWeight: '600', color: '#dc2626' }}>
-            支付功能暂时不可用
+            支付功能配置错误
           </h2>
-          <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280' }}>
-            {stripeError || '请稍后再试或联系客服获取帮助'}
+          <p style={{ margin: '0 0 1rem 0', color: '#6b7280' }}>
+            {cloudflareStatus.isCloudflarePages
+              ? '检测到Cloudflare Pages环境，需要设置环境变量'
+              : '未找到Stripe公钥配置'}
           </p>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+          <div style={{
+            backgroundColor: '#f3f4f6',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '1.5rem',
+            textAlign: 'left',
+            fontSize: '0.875rem'
+          }}>
+            <strong>快速修复：</strong>
+            <div style={{ marginTop: '0.5rem', fontFamily: 'monospace', backgroundColor: '#1f2937', color: '#f9fafb', padding: '0.5rem', borderRadius: '0.25rem' }}>
+              localStorage.setItem('STRIPE_TEMP_KEY', 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um');<br/>
+              location.reload();
+            </div>
+            <div style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.8rem' }}>
+              在浏览器控制台运行上述代码可立即修复
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                if (applyCloudflareTemporaryFix()) {
+                  alert('✅ 临时修复已应用！页面将刷新...');
+                  setTimeout(() => window.location.reload(), 1000);
+                }
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              🔧 立即修复
+            </button>
             <button
               onClick={() => setShowDiagnostic(true)}
               style={{
@@ -374,7 +423,21 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
                 fontSize: '1rem'
               }}
             >
-              诊断问题
+              📊 详细诊断
+            </button>
+            <button
+              onClick={() => window.open('https://dash.cloudflare.com/', '_blank')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              🌐 Cloudflare设置
             </button>
             <button
               onClick={onCancel}
@@ -394,16 +457,12 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ planId, onSucce
         </div>
         </div>
 
-        {/* 系统状态检查工具 */}
-        <React.Suspense fallback={<div>加载状态检查...</div>}>
-          <StripeSystemStatus onStatusChange={(isHealthy) => {
-            console.log('🔍 支付系统状态更新:', isHealthy);
-            if (isHealthy) {
-              // 如果系统状态正常，可以重新初始化Stripe
-              setTimeout(() => {
-                window.location.reload();
-              }, 1000);
-            }
+        {/* Cloudflare配置检查工具 */}
+        <React.Suspense fallback={<div>加载配置检查...</div>}>
+          <CloudflareStripeConfig onConfigFixed={() => {
+            console.log('🔧 Cloudflare配置已修复');
+            // 配置修复后重新加载页面
+            window.location.reload();
           }} />
         </React.Suspense>
 

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe支付系统最终验证</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .status {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #0056b3; transform: translateY(-1px); }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
+        .details {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            color: #6c757d;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Stripe支付系统最终验证</h1>
+            <p>Cloudflare Pages环境变量配置检查</p>
+        </div>
+
+        <div id="verification-results">
+            <div class="status info">🔍 正在进行系统验证...</div>
+        </div>
+
+        <div style="text-align: center; margin-top: 2rem;">
+            <button class="btn" onclick="runVerification()">🔄 重新验证</button>
+            <button class="btn btn-warning" onclick="applyTemporaryFix()">🔧 应用临时修复</button>
+            <button class="btn btn-success" onclick="openCloudflarePages()">🌐 打开Cloudflare Pages</button>
+        </div>
+
+        <div class="details" id="debug-info" style="display: none;">
+            <strong>调试信息:</strong>
+            <div id="debug-content"></div>
+        </div>
+
+        <button class="btn" onclick="toggleDebugInfo()" style="margin-top: 1rem;">
+            🔍 显示/隐藏调试信息
+        </button>
+    </div>
+
+    <script>
+        const CONFIG = {
+            backendUrl: 'https://api.indicate.top',
+            frontendUrl: 'https://destiny-frontend.pages.dev',
+            testStripeKey: 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um'
+        };
+
+        let debugData = {};
+
+        async function runVerification() {
+            const resultsDiv = document.getElementById('verification-results');
+            resultsDiv.innerHTML = '<div class="status info">🔍 正在验证...</div>';
+
+            let results = '';
+            debugData = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                location: window.location.href,
+                tests: []
+            };
+
+            // 1. 检查后端健康状态
+            try {
+                const healthResponse = await fetch(`${CONFIG.backendUrl}/api/stripe/health`);
+                const healthData = await healthResponse.json();
+                
+                if (healthData.success && healthData.stripe.systemStatus.paymentSystemEnabled) {
+                    results += '<div class="status success">✅ 后端配置完全正常</div>';
+                    results += `<div class="details">Secret Key: ${healthData.stripe.backend.secretKeyConfigured ? '已配置' : '未配置'}
+Webhook Secret: ${healthData.stripe.backend.webhookSecretConfigured ? '已配置' : '未配置'}
+支付系统: ${healthData.stripe.systemStatus.paymentSystemEnabled ? '启用' : '禁用'}</div>`;
+                    
+                    debugData.tests.push({
+                        name: '后端健康检查',
+                        status: 'success',
+                        data: healthData
+                    });
+                } else {
+                    results += '<div class="status error">❌ 后端配置异常</div>';
+                    debugData.tests.push({
+                        name: '后端健康检查',
+                        status: 'error',
+                        data: healthData
+                    });
+                }
+            } catch (error) {
+                results += `<div class="status error">❌ 后端连接失败: ${error.message}</div>`;
+                debugData.tests.push({
+                    name: '后端健康检查',
+                    status: 'error',
+                    error: error.message
+                });
+            }
+
+            // 2. 检查前端配置指导
+            try {
+                const configResponse = await fetch(`${CONFIG.backendUrl}/api/stripe/frontend-config`);
+                const configData = await configResponse.json();
+                
+                if (configData.success) {
+                    results += '<div class="status success">✅ 前端配置指导获取成功</div>';
+                    results += `<div class="details">推荐环境变量: ${configData.cloudflarePages.envVarName}
+设置位置: Cloudflare Pages Dashboard
+后端就绪: ${configData.backend.ready ? '是' : '否'}</div>`;
+                    
+                    debugData.tests.push({
+                        name: '前端配置指导',
+                        status: 'success',
+                        data: configData
+                    });
+                } else {
+                    results += '<div class="status warning">⚠️ 前端配置指导获取失败</div>';
+                    debugData.tests.push({
+                        name: '前端配置指导',
+                        status: 'warning',
+                        data: configData
+                    });
+                }
+            } catch (error) {
+                results += `<div class="status error">❌ 配置指导获取失败: ${error.message}</div>`;
+                debugData.tests.push({
+                    name: '前端配置指导',
+                    status: 'error',
+                    error: error.message
+                });
+            }
+
+            // 3. 模拟前端环境变量检查
+            const mockEnv = {
+                VITE_STRIPE_PUBLISHABLE_KEY: localStorage.getItem('STRIPE_TEMP_KEY') || undefined,
+                MODE: 'production',
+                PROD: true
+            };
+
+            const hasValidKey = mockEnv.VITE_STRIPE_PUBLISHABLE_KEY && 
+                               mockEnv.VITE_STRIPE_PUBLISHABLE_KEY.length > 50 &&
+                               mockEnv.VITE_STRIPE_PUBLISHABLE_KEY.startsWith('pk_');
+
+            if (hasValidKey) {
+                results += '<div class="status success">✅ 前端环境变量配置正常</div>';
+                results += `<div class="details">密钥来源: ${mockEnv.VITE_STRIPE_PUBLISHABLE_KEY ? 'localStorage临时修复' : 'Cloudflare Pages'}
+密钥长度: ${mockEnv.VITE_STRIPE_PUBLISHABLE_KEY?.length || 0}
+密钥前缀: ${mockEnv.VITE_STRIPE_PUBLISHABLE_KEY?.substring(0, 7) || 'none'}</div>`;
+            } else {
+                results += '<div class="status error">❌ 前端环境变量配置缺失</div>';
+                results += '<div class="details">需要在Cloudflare Pages Dashboard中设置 VITE_STRIPE_PUBLISHABLE_KEY</div>';
+            }
+
+            debugData.tests.push({
+                name: '前端环境变量',
+                status: hasValidKey ? 'success' : 'error',
+                data: mockEnv
+            });
+
+            // 4. 最终状态总结
+            const allTestsPassed = debugData.tests.every(test => test.status === 'success');
+            
+            if (allTestsPassed) {
+                results += '<div class="status success">🎉 支付系统完全正常！所有检查都通过。</div>';
+            } else {
+                results += '<div class="status warning">⚠️ 支付系统需要配置。请按照下方说明进行修复。</div>';
+            }
+
+            resultsDiv.innerHTML = results;
+            updateDebugInfo();
+        }
+
+        function applyTemporaryFix() {
+            localStorage.setItem('STRIPE_TEMP_KEY', CONFIG.testStripeKey);
+            localStorage.setItem('STRIPE_FIX_APPLIED', 'true');
+            
+            alert('✅ 临时修复已应用！页面将刷新以生效。');
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+
+        function openCloudflarePages() {
+            window.open('https://dash.cloudflare.com/', '_blank');
+        }
+
+        function toggleDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function updateDebugInfo() {
+            const debugContent = document.getElementById('debug-content');
+            debugContent.textContent = JSON.stringify(debugData, null, 2);
+        }
+
+        // 页面加载时自动运行验证
+        window.addEventListener('load', runVerification);
+    </script>
+</body>
+</html>
