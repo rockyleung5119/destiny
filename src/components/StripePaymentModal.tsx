@@ -8,44 +8,29 @@ import {
 } from '@stripe/react-stripe-js';
 import { useAuth } from '../hooks/useAuth';
 import { stripeAPI } from '../services/api';
-import { getStripePublishableKey, checkStripeEnvironment } from '../utils/stripe-env-checker';
-import { getCloudflareStripeKey, checkCloudflareEnvironment, applyCloudflareTemporaryFix } from '../utils/cloudflare-env-helper';
+import {
+  initializeStripe,
+  getStripeInstance,
+  createPaymentMethod,
+  checkStripeAvailability,
+  applyStripeFix
+} from '../utils/stripe-integration';
 
 // 懒加载诊断组件
 const StripeConfigDiagnostic = React.lazy(() => import('./StripeConfigDiagnostic'));
 const CloudflareStripeConfig = React.lazy(() => import('./CloudflareStripeConfig'));
 
-// 使用Cloudflare优化的环境检查工具
-const stripeKey = getCloudflareStripeKey() || getStripePublishableKey();
-const envStatus = checkStripeEnvironment();
-const cloudflareStatus = checkCloudflareEnvironment();
+// 使用增强的Stripe集成检查
+const stripeAvailability = checkStripeAvailability();
 
-console.log('🔑 StripePaymentModal Key Check (Cloudflare Optimized):', {
-  stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
-  length: stripeKey?.length || 0,
-  startsWithPk: stripeKey?.startsWith('pk_') || false,
-  environment: import.meta.env.MODE || 'unknown',
-  isProd: import.meta.env.PROD || false,
-  hasValidKey: envStatus.hasValidKey,
-  keySource: envStatus.keySource,
-  // Cloudflare特定信息
-  isCloudflarePages: cloudflareStatus.isCloudflarePages,
-  cloudflareKeySource: cloudflareStatus.stripeKeySource,
-  cloudflareRecommendations: cloudflareStatus.recommendations.length,
-  cloudflareEnvVars: Object.keys(import.meta.env).filter(key =>
-    key.startsWith('VITE_') || key.startsWith('REACT_APP_')
-  ),
-  allStripeKeys: Object.keys(import.meta.env).filter(key =>
-    key.includes('STRIPE') || key.includes('stripe')
-  )
-});
+console.log('🔑 StripePaymentModal 增强集成检查:', stripeAvailability);
 
-// 使用环境检查结果
-const isPaymentEnabled = envStatus.hasValidKey && !!stripeKey;
+// 使用增强的Stripe可用性检查
+const isPaymentEnabled = stripeAvailability.available;
 
-// 初始化Stripe - 添加错误处理
-const stripePromise = isPaymentEnabled && stripeKey
-  ? loadStripe(stripeKey).catch(error => {
+// 初始化Stripe - 使用增强的初始化方法
+const stripePromise = isPaymentEnabled
+  ? initializeStripe().catch(error => {
       console.warn('Stripe initialization failed:', error);
       return null;
     })

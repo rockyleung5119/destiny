@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整Stripe支付系统测试</title>
+    <!-- 直接引入Stripe.js -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 2rem;
+        }
+        .status {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            font-size: 1rem;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .code {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            border: 1px solid #e9ecef;
+            margin: 1rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .card-element {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #ddd;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center; color: #495057;">
+            🎯 完整Stripe支付系统测试
+        </h1>
+        
+        <div class="status info">
+            📍 测试环境: <span id="test-environment"></span><br>
+            🕒 测试时间: <span id="test-time"></span>
+        </div>
+
+        <div class="grid">
+            <!-- 系统状态检查 -->
+            <div>
+                <h3>🔍 系统状态检查</h3>
+                <div id="system-status">检查中...</div>
+                <button class="btn" onclick="checkSystemStatus()">🔄 重新检查</button>
+            </div>
+            
+            <!-- Stripe.js集成测试 -->
+            <div>
+                <h3>🔑 Stripe.js集成测试</h3>
+                <div id="stripe-integration-status">测试中...</div>
+                <button class="btn" onclick="testStripeIntegration()">🧪 测试集成</button>
+            </div>
+        </div>
+
+        <!-- 支付流程测试 -->
+        <div style="margin-top: 2rem;">
+            <h3>💳 支付流程测试</h3>
+            <div id="payment-test-area">
+                <div class="status info">选择测试计划:</div>
+                <div>
+                    <button class="btn" onclick="testPaymentFlow('single')">测试单次支付</button>
+                    <button class="btn" onclick="testPaymentFlow('monthly')">测试月度订阅</button>
+                    <button class="btn" onclick="testPaymentFlow('yearly')">测试年度订阅</button>
+                </div>
+                
+                <!-- 卡片输入区域 -->
+                <div id="card-element" class="card-element" style="display: none;">
+                    <div id="card-input"></div>
+                </div>
+                
+                <div id="payment-results"></div>
+            </div>
+        </div>
+
+        <!-- 调试信息 -->
+        <div style="margin-top: 2rem;">
+            <h3>🔧 调试信息</h3>
+            <button class="btn" onclick="toggleDebugInfo()">显示/隐藏调试信息</button>
+            <div class="code" id="debug-output" style="display: none;">
+                调试信息将在这里显示...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            backendUrl: 'https://api.indicate.top',
+            frontendUrl: 'https://destiny-frontend.pages.dev',
+            testStripeKey: 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um'
+        };
+
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+        let debugLog = [];
+
+        // 更新页面信息
+        document.getElementById('test-environment').textContent = window.location.href;
+        document.getElementById('test-time').textContent = new Date().toLocaleString();
+
+        function log(message, level = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            debugLog.push(logEntry);
+            
+            document.getElementById('debug-output').textContent = debugLog.join('\n');
+            console.log(message);
+        }
+
+        async function checkSystemStatus() {
+            log('🔍 开始系统状态检查...');
+            const statusDiv = document.getElementById('system-status');
+            statusDiv.innerHTML = '检查中...';
+
+            let results = '';
+
+            try {
+                // 1. 检查后端健康状态
+                const healthResponse = await fetch(`${CONFIG.backendUrl}/api/stripe/health`);
+                const healthData = await healthResponse.json();
+                
+                if (healthData.success) {
+                    results += '<div class="status success">✅ 后端API健康</div>';
+                    results += `<div class="code">Secret Key: ${healthData.stripe.backend.secretKeyConfigured ? '已配置' : '未配置'}
+Webhook Secret: ${healthData.stripe.backend.webhookSecretConfigured ? '已配置' : '未配置'}
+支付系统: ${healthData.stripe.systemStatus.paymentSystemEnabled ? '启用' : '禁用'}</div>`;
+                    log('✅ 后端健康检查通过');
+                } else {
+                    results += '<div class="status error">❌ 后端API异常</div>';
+                    log('❌ 后端健康检查失败');
+                }
+
+                // 2. 检查前端配置
+                const configResponse = await fetch(`${CONFIG.backendUrl}/api/stripe/frontend-config`);
+                const configData = await configResponse.json();
+                
+                if (configData.success) {
+                    results += '<div class="status success">✅ 前端配置指导可用</div>';
+                    log('✅ 前端配置指导获取成功');
+                } else {
+                    results += '<div class="status warning">⚠️ 前端配置指导不可用</div>';
+                    log('⚠️ 前端配置指导获取失败');
+                }
+
+            } catch (error) {
+                results += `<div class="status error">❌ 系统检查失败: ${error.message}</div>`;
+                log(`❌ 系统检查异常: ${error.message}`);
+            }
+
+            statusDiv.innerHTML = results;
+        }
+
+        async function testStripeIntegration() {
+            log('🔑 开始Stripe.js集成测试...');
+            const statusDiv = document.getElementById('stripe-integration-status');
+            statusDiv.innerHTML = '测试中...';
+
+            let results = '';
+
+            try {
+                // 1. 检查Stripe.js是否加载
+                if (typeof window.Stripe === 'function') {
+                    results += '<div class="status success">✅ Stripe.js已加载</div>';
+                    log('✅ Stripe.js全局对象可用');
+                } else {
+                    results += '<div class="status error">❌ Stripe.js未加载</div>';
+                    log('❌ Stripe.js全局对象不可用');
+                    statusDiv.innerHTML = results;
+                    return;
+                }
+
+                // 2. 尝试初始化Stripe
+                const testKey = CONFIG.testStripeKey;
+                stripe = window.Stripe(testKey);
+                
+                if (stripe) {
+                    results += '<div class="status success">✅ Stripe实例创建成功</div>';
+                    log(`✅ Stripe实例初始化成功，使用密钥: ${testKey.substring(0, 20)}...`);
+                    
+                    // 3. 创建Elements
+                    elements = stripe.elements();
+                    if (elements) {
+                        results += '<div class="status success">✅ Stripe Elements创建成功</div>';
+                        log('✅ Stripe Elements创建成功');
+                        
+                        // 4. 创建卡片元素
+                        cardElement = elements.create('card', {
+                            style: {
+                                base: {
+                                    fontSize: '16px',
+                                    color: '#424770',
+                                    '::placeholder': {
+                                        color: '#aab7c4',
+                                    },
+                                },
+                            },
+                        });
+                        
+                        results += '<div class="status success">✅ 卡片元素创建成功</div>';
+                        log('✅ 卡片元素创建成功');
+                        
+                        // 挂载卡片元素
+                        cardElement.mount('#card-input');
+                        document.getElementById('card-element').style.display = 'block';
+                        
+                    } else {
+                        results += '<div class="status error">❌ Stripe Elements创建失败</div>';
+                        log('❌ Stripe Elements创建失败');
+                    }
+                } else {
+                    results += '<div class="status error">❌ Stripe实例创建失败</div>';
+                    log('❌ Stripe实例创建失败');
+                }
+
+            } catch (error) {
+                results += `<div class="status error">❌ Stripe集成测试失败: ${error.message}</div>`;
+                log(`❌ Stripe集成测试异常: ${error.message}`);
+            }
+
+            statusDiv.innerHTML = results;
+        }
+
+        async function testPaymentFlow(planId) {
+            log(`💳 开始测试支付流程: ${planId}`);
+            const resultsDiv = document.getElementById('payment-results');
+            resultsDiv.innerHTML = '<div class="status info">🔄 处理支付...</div>';
+
+            try {
+                if (!stripe || !cardElement) {
+                    throw new Error('Stripe未初始化，请先运行集成测试');
+                }
+
+                // 1. 创建支付方法
+                log('🔐 创建支付方法...');
+                const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                    billing_details: {
+                        name: 'Test User',
+                        email: 'test@example.com',
+                    },
+                });
+
+                if (paymentMethodError) {
+                    throw new Error(`支付方法创建失败: ${paymentMethodError.message}`);
+                }
+
+                log(`✅ 支付方法创建成功: ${paymentMethod.id}`);
+
+                // 2. 调用后端API
+                log('📡 调用后端支付API...');
+                const response = await fetch(`${CONFIG.backendUrl}/api/stripe/create-payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token' // 测试token
+                    },
+                    body: JSON.stringify({
+                        planId: planId,
+                        paymentMethodId: paymentMethod.id,
+                        customerEmail: 'test@example.com',
+                        customerName: 'Test User'
+                    })
+                });
+
+                const result = await response.json();
+                log(`📋 后端响应: ${JSON.stringify(result, null, 2)}`);
+
+                if (response.ok && result.success) {
+                    resultsDiv.innerHTML = '<div class="status success">🎉 支付流程测试成功！</div>';
+                    log('🎉 支付流程测试完成');
+                } else {
+                    resultsDiv.innerHTML = `<div class="status warning">⚠️ 后端响应: ${result.message || '未知错误'}</div>`;
+                    log(`⚠️ 后端处理结果: ${result.message || '未知错误'}`);
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="status error">❌ 支付流程测试失败: ${error.message}</div>`;
+                log(`❌ 支付流程测试异常: ${error.message}`);
+            }
+        }
+
+        function toggleDebugInfo() {
+            const debugDiv = document.getElementById('debug-output');
+            debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // 页面加载时自动运行检查
+        window.addEventListener('load', () => {
+            log('🚀 页面加载完成，开始自动检查...');
+            checkSystemStatus();
+            setTimeout(testStripeIntegration, 1000);
+        });
+    </script>
+</body>
+</html>
