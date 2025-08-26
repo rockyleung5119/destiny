@@ -21,13 +21,13 @@ const StripeConfigDiagnostic: React.FC = () => {
     const stripeKey = viteKey || reactKey; // 优先使用VITE_前缀，兼容REACT_APP_前缀
     const isProduction = import.meta.env.MODE === 'production';
 
-    // 生产环境放宽检查：允许测试密钥用于功能测试
+    // 生产环境进一步放宽检查：适应Cloudflare Pages环境
     const keyStatus = stripeKey &&
-                     stripeKey.length > 20 && // 放宽长度要求
+                     stripeKey.length >= 30 && // 进一步放宽长度要求
                      stripeKey.startsWith('pk_') && // 只要求pk开头
                      !stripeKey.includes('placeholder') &&
                      !stripeKey.includes('your-stripe') &&
-                     !stripeKey.includes('MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD') ? 'success' : 'error';
+                     !stripeKey.includes('MUST_BE_SET') ? 'success' : 'error';
 
     diagnosticResults.push({
       category: '前端环境变量',

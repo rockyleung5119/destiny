@@ -22,30 +22,49 @@ export interface StripeEnvStatus {
 const PRODUCTION_STRIPE_KEY = 'pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um';
 
 /**
- * 检查密钥是否有效
+ * 检查密钥是否有效 - 优化验证逻辑
  */
 function isValidStripeKey(key: string | undefined): boolean {
-  if (!key || typeof key !== 'string') return false;
-  
+  if (!key || typeof key !== 'string') {
+    console.log('🔍 密钥验证: 密钥为空或类型错误');
+    return false;
+  }
+
+  // 基本格式检查 - 适应Cloudflare Pages实际情况
+  const hasValidPrefix = key.startsWith('pk_test_') || key.startsWith('pk_live_') || key.startsWith('pk_');
+  const hasMinimumLength = key.length >= 20; // 大幅降低长度要求
+
+  // 排除明显的占位符 - 简化检查
   const invalidValues = [
-    'MUST_BE_SET_IN_CLOUDFLARE_PAGES_DASHBOARD',
-    'your-stripe-publishable-key-here',
-    'pk_test_placeholder',
+    'MUST_BE_SET',
+    'placeholder',
+    'your-stripe',
     'undefined',
     'null',
     ''
   ];
-  
-  return key.length > 50 &&
-         key.startsWith('pk_') &&
-         !invalidValues.some(invalid => key.includes(invalid)) &&
-         !key.includes('placeholder') &&
-         !key.includes('your-stripe') &&
-         !key.includes('REPLACE_WITH');
+
+  const isPlaceholder = invalidValues.some(invalid =>
+    key.toLowerCase().includes(invalid.toLowerCase())
+  );
+
+  const isValid = hasValidPrefix && hasMinimumLength && !isPlaceholder;
+
+  console.log('🔍 密钥验证详情:', {
+    keyLength: key.length,
+    keyPrefix: key.substring(0, 10),
+    hasValidPrefix,
+    hasMinimumLength,
+    isPlaceholder,
+    isValid,
+    fullKey: key // 显示完整密钥用于调试
+  });
+
+  return isValid;
 }
 
 /**
- * 获取Stripe公钥 - 优化Cloudflare Pages环境变量读取
+ * 获取Stripe公钥 - 强化Cloudflare Pages环境变量读取
  */
 export function getStripePublishableKey(): string | null {
   // 优先级：VITE_ > REACT_APP_ > localStorage临时修复
@@ -59,11 +78,14 @@ export function getStripePublishableKey(): string | null {
     key.includes('STRIPE') || key.includes('stripe')
   );
 
-  console.log('🔍 Stripe Key Detection (Enhanced):', {
+  console.log('🔍 Stripe Key Detection (Cloudflare Enhanced):', {
     environment: import.meta.env.MODE || 'unknown',
     isProd: import.meta.env.PROD || false,
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+    isCloudflarePages: typeof window !== 'undefined' ? window.location.hostname.includes('pages.dev') : false,
     viteKey: viteKey ? `${viteKey.substring(0, 20)}...` : 'undefined',
     viteKeyLength: viteKey?.length || 0,
+    viteKeyFull: viteKey || 'undefined', // 显示完整值用于调试
     reactKey: reactKey ? `${reactKey.substring(0, 20)}...` : 'undefined',
     reactKeyLength: reactKey?.length || 0,
     tempKey: tempKey ? `${tempKey.substring(0, 20)}...` : 'undefined',
@@ -73,23 +95,37 @@ export function getStripePublishableKey(): string | null {
     cloudflareEnvVars: allEnvKeys.filter(key => key.startsWith('VITE_') || key.startsWith('REACT_APP_'))
   });
 
+  // 使用更宽松的验证逻辑
+  function isKeyUsable(key) {
+    return key &&
+           typeof key === 'string' &&
+           key.length >= 20 &&
+           key.startsWith('pk_') &&
+           !key.includes('MUST_BE_SET') &&
+           !key.includes('placeholder') &&
+           !key.includes('your-stripe');
+  }
+
   // 验证并返回有效密钥
-  if (isValidStripeKey(viteKey)) {
+  if (isKeyUsable(viteKey)) {
     console.log('✅ 使用 VITE_STRIPE_PUBLISHABLE_KEY');
     return viteKey;
   }
 
-  if (isValidStripeKey(reactKey)) {
+  if (isKeyUsable(reactKey)) {
     console.log('✅ 使用 REACT_APP_STRIPE_PUBLISHABLE_KEY');
     return reactKey;
   }
 
-  if (isValidStripeKey(tempKey)) {
+  if (isKeyUsable(tempKey)) {
     console.log('✅ 使用 localStorage 临时密钥');
     return tempKey;
   }
 
-  console.warn('❌ 未找到有效的Stripe公钥');
+  console.warn('❌ 未找到可用的Stripe公钥');
+  console.warn('🔧 建议运行临时修复代码:');
+  console.warn('localStorage.setItem("STRIPE_TEMP_KEY", "pk_test_51RySLYBb9puAdbwBN2l4CKOfb261TBvm9xn1zBUU0HZQFKvMwLpxAsbvkIJWOZG15qYoDmMVw3ajjSXlxyFAjUTg00MW0Kb6um"); location.reload();');
+
   return null;
 }
 

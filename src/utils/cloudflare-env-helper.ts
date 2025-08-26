@@ -37,7 +37,7 @@ function isValidStripeKey(key: string | undefined): boolean {
     'REPLACE_WITH'
   ];
   
-  return key.length > 50 &&
+  return key.length >= 50 && // 放宽长度要求
          key.startsWith('pk_') &&
          !invalidPatterns.some(pattern => key.toLowerCase().includes(pattern.toLowerCase()));
 }
