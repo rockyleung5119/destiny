@@ -2,32 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../hooks/useAuth';
 import { Check, Star, Crown, Zap, Gift, Calendar } from 'lucide-react';
-
-// 动态导入Stripe组件以防止加载错误
-const StripePaymentModal = React.lazy(() =>
-  import('./StripePaymentModal').catch(() => ({
-    default: () => (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.75rem',
-          padding: '2rem',
-          maxWidth: '400px',
-          width: '90%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem', fontWeight: '600', color: '#dc2626' }}>
+import StripeCheckoutButton from './StripeCheckoutButton';
             支付功能暂时不可用
           </h2>
           <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280' }}>
@@ -56,8 +31,6 @@ const StripePaymentModal = React.lazy(() =>
 const Membership: React.FC = () => {
   const { t } = useLanguage();
   const { user, isLoggedIn } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const plans = [
     {
@@ -110,27 +83,9 @@ const Membership: React.FC = () => {
     },
   ];
 
-  const handleSelectPlan = (planId: string) => {
-    if (!isLoggedIn) {
-      alert(t('pleaseLoginFirst') || '请先登录后再购买会员');
-      return;
-    }
-
-    setSelectedPlan(planId);
-    setShowPaymentModal(true);
-  };
-
   const handlePaymentSuccess = (planId: string) => {
-    setShowPaymentModal(false);
-    setSelectedPlan(null);
-
     // 显示成功消息，不需要刷新页面
     alert(t('paymentSuccess') || '支付成功！会员权限已激活。');
-  };
-
-  const handlePaymentCancel = () => {
-    setShowPaymentModal(false);
-    setSelectedPlan(null);
   };
 
   return (
@@ -218,17 +173,17 @@ const Membership: React.FC = () => {
                     ))}
                   </ul>
 
-                  {/* CTA Button */}
-                  <button
-                    onClick={() => handleSelectPlan(plan.id)}
-                    className={`w-full py-4 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg ${
+                  {/* Stripe Checkout Button */}
+                  <StripeCheckoutButton
+                    planId={plan.id}
+                    onSuccess={handlePaymentSuccess}
+                    disabled={!isLoggedIn}
+                    className={`w-full ${
                       plan.popular
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700'
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        ? 'stripe-checkout-popular'
+                        : 'stripe-checkout-normal'
                     }`}
-                  >
-                    {t('selectPlan')}
-                  </button>
+                  />
                 </div>
               );
             })}
@@ -288,44 +243,6 @@ const Membership: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Stripe支付模态框 */}
-      {showPaymentModal && selectedPlan && (
-        <React.Suspense fallback={
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: '1rem',
-              padding: '2rem',
-              textAlign: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              color: '#1f2937'
-            }}>
-              <div>加载支付组件...</div>
-            </div>
-          </div>
-        }>
-          <StripePaymentModal
-            planId={selectedPlan}
-            onSuccess={handlePaymentSuccess}
-            onCancel={handlePaymentCancel}
-          />
-        </React.Suspense>
-      )}
     </section>
   );
 };

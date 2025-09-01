@@ -148,13 +148,46 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
         .stripe-checkout-container {
           max-width: 400px;
         }
-        
+
         .plan-info {
           background: rgba(255, 255, 255, 0.05);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 0.75rem;
           padding: 1rem;
           backdrop-filter: blur(8px);
+        }
+
+        /* 为Membership组件的特殊样式 */
+        :global(.stripe-checkout-popular button) {
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+          color: white !important;
+          border-radius: 9999px !important;
+          font-weight: 600 !important;
+          transition: all 0.3s ease !important;
+          transform: scale(1) !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        :global(.stripe-checkout-popular button:hover) {
+          background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%) !important;
+          transform: scale(1.05) !important;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        :global(.stripe-checkout-normal button) {
+          background: #f3f4f6 !important;
+          color: #374151 !important;
+          border-radius: 9999px !important;
+          font-weight: 600 !important;
+          transition: all 0.3s ease !important;
+          transform: scale(1) !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        :global(.stripe-checkout-normal button:hover) {
+          background: #e5e7eb !important;
+          transform: scale(1.05) !important;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
         }
       `}</style>
     </div>

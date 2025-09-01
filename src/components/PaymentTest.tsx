@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Card, Space, Typography, Alert } from 'antd';
-import StripePaymentModal from './StripePaymentModal';
+import StripeCheckoutButton from './StripeCheckoutButton';
 
 const { Title, Text } = Typography;
 
@@ -100,13 +100,21 @@ const PaymentTest: React.FC = () => {
         )}
       </Space>
 
-      {showPaymentModal && (
-        <StripePaymentModal
-          planId={selectedPlan}
-          onSuccess={handlePaymentSuccess}
-          onCancel={handlePaymentCancel}
-        />
-      )}
+      <div className="mt-6">
+        <h3>Stripe预构建支付页面测试</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <StripeCheckoutButton
+            planId="monthly"
+            onSuccess={handlePaymentSuccess}
+            disabled={!isPaymentEnabled}
+          />
+          <StripeCheckoutButton
+            planId="yearly"
+            onSuccess={handlePaymentSuccess}
+            disabled={!isPaymentEnabled}
+          />
+        </div>
+      </div>
     </div>
   );
 };
