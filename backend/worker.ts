@@ -125,14 +125,33 @@ class StripeAPIClient {
       options.body = new URLSearchParams(data).toString();
     }
 
-    const response = await fetch(url, options);
-    const result = await response.json();
+    try {
+      const response = await fetch(url, options);
 
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'Stripe API error');
+      // 检查响应是否为空或无效
+      const responseText = await response.text();
+
+      if (!responseText || responseText.trim() === '') {
+        throw new Error(`Empty response from Stripe API: ${response.status} ${response.statusText}`);
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('❌ Failed to parse Stripe API response as JSON:', responseText);
+        throw new Error(`Invalid JSON response from Stripe API: ${responseText.substring(0, 200)}...`);
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || `Stripe API error: ${response.status} ${response.statusText}`);
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`❌ Stripe API request failed for ${method} ${url}:`, error);
+      throw error;
     }
-
-    return result;
   }
 
   async createCustomer(data: any) {
@@ -1915,10 +1934,22 @@ app.post('/api/stripe/create-checkout-session', jwtMiddleware, async (c) => {
 
   } catch (error) {
     console.error('❌ Checkout session creation failed:', error);
+
+    // 提供更详细的错误信息用于调试
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorDetails = {
+      type: error instanceof Error ? error.constructor.name : 'UnknownError',
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    };
+
+    console.error('❌ Error details:', errorDetails);
+
     return c.json({
       success: false,
       message: 'Failed to create checkout session',
-      error: error.message || 'Unknown error'
+      error: errorMessage,
+      debug: process.env.NODE_ENV === 'development' ? errorDetails : undefined
     }, 500);
   }
 });

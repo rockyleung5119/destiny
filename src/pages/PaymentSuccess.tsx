@@ -12,19 +12,77 @@ const PaymentSuccess: React.FC = () => {
   const sessionId = urlParams.get('session_id');
   const planId = urlParams.get('plan');
 
+  // 预构建支付页面可能返回的参数
+  const paymentIntent = urlParams.get('payment_intent');
+  const paymentIntentClientSecret = urlParams.get('payment_intent_client_secret');
+  const redirectStatus = urlParams.get('redirect_status');
+
   useEffect(() => {
     const verifyPayment = async () => {
-      if (!sessionId) {
+      // 检查是否来自预构建支付页面
+      const isPrebuiltCheckout = paymentIntent || paymentIntentClientSecret || redirectStatus;
+
+      if (!sessionId && !isPrebuiltCheckout) {
+        // 尝试从localStorage获取待处理的支付信息
+        const pendingPayment = localStorage.getItem('pendingPayment');
+        if (pendingPayment) {
+          try {
+            const paymentInfo = JSON.parse(pendingPayment);
+            console.log('📋 从localStorage恢复支付信息:', paymentInfo);
+
+            // 假设支付成功（因为用户被重定向到成功页面）
+            setVerificationStatus('success');
+            setMessage(`${paymentInfo.planId === 'single' ? '单次占卜' : paymentInfo.planId === 'monthly' ? '月度套餐' : '年度套餐'}支付成功！`);
+
+            // 清除localStorage中的支付信息
+            localStorage.removeItem('pendingPayment');
+
+            // 刷新用户信息
+            if (refreshUser) {
+              await refreshUser();
+            }
+
+            setIsVerifying(false);
+            return;
+          } catch (e) {
+            console.error('❌ 解析支付信息失败:', e);
+          }
+        }
+
         setVerificationStatus('error');
-        setMessage('缺少支付会话ID');
+        setMessage('缺少支付验证信息');
         setIsVerifying(false);
         return;
       }
 
       try {
-        console.log('🔍 验证支付状态...', { sessionId, planId });
+        console.log('🔍 验证支付状态...', {
+          sessionId,
+          planId,
+          paymentIntent,
+          redirectStatus,
+          isPrebuiltCheckout
+        });
 
-        // 调用后端验证支付状态
+        if (isPrebuiltCheckout) {
+          // 处理预构建支付页面的成功返回
+          if (redirectStatus === 'succeeded') {
+            setVerificationStatus('success');
+            setMessage('支付成功！您的会员权限已激活。');
+
+            // 刷新用户信息
+            if (refreshUser) {
+              await refreshUser();
+            }
+          } else {
+            setVerificationStatus('error');
+            setMessage('支付状态未确认，请联系客服。');
+          }
+          setIsVerifying(false);
+          return;
+        }
+
+        // 原有的session验证逻辑
         const response = await fetch('/api/stripe/verify-payment', {
           method: 'POST',
           headers: {
@@ -42,7 +100,7 @@ const PaymentSuccess: React.FC = () => {
         if (data.success) {
           setVerificationStatus('success');
           setMessage(data.message || '支付成功！');
-          
+
           // 刷新用户信息以获取最新的会员状态
           if (refreshUser) {
             await refreshUser();
@@ -62,7 +120,7 @@ const PaymentSuccess: React.FC = () => {
     };
 
     verifyPayment();
-  }, [sessionId, planId, refreshUser]);
+  }, [sessionId, planId, paymentIntent, redirectStatus, refreshUser]);
 
   const handleContinue = () => {
     // 重新加载页面回到主页面

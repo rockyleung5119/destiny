@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { buildPaymentUrl, PLAN_DETAILS } from '../config/stripe';
 
 interface StripeCheckoutButtonProps {
   planId: string;
@@ -8,28 +9,6 @@ interface StripeCheckoutButtonProps {
   disabled?: boolean;
   className?: string;
 }
-
-// 套餐信息
-const PLAN_INFO = {
-  single: {
-    name: '单次占卜',
-    price: '$1.99',
-    description: '一次性访问任何服务',
-    type: 'one-time'
-  },
-  monthly: {
-    name: '月度套餐',
-    price: '$19.90',
-    description: '无限算命功能，每月自动续费',
-    type: 'subscription'
-  },
-  yearly: {
-    name: '年度套餐',
-    price: '$188',
-    description: '无限算命功能，每年自动续费',
-    type: 'subscription'
-  }
-};
 
 const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
   planId,
@@ -42,7 +21,7 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const plan = PLAN_INFO[planId as keyof typeof PLAN_INFO];
+  const plan = PLAN_DETAILS[planId as keyof typeof PLAN_DETAILS];
 
   if (!plan) {
     return (
@@ -62,40 +41,32 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
     setError(null);
 
     try {
-      console.log('🛒 开始创建Checkout Session...');
+      console.log('🛒 使用预构建支付页面进行支付...');
+      console.log(`📋 套餐: ${plan.name} (${planId})`);
+      console.log(`👤 用户: ${user.email}`);
 
-      // 调用后端API创建Checkout Session
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          planId,
-          customerEmail: user.email,
-          customerName: user.name || user.email
-        })
-      });
+      // 使用配置文件构建支付URL
+      const paymentUrl = buildPaymentUrl(planId, user.email, user.id.toString());
 
-      const data = await response.json();
+      console.log('✅ 重定向到Stripe预构建支付页面...');
+      console.log(`🔗 支付URL: ${paymentUrl}`);
 
-      if (!response.ok) {
-        throw new Error(data.message || '创建支付会话失败');
-      }
+      // 保存支付信息到localStorage，用于支付成功后的处理
+      localStorage.setItem('pendingPayment', JSON.stringify({
+        planId,
+        planName: plan.name,
+        userEmail: user.email,
+        userId: user.id,
+        timestamp: Date.now()
+      }));
 
-      if (data.success && data.url) {
-        console.log('✅ Checkout Session创建成功，重定向到Stripe...');
-        
-        // 重定向到Stripe预构建支付页面
-        window.location.href = data.url;
-      } else {
-        throw new Error(data.message || '无效的支付会话响应');
-      }
+      // 重定向到Stripe预构建支付页面
+      window.location.href = paymentUrl;
 
     } catch (error) {
-      console.error('❌ Checkout失败:', error);
-      setError(error instanceof Error ? error.message : '支付处理失败');
+      console.error('❌ 支付重定向失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '支付处理失败';
+      setError(`支付处理失败: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }

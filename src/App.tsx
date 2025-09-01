@@ -32,9 +32,18 @@ function AppContent() {
     const sessionId = urlParams.get('session_id');
     const planId = urlParams.get('plan');
 
-    if (sessionId && window.location.pathname.includes('/payment/success')) {
+    // 预构建支付页面可能返回的参数
+    const paymentIntent = urlParams.get('payment_intent');
+    const redirectStatus = urlParams.get('redirect_status');
+
+    // 检查是否是支付成功页面
+    if (window.location.pathname.includes('/payment/success') ||
+        sessionId ||
+        paymentIntent ||
+        redirectStatus === 'succeeded') {
       setCurrentView('payment-success');
-    } else if (planId && window.location.pathname.includes('/payment/cancel')) {
+    } else if (window.location.pathname.includes('/payment/cancel') ||
+               redirectStatus === 'failed') {
       setCurrentView('payment-cancel');
     }
   }, []);
