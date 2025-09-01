@@ -3,30 +3,6 @@ import { useLanguage } from '../hooks/useLanguage';
 import { useAuth } from '../hooks/useAuth';
 import { Check, Star, Crown, Zap, Gift, Calendar } from 'lucide-react';
 import StripeCheckoutButton from './StripeCheckoutButton';
-            支付功能暂时不可用
-          </h2>
-          <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280' }}>
-            请稍后再试或联系客服
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: 'pointer',
-              fontSize: '1rem'
-            }}
-          >
-            关闭
-          </button>
-        </div>
-      </div>
-    )
-  }))
-);
 
 const Membership: React.FC = () => {
   const { t } = useLanguage();

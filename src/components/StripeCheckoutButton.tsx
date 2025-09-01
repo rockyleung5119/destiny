@@ -101,30 +101,45 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
     }
   };
 
+  // 根据className确定按钮样式
+  const getButtonStyles = () => {
+    if (isLoading || disabled || !user) {
+      return "w-full py-3 px-6 font-medium bg-gray-500 cursor-not-allowed opacity-50 text-white rounded-lg transition-all duration-200";
+    }
+
+    if (className?.includes('stripe-checkout-popular')) {
+      return "w-full py-4 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700";
+    }
+
+    if (className?.includes('stripe-checkout-normal')) {
+      return "w-full py-4 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg bg-gray-100 text-gray-800 hover:bg-gray-200";
+    }
+
+    return "w-full py-3 px-6 font-medium bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-lg hover:shadow-xl text-white rounded-lg transition-all duration-200";
+  };
+
+  const showPlanInfo = !className?.includes('stripe-checkout-');
+
   return (
-    <div className={`stripe-checkout-container ${className}`}>
+    <div className={`max-w-md mx-auto ${className || ''}`}>
       {error && (
         <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {error}
         </div>
       )}
-      
-      <div className="plan-info mb-4">
-        <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
-        <p className="text-gray-300 text-sm">{plan.description}</p>
-        <div className="text-2xl font-bold text-blue-400 mt-2">{plan.price}</div>
-      </div>
+
+      {showPlanInfo && (
+        <div className="mb-4 p-4 bg-white bg-opacity-5 border border-white border-opacity-10 rounded-xl backdrop-blur-sm">
+          <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
+          <p className="text-gray-300 text-sm">{plan.description}</p>
+          <div className="text-2xl font-bold text-blue-400 mt-2">{plan.price}</div>
+        </div>
+      )}
 
       <button
         onClick={handleCheckout}
         disabled={disabled || isLoading || !user}
-        className={`
-          w-full py-3 px-6 rounded-lg font-medium text-white transition-all duration-200
-          ${isLoading || disabled || !user
-            ? 'bg-gray-500 cursor-not-allowed opacity-50'
-            : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-lg hover:shadow-xl'
-          }
-        `}
+        className={getButtonStyles()}
       >
         {isLoading ? (
           <div className="flex items-center justify-center">
@@ -138,58 +153,13 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
         )}
       </button>
 
-      <div className="mt-4 text-xs text-gray-400 text-center">
-        <p>✅ 安全支付由 Stripe 提供</p>
-        <p>🌍 支持全球主要支付方式</p>
-        <p>🔒 您的支付信息完全安全</p>
-      </div>
-
-      <style jsx>{`
-        .stripe-checkout-container {
-          max-width: 400px;
-        }
-
-        .plan-info {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 0.75rem;
-          padding: 1rem;
-          backdrop-filter: blur(8px);
-        }
-
-        /* 为Membership组件的特殊样式 */
-        :global(.stripe-checkout-popular button) {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-          color: white !important;
-          border-radius: 9999px !important;
-          font-weight: 600 !important;
-          transition: all 0.3s ease !important;
-          transform: scale(1) !important;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-        }
-
-        :global(.stripe-checkout-popular button:hover) {
-          background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%) !important;
-          transform: scale(1.05) !important;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-        }
-
-        :global(.stripe-checkout-normal button) {
-          background: #f3f4f6 !important;
-          color: #374151 !important;
-          border-radius: 9999px !important;
-          font-weight: 600 !important;
-          transition: all 0.3s ease !important;
-          transform: scale(1) !important;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-        }
-
-        :global(.stripe-checkout-normal button:hover) {
-          background: #e5e7eb !important;
-          transform: scale(1.05) !important;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-        }
-      `}</style>
+      {showPlanInfo && (
+        <div className="mt-4 text-xs text-gray-400 text-center">
+          <p>✅ 安全支付由 Stripe 提供</p>
+          <p>🌍 支持全球主要支付方式</p>
+          <p>🔒 您的支付信息完全安全</p>
+        </div>
+      )}
     </div>
   );
 };
