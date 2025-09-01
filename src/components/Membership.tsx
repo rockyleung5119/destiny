@@ -86,7 +86,6 @@ const Membership: React.FC = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {plans.map((plan) => {
               const IconComponent = plan.icon;
-              const isSelected = selectedPlan === plan.id;
               
               return (
                 <div
@@ -94,9 +93,7 @@ const Membership: React.FC = () => {
                   className={`relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-2 flex flex-col h-full ${
                     plan.popular
                       ? 'border-indigo-500 ring-4 ring-indigo-100'
-                      : isSelected
-                        ? 'border-purple-500 ring-4 ring-purple-100'
-                        : 'border-gray-200'
+                      : 'border-gray-200'
                   }`}
                 >
                   {/* Popular Badge */}
