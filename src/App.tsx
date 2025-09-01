@@ -11,6 +11,8 @@ import Footer from './components/Footer';
 import TermsOfService from './components/TermsOfService';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import ContactPage from './components/ContactPage';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancel from './pages/PaymentCancel';
 
 import Navigation from './components/Navigation';
 import MemberSettings from './components/MemberSettings';
@@ -21,8 +23,21 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 // 内部组件，使用AuthContext
 function AppContent() {
-  const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact' | 'payment-success' | 'payment-cancel'>('main');
   const { user, isAuthenticated, logout } = useAuth();
+
+  // 检查URL参数来确定初始视图
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const planId = urlParams.get('plan');
+
+    if (sessionId && window.location.pathname.includes('/payment/success')) {
+      setCurrentView('payment-success');
+    } else if (planId && window.location.pathname.includes('/payment/cancel')) {
+      setCurrentView('payment-cancel');
+    }
+  }, []);
 
   console.log('🔍 App render - currentView:', currentView, 'isAuthenticated:', isAuthenticated, 'user:', user);
 
@@ -136,6 +151,14 @@ function AppContent() {
     return (
         <ContactPage onBack={() => setCurrentView('main')} />
     );
+  }
+
+  if (currentView === 'payment-success') {
+    return <PaymentSuccess />;
+  }
+
+  if (currentView === 'payment-cancel') {
+    return <PaymentCancel />;
   }
 
   return (

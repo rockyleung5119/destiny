@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMembership } from '../hooks/useMembership';
 import { useAuth } from '../hooks/useAuth';
-import StripePaymentModal from './StripePaymentModal';
+import StripeCheckoutButton from './StripeCheckoutButton';
 
 // 检查支付功能是否启用 - 兼容多种环境变量配置
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
@@ -29,48 +29,13 @@ interface MembershipPlansProps {
 const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
   const { upgradeMembership } = useMembership();
   const { user, isLoggedIn } = useAuth();
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  const handleSelectPlan = async (planId: string) => {
-    if (!isLoggedIn) {
-      alert('请先登录后再购买会员');
-      return;
-    }
-
-    // 检查支付功能是否启用
-    if (!isPaymentEnabled) {
-      console.error('❌ Payment not enabled:', {
-        stripeKey: stripeKey ? `${stripeKey.substring(0, 20)}...` : 'undefined',
-        isPaymentEnabled,
-        reason: !stripeKey ? 'No Stripe key' :
-                stripeKey.length <= 20 ? 'Key too short' :
-                !stripeKey.startsWith('pk_') ? 'Invalid key format' :
-                stripeKey === 'pk_test_placeholder' ? 'Placeholder key' : 'Unknown'
-      });
-      alert('支付功能暂时不可用，请稍后再试或联系客服获取帮助。');
-      return;
-    }
-
+  const handlePaymentSuccess = (planId: string) => {
+    console.log('✅ 支付成功:', planId);
+    // 支付成功后的处理逻辑
     if (onSelectPlan) {
       onSelectPlan(planId);
-    } else {
-      // 显示Stripe支付模态框
-      setSelectedPlan(planId);
-      setShowPaymentModal(true);
     }
-  };
-
-  const handlePaymentSuccess = async (planId: string) => {
-    setShowPaymentModal(false);
-    setSelectedPlan(null);
-
-    // 不需要刷新页面，会员状态会自动更新
-  };
-
-  const handlePaymentCancel = () => {
-    setShowPaymentModal(false);
-    setSelectedPlan(null);
   };
 
   return (
@@ -161,25 +126,12 @@ const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
               即时结果
             </li>
           </ul>
-          <button
-            className="select-plan-btn"
-            onClick={() => handleSelectPlan('single')}
-            style={{
-              width: '100%',
-              padding: '1rem 2rem',
-              backgroundColor: '#f3f4f6',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              marginTop: 'auto'
-            }}
-          >
-            选择套餐
-          </button>
+          <StripeCheckoutButton
+            planId="single"
+            onSuccess={handlePaymentSuccess}
+            disabled={!isLoggedIn}
+            className="mt-auto"
+          />
         </div>
 
         {/* Monthly Plan */}
@@ -283,25 +235,12 @@ const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
               优先支持
             </li>
           </ul>
-          <button
-            className="select-plan-btn primary"
-            onClick={() => handleSelectPlan('monthly')}
-            style={{
-              width: '100%',
-              padding: '1rem 2rem',
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              marginTop: 'auto'
-            }}
-          >
-            选择套餐
-          </button>
+          <StripeCheckoutButton
+            planId="monthly"
+            onSuccess={handlePaymentSuccess}
+            disabled={!isLoggedIn}
+            className="mt-auto"
+          />
         </div>
 
         {/* Yearly Plan */}
@@ -403,36 +342,14 @@ const MembershipPlans: React.FC<MembershipPlansProps> = ({ onSelectPlan }) => {
               新功能抢先体验
             </li>
           </ul>
-          <button
-            className="select-plan-btn"
-            onClick={() => handleSelectPlan('yearly')}
-            style={{
-              width: '100%',
-              padding: '1rem 2rem',
-              backgroundColor: '#f3f4f6',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              marginTop: 'auto'
-            }}
-          >
-            选择套餐
-          </button>
+          <StripeCheckoutButton
+            planId="yearly"
+            onSuccess={handlePaymentSuccess}
+            disabled={!isLoggedIn}
+            className="mt-auto"
+          />
         </div>
       </div>
-
-      {/* Stripe支付模态框 */}
-      {showPaymentModal && selectedPlan && (
-        <StripePaymentModal
-          planId={selectedPlan}
-          onSuccess={handlePaymentSuccess}
-          onCancel={handlePaymentCancel}
-        />
-      )}
     </div>
   );
 };

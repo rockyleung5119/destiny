@@ -15,6 +15,12 @@ const createPaymentSchema = Joi.object({
   customerName: Joi.string().required()
 });
 
+const createCheckoutSessionSchema = Joi.object({
+  planId: Joi.string().valid('single', 'monthly', 'yearly').required(),
+  customerEmail: Joi.string().email().required(),
+  customerName: Joi.string().required()
+});
+
 // 创建支付意图或订阅
 router.post('/create-payment', authenticateToken, requireEmailVerification, asyncHandler(async (req, res) => {
   // 验证输入数据
