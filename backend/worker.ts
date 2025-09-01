@@ -2028,6 +2028,85 @@ app.post('/api/stripe/verify-payment', jwtMiddleware, async (c) => {
   }
 });
 
+// 预构建支付页面成功处理API端点
+app.post('/api/stripe/prebuilt-payment-success', jwtMiddleware, async (c) => {
+  try {
+    console.log('🎉 处理预构建支付页面成功回调...');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    // 解析请求数据
+    const requestData = await c.req.json();
+    const { planId, paymentIntent, redirectStatus } = requestData;
+
+    console.log('📋 预构建支付成功数据:', {
+      userId,
+      planId,
+      paymentIntent,
+      redirectStatus
+    });
+
+    // 验证必要字段
+    if (!planId) {
+      console.error('❌ 缺少套餐ID');
+      return c.json({
+        success: false,
+        message: 'Missing plan ID'
+      }, 400);
+    }
+
+    // 验证计划ID
+    const validPlans = ['single', 'monthly', 'yearly'];
+    if (!validPlans.includes(planId)) {
+      console.error('❌ 无效的计划ID:', planId);
+      return c.json({
+        success: false,
+        message: 'Invalid plan ID',
+        validPlans
+      }, 400);
+    }
+
+    // 检查支付状态
+    if (redirectStatus !== 'succeeded' && !paymentIntent) {
+      console.error('❌ 支付状态未确认');
+      return c.json({
+        success: false,
+        message: 'Payment status not confirmed'
+      }, 400);
+    }
+
+    console.log(`🔧 为用户 ${userId} 激活 ${planId} 套餐...`);
+
+    // 更新用户会员状态
+    try {
+      await updateUserMembership(c.env.DB, userId, planId, paymentIntent || 'prebuilt_payment');
+
+      console.log('✅ 预构建支付成功，用户会员状态更新成功');
+
+      return c.json({
+        success: true,
+        message: '支付成功，会员权限已激活',
+        planId: planId,
+        userId: userId
+      });
+    } catch (dbError) {
+      console.error('❌ 数据库更新失败:', dbError);
+      return c.json({
+        success: false,
+        message: '支付成功但会员状态更新失败，请联系客服'
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('❌ 预构建支付处理失败:', error);
+    return c.json({
+      success: false,
+      message: 'Prebuilt payment processing failed',
+      error: error.message || 'Unknown error'
+    }, 500);
+  }
+});
+
 // Stripe支付API端点 - 增强版 (保留用于向后兼容)
 app.post('/api/stripe/create-payment', jwtMiddleware, async (c) => {
   try {

@@ -30,16 +30,42 @@ const PaymentSuccess: React.FC = () => {
             const paymentInfo = JSON.parse(pendingPayment);
             console.log('📋 从localStorage恢复支付信息:', paymentInfo);
 
-            // 假设支付成功（因为用户被重定向到成功页面）
-            setVerificationStatus('success');
-            setMessage(`${paymentInfo.planId === 'single' ? '单次占卜' : paymentInfo.planId === 'monthly' ? '月度套餐' : '年度套餐'}支付成功！`);
+            // 调用后端API更新用户权限
+            try {
+              const response = await fetch('/api/stripe/prebuilt-payment-success', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                  planId: paymentInfo.planId,
+                  paymentIntent: 'localStorage_recovery',
+                  redirectStatus: 'succeeded'
+                })
+              });
 
-            // 清除localStorage中的支付信息
-            localStorage.removeItem('pendingPayment');
+              const data = await response.json();
 
-            // 刷新用户信息
-            if (refreshUser) {
-              await refreshUser();
+              if (data.success) {
+                setVerificationStatus('success');
+                setMessage(`${paymentInfo.planId === 'single' ? '单次占卜' : paymentInfo.planId === 'monthly' ? '月度套餐' : '年度套餐'}支付成功！您的会员权限已激活。`);
+
+                // 清除localStorage中的支付信息
+                localStorage.removeItem('pendingPayment');
+
+                // 刷新用户信息
+                if (refreshUser) {
+                  await refreshUser();
+                }
+              } else {
+                setVerificationStatus('error');
+                setMessage(data.message || '权限更新失败，请联系客服。');
+              }
+            } catch (apiError) {
+              console.error('❌ API调用失败:', apiError);
+              setVerificationStatus('error');
+              setMessage('权限更新失败，请联系客服。');
             }
 
             setIsVerifying(false);
@@ -66,13 +92,64 @@ const PaymentSuccess: React.FC = () => {
 
         if (isPrebuiltCheckout) {
           // 处理预构建支付页面的成功返回
-          if (redirectStatus === 'succeeded') {
-            setVerificationStatus('success');
-            setMessage('支付成功！您的会员权限已激活。');
+          if (redirectStatus === 'succeeded' || paymentIntent) {
+            console.log('🎉 预构建支付成功，开始更新用户权限...');
 
-            // 刷新用户信息
-            if (refreshUser) {
-              await refreshUser();
+            // 从localStorage获取支付信息
+            const pendingPayment = localStorage.getItem('pendingPayment');
+            let planId = null;
+
+            if (pendingPayment) {
+              try {
+                const paymentInfo = JSON.parse(pendingPayment);
+                planId = paymentInfo.planId;
+                console.log('📋 从localStorage获取套餐信息:', planId);
+              } catch (e) {
+                console.error('❌ 解析支付信息失败:', e);
+              }
+            }
+
+            // 如果没有从localStorage获取到planId，尝试从URL参数获取
+            if (!planId) {
+              planId = urlParams.get('plan') || 'single'; // 默认为single
+            }
+
+            try {
+              // 调用后端API更新用户权限
+              const response = await fetch('/api/stripe/prebuilt-payment-success', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                  planId,
+                  paymentIntent,
+                  redirectStatus
+                })
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                setVerificationStatus('success');
+                setMessage('支付成功！您的会员权限已激活。');
+
+                // 清除localStorage中的支付信息
+                localStorage.removeItem('pendingPayment');
+
+                // 刷新用户信息
+                if (refreshUser) {
+                  await refreshUser();
+                }
+              } else {
+                setVerificationStatus('error');
+                setMessage(data.message || '权限更新失败，请联系客服。');
+              }
+            } catch (apiError) {
+              console.error('❌ API调用失败:', apiError);
+              setVerificationStatus('error');
+              setMessage('权限更新失败，请联系客服。');
             }
           } else {
             setVerificationStatus('error');
