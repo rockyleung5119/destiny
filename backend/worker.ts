@@ -819,17 +819,36 @@ async function updateUserMembership(db: D1Database, userId: number, planId: stri
   }
 
   try {
-    // 检查是否已有会员记录
-    const existingMembership = await db.prepare(`
-      SELECT remaining_credits FROM memberships WHERE user_id = ? AND plan_id = 'single'
-    `).bind(userId).first();
+    console.log(`🔧 开始更新用户 ${userId} 的会员状态，套餐: ${planId}`);
 
-    if (planId === 'single' && existingMembership) {
-      // 如果是单次服务且已有记录，累加积分
-      const currentCredits = existingMembership.remaining_credits || 0;
-      remainingCredits = currentCredits + 1;
+    // 🔑 修复：先停用所有现有会员记录（避免多个活跃会员记录）
+    await db.prepare(`
+      UPDATE memberships
+      SET is_active = 0, updated_at = ?
+      WHERE user_id = ? AND is_active = 1
+    `).bind(now.toISOString(), userId).run();
 
-      // 更新现有记录
+    console.log(`✅ 已停用用户 ${userId} 的所有现有会员记录`);
+
+    // 检查是否已有相同套餐的记录（仅用于single套餐的积分累加）
+    let shouldAccumulate = false;
+    if (planId === 'single') {
+      const existingMembership = await db.prepare(`
+        SELECT remaining_credits FROM memberships WHERE user_id = ? AND plan_id = 'single'
+        ORDER BY created_at DESC LIMIT 1
+      `).bind(userId).first();
+
+      if (existingMembership) {
+        // 如果是单次服务且已有记录，累加积分
+        const currentCredits = existingMembership.remaining_credits || 0;
+        remainingCredits = currentCredits + 1;
+        shouldAccumulate = true;
+        console.log(`🔄 单次服务积分累加: ${currentCredits} + 1 = ${remainingCredits}`);
+      }
+    }
+
+    if (shouldAccumulate) {
+      // 更新现有single记录的积分
       await db.prepare(`
         UPDATE memberships
         SET remaining_credits = ?, updated_at = ?, is_active = 1, expires_at = ?
@@ -843,9 +862,9 @@ async function updateUserMembership(db: D1Database, userId: number, planId: stri
 
       console.log(`✅ 累加单次服务积分: 用户 ${userId} 现有 ${remainingCredits} 次积分`);
     } else {
-      // 插入或替换会员记录
+      // 创建新的会员记录
       await db.prepare(`
-        INSERT OR REPLACE INTO memberships (
+        INSERT INTO memberships (
           user_id, plan_id, is_active, expires_at, stripe_subscription_id,
           remaining_credits, created_at, updated_at
         ) VALUES (?, ?, 1, ?, ?, ?, ?, ?)
@@ -2877,7 +2896,14 @@ app.post('/api/stripe/webhook', async (c) => {
     const signature = c.req.header('stripe-signature');
     const body = await c.req.text();
 
+    console.log('🔔 Webhook received:', {
+      hasSignature: !!signature,
+      bodyLength: body.length,
+      timestamp: new Date().toISOString()
+    });
+
     if (!signature) {
+      console.error('❌ Missing stripe signature');
       return c.json({ error: 'Missing signature' }, 400);
     }
 
@@ -2889,10 +2915,75 @@ app.post('/api/stripe/webhook', async (c) => {
     const stripeService = new CloudflareStripeService(c.env);
     await stripeService.handleWebhook(body, signature);
 
+    console.log('✅ Webhook processed successfully');
     return c.json({ received: true });
   } catch (error) {
     console.error('❌ Webhook error:', error);
+
+    // 记录webhook错误到数据库
+    try {
+      await c.env.DB.prepare(`
+        INSERT INTO system_logs (
+          level, message, details, created_at
+        ) VALUES ('error', 'Webhook处理失败', ?, ?)
+      `).bind(
+        JSON.stringify({
+          error: error.message,
+          stack: error.stack,
+          timestamp: new Date().toISOString()
+        }),
+        new Date().toISOString()
+      ).run();
+    } catch (logError) {
+      console.error('❌ 记录webhook错误失败:', logError);
+    }
+
     return c.json({ error: 'Webhook handling failed' }, 400);
+  }
+});
+
+// 🔍 调试端点：检查用户会员状态和支付日志
+app.get('/api/debug/user/:userId/membership', jwtMiddleware, async (c) => {
+  try {
+    const userId = c.req.param('userId');
+    const payload = c.get('jwtPayload');
+
+    // 只允许用户查看自己的信息
+    if (payload.userId.toString() !== userId) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+
+    // 获取所有会员记录
+    const memberships = await c.env.DB.prepare(`
+      SELECT * FROM memberships WHERE user_id = ? ORDER BY created_at DESC
+    `).bind(userId).all();
+
+    // 获取支付日志
+    const paymentLogs = await c.env.DB.prepare(`
+      SELECT * FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 10
+    `).bind(userId).all();
+
+    // 获取系统日志（与该用户相关的）
+    const systemLogs = await c.env.DB.prepare(`
+      SELECT * FROM system_logs
+      WHERE details LIKE ? OR details LIKE ?
+      ORDER BY created_at DESC LIMIT 10
+    `).bind(`%"userId":"${userId}"%`, `%"finalUserId":"${userId}"%`).all();
+
+    return c.json({
+      success: true,
+      data: {
+        userId: userId,
+        memberships: memberships.results || [],
+        paymentLogs: paymentLogs.results || [],
+        systemLogs: systemLogs.results || [],
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error);
+    return c.json({ error: 'Debug query failed' }, 500);
   }
 });
 
