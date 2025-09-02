@@ -54,9 +54,11 @@ const PaymentSuccess: React.FC = () => {
                 // 清除localStorage中的支付信息
                 localStorage.removeItem('pendingPayment');
 
-                // 刷新用户信息
+                // 刷新用户信息并等待完成
                 if (refreshUser) {
+                  console.log('🔄 刷新用户信息...');
                   await refreshUser();
+                  console.log('✅ 用户信息刷新完成');
                 }
               } else {
                 setVerificationStatus('error');
@@ -138,9 +140,11 @@ const PaymentSuccess: React.FC = () => {
                 // 清除localStorage中的支付信息
                 localStorage.removeItem('pendingPayment');
 
-                // 刷新用户信息
+                // 刷新用户信息并等待完成
                 if (refreshUser) {
+                  console.log('🔄 刷新用户信息...');
                   await refreshUser();
+                  console.log('✅ 用户信息刷新完成');
                 }
               } else {
                 setVerificationStatus('error');
@@ -180,7 +184,9 @@ const PaymentSuccess: React.FC = () => {
 
           // 刷新用户信息以获取最新的会员状态
           if (refreshUser) {
+            console.log('🔄 刷新用户信息...');
             await refreshUser();
+            console.log('✅ 用户信息刷新完成');
           }
         } else {
           setVerificationStatus('error');
@@ -199,23 +205,28 @@ const PaymentSuccess: React.FC = () => {
     verifyPayment();
   }, [sessionId, planId, paymentIntent, redirectStatus, refreshUser]);
 
-  const handleContinue = () => {
-    // 确保用户已登录状态，跳转到主页
-    if (user) {
-      // 用户已登录，直接跳转到主页
-      window.location.href = '/';
-    } else {
-      // 用户未登录，先刷新认证状态再跳转
+  const handleContinue = async () => {
+    console.log('🔄 处理继续按钮点击，当前用户状态:', { user: !!user });
+
+    try {
+      // 确保用户认证状态是最新的
       if (refreshUser) {
-        refreshUser().then(() => {
-          window.location.href = '/';
-        }).catch(() => {
-          // 如果刷新失败，仍然跳转到主页
-          window.location.href = '/';
-        });
-      } else {
-        window.location.href = '/';
+        console.log('🔄 刷新用户认证状态...');
+        await refreshUser();
+        console.log('✅ 用户认证状态刷新完成');
       }
+
+      // 等待一小段时间确保状态更新
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 跳转到主页（保持登录状态）
+      console.log('🏠 跳转到主页...');
+      window.location.href = '/';
+
+    } catch (error) {
+      console.error('❌ 刷新用户状态失败:', error);
+      // 即使刷新失败也跳转到主页
+      window.location.href = '/';
     }
   };
 

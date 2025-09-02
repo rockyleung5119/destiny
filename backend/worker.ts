@@ -481,29 +481,48 @@ class CloudflareStripeService {
 
   private async handleCheckoutSessionCompleted(session: any) {
     console.log('🎉 Checkout session completed:', session.id);
+    console.log('📋 Session详细信息:', {
+      id: session.id,
+      client_reference_id: session.client_reference_id,
+      metadata: session.metadata,
+      payment_status: session.payment_status,
+      customer_details: session.customer_details
+    });
 
     try {
-      // 从session中获取用户信息 - 支持多种方式获取用户ID
-      let userId = session.client_reference_id ||
-                   session.metadata?.userId ||
-                   session.metadata?.user_id;
+      // 🔧 增强的用户和套餐信息解析
+      let userId = null;
+      let planId = null;
 
-      // 如果client_reference_id包含用户信息，解析它
-      if (userId && typeof userId === 'string' && userId.includes('user_')) {
-        const match = userId.match(/user_(\d+)/);
-        if (match) {
-          userId = match[1];
+      // 1. 从client_reference_id解析（新格式：user_123_plan_monthly_1234567890）
+      if (session.client_reference_id) {
+        const clientRef = session.client_reference_id;
+        console.log('🔍 解析client_reference_id:', clientRef);
+
+        // 解析用户ID
+        const userMatch = clientRef.match(/user_(\d+)/);
+        if (userMatch) {
+          userId = userMatch[1];
+          console.log('✅ 从client_reference_id解析到用户ID:', userId);
+        }
+
+        // 解析套餐ID
+        const planMatch = clientRef.match(/plan_(\w+)/);
+        if (planMatch) {
+          planId = planMatch[1];
+          console.log('✅ 从client_reference_id解析到套餐ID:', planId);
         }
       }
 
-      let planId = session.metadata?.planId || session.metadata?.plan_id;
+      // 2. 从metadata获取（备用方案）
+      if (!userId) {
+        userId = session.metadata?.userId || session.metadata?.user_id;
+        console.log('🔄 从metadata获取用户ID:', userId);
+      }
 
-      // 如果client_reference_id包含套餐信息，解析它
-      if (session.client_reference_id && session.client_reference_id.includes('plan_')) {
-        const match = session.client_reference_id.match(/plan_(\w+)/);
-        if (match) {
-          planId = match[1];
-        }
+      if (!planId) {
+        planId = session.metadata?.planId || session.metadata?.plan_id;
+        console.log('🔄 从metadata获取套餐ID:', planId);
       }
 
       const customerEmail = session.customer_details?.email;
@@ -540,13 +559,27 @@ class CloudflareStripeService {
 
       // 如果仍然没有找到用户ID，记录详细信息用于调试
       if (!finalUserId) {
-        console.error('❌ 无法确定用户ID，session详细信息:', {
+        const errorDetails = {
           sessionId: session.id,
           client_reference_id: session.client_reference_id,
           metadata: session.metadata,
           customer_details: session.customer_details,
-          mode: session.mode
-        });
+          mode: session.mode,
+          payment_status: session.payment_status,
+          amount_total: session.amount_total
+        };
+
+        console.error('❌ 无法确定用户ID，session详细信息:', errorDetails);
+
+        // 记录到系统日志表
+        await this.env.DB.prepare(`
+          INSERT INTO system_logs (
+            level, message, details, created_at
+          ) VALUES ('error', 'Webhook无法识别用户ID', ?, ?)
+        `).bind(
+          JSON.stringify(errorDetails),
+          new Date().toISOString()
+        ).run();
       }
 
       if (!finalUserId || !planId) {
@@ -2588,11 +2621,12 @@ app.post('/api/stripe/create-checkout-session', jwtMiddleware, async (c) => {
       }],
       success_url: `${c.env.FRONTEND_URL || 'https://indicate.top'}/payment/success?session_id={CHECKOUT_SESSION_ID}&plan=${planId}`,
       cancel_url: `${c.env.FRONTEND_URL || 'https://indicate.top'}/payment/cancel`,
-      client_reference_id: userId.toString(),
+      client_reference_id: `user_${userId}_plan_${planId}_${Date.now()}`,
       metadata: {
         userId: userId.toString(),
         planId: planId,
-        userEmail: user.email
+        userEmail: user.email,
+        userName: user.name || 'Unknown'
       },
       customer_email: user.email
     });
