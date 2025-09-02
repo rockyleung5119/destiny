@@ -57,7 +57,32 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
         })
       });
 
-      const data = await response.json();
+      // 检查响应状态
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API响应错误:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+      }
+
+      // 安全地解析JSON
+      let data;
+      try {
+        const responseText = await response.text();
+        console.log('📡 API响应文本:', responseText);
+
+        if (!responseText.trim()) {
+          throw new Error('API返回空响应');
+        }
+
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('❌ JSON解析失败:', jsonError);
+        throw new Error('API响应格式错误，请稍后重试');
+      }
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to create checkout session');

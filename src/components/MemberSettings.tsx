@@ -305,12 +305,12 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
   // 取消订阅处理函数
   const handleCancelSubscription = async () => {
     if (!userProfile?.membership?.isActive) {
-      setMessage('没有活跃的订阅需要取消');
+      setMessage(t('noActiveSubscription'));
       setMessageType('warning');
       return;
     }
 
-    if (!confirm('确定要取消订阅吗？订阅将在当前计费周期结束时停止。')) {
+    if (!confirm(t('confirmCancelSubscription'))) {
       return;
     }
 
@@ -329,18 +329,18 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
       const data = await response.json();
 
       if (data.success) {
-        setMessage('订阅已成功取消，将在当前计费周期结束时生效');
+        setMessage(t('subscriptionCancelledDesc'));
         setMessageType('success');
         setSubscriptionCancelled(true);
         // 刷新用户信息
         await loadUserProfile();
       } else {
-        setMessage(data.message || '取消订阅失败');
+        setMessage(data.message || t('cancelSubscription') + ' failed');
         setMessageType('error');
       }
     } catch (error) {
       console.error('Cancel subscription error:', error);
-      setMessage('取消订阅失败，请稍后重试');
+      setMessage(t('cancelSubscription') + ' failed, please try again later');
       setMessageType('error');
     } finally {
       setIsCancellingSubscription(false);
@@ -414,7 +414,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
               }`}
             >
               <CreditCard size={20} />
-              订阅管理
+              {t('subscriptionManagement')}
             </button>
             <button
               onClick={() => setActiveTab('delete')}
@@ -786,43 +786,43 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
           {activeTab === 'subscription' && (
             <div>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent mb-2">订阅管理</h2>
-                <p className="text-gray-600">管理您的会员订阅和付费计划</p>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent mb-2">{t('subscriptionManagement')}</h2>
+                <p className="text-gray-600">{t('subscriptionManagementDesc')}</p>
               </div>
 
               {/* 当前订阅状态 */}
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-6">
                 <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
                   <CreditCard size={20} />
-                  当前订阅状态
+                  {t('currentSubscriptionStatus')}
                 </h3>
 
                 {userProfile?.membership?.isActive ? (
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-700">套餐类型:</span>
+                      <span className="text-gray-700">{t('planType')}:</span>
                       <span className="font-medium text-blue-700">
-                        {userProfile.membership.planId === 'monthly' ? '月度套餐' :
-                         userProfile.membership.planId === 'yearly' ? '年度套餐' : '单次付费'}
+                        {userProfile.membership.planId === 'monthly' ? t('monthlyPlan') :
+                         userProfile.membership.planId === 'yearly' ? t('yearlyPlan') : t('singlePayment')}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-700">状态:</span>
+                      <span className="text-gray-700">{t('status')}:</span>
                       <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                        活跃
+                        {t('activeStatus')}
                       </span>
                     </div>
                     {userProfile.membership.expiresAt && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-700">到期时间:</span>
+                        <span className="text-gray-700">{t('expirationDate')}:</span>
                         <span className="font-medium text-gray-800">
-                          {new Date(userProfile.membership.expiresAt).toLocaleDateString('zh-CN')}
+                          {new Date(userProfile.membership.expiresAt).toLocaleDateString()}
                         </span>
                       </div>
                     )}
                     {userProfile.membership.remainingCredits !== undefined && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-700">剩余次数:</span>
+                        <span className="text-gray-700">{t('remainingCredits')}:</span>
                         <span className="font-medium text-gray-800">
                           {userProfile.membership.remainingCredits}
                         </span>
@@ -831,12 +831,12 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-gray-600 mb-4">您当前没有活跃的订阅</p>
+                    <p className="text-gray-600 mb-4">{t('noActiveSubscription')}</p>
                     <button
                       onClick={() => window.location.href = '/pricing'}
                       className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all"
                     >
-                      查看套餐
+                      {t('viewPlans')}
                     </button>
                   </div>
                 )}
@@ -847,16 +847,16 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                userProfile.membership.planId !== 'single' &&
                !subscriptionCancelled && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-red-800 mb-4">取消订阅</h3>
+                  <h3 className="text-lg font-semibold text-red-800 mb-4">{t('cancelSubscription')}</h3>
                   <p className="text-red-700 mb-4">
-                    取消订阅后，您的会员权限将在当前计费周期结束时停止。您仍可以使用服务直到到期日。
+                    {t('cancelSubscriptionDesc')}
                   </p>
                   <button
                     onClick={handleCancelSubscription}
                     disabled={isCancellingSubscription}
                     className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    {isCancellingSubscription ? '正在取消...' : '取消订阅'}
+                    {isCancellingSubscription ? t('cancelling') : t('cancelSubscription')}
                   </button>
                 </div>
               )}
@@ -864,9 +864,9 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
               {/* 已取消订阅的提示 */}
               {subscriptionCancelled && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-yellow-800 mb-2">订阅已取消</h3>
+                  <h3 className="text-lg font-semibold text-yellow-800 mb-2">{t('subscriptionCancelled')}</h3>
                   <p className="text-yellow-700">
-                    您的订阅已成功取消，将在当前计费周期结束时生效。您仍可以继续使用服务直到到期日。
+                    {t('subscriptionCancelledDesc')}
                   </p>
                 </div>
               )}
