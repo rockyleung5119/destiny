@@ -41,57 +41,13 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
     setError(null);
 
     try {
-      console.log('🛒 创建Stripe Checkout Session...');
+      console.log('🛒 使用Stripe预构建支付页面...');
       console.log(`📋 套餐: ${plan.name} (${planId})`);
       console.log(`👤 用户: ${user.email}`);
 
-      // 调用新的API端点创建Checkout Session
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          planId
-        })
-      });
-
-      // 检查响应状态
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API响应错误:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
-      }
-
-      // 安全地解析JSON
-      let data;
-      try {
-        const responseText = await response.text();
-        console.log('📡 API响应文本:', responseText);
-
-        if (!responseText.trim()) {
-          throw new Error('API返回空响应');
-        }
-
-        data = JSON.parse(responseText);
-      } catch (jsonError) {
-        console.error('❌ JSON解析失败:', jsonError);
-        throw new Error('API响应格式错误，请稍后重试');
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create checkout session');
-      }
-
-      console.log('✅ Checkout Session创建成功:', data.sessionId);
-
-      console.log('✅ 重定向到Stripe Checkout页面...');
-      console.log(`🔗 支付URL: ${data.url}`);
+      // 使用预构建支付页面URL
+      const paymentUrl = buildPaymentUrl(planId, user.email, user.id.toString());
+      console.log(`🔗 支付URL: ${paymentUrl}`);
 
       // 保存支付信息到localStorage，用于支付成功后的处理
       localStorage.setItem('pendingPayment', JSON.stringify({
@@ -99,12 +55,13 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
         planName: plan.name,
         userEmail: user.email,
         userId: user.id,
-        sessionId: data.sessionId,
         timestamp: Date.now()
       }));
 
-      // 重定向到Stripe Checkout页面
-      window.location.href = data.url;
+      console.log('✅ 重定向到Stripe预构建支付页面...');
+
+      // 直接重定向到预构建支付页面
+      window.location.href = paymentUrl;
 
     } catch (error) {
       console.error('❌ 支付重定向失败:', error);
@@ -158,7 +115,7 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
         {isLoading ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-            创建支付会话...
+            跳转支付页面...
           </div>
         ) : !user ? (
           '请先登录'

@@ -384,6 +384,10 @@ export const translations: Translations = {
     subscriptionCancelled: 'Subscription Cancelled',
     subscriptionCancelledDesc: 'Your subscription has been successfully cancelled and will take effect at the end of the current billing cycle. You can continue to use the service until the expiration date.',
     confirmCancelSubscription: 'Are you sure you want to cancel your subscription? The subscription will stop at the end of the current billing cycle.',
+    freePlan: 'Free Plan',
+    noActiveMembership: 'No Active Membership',
+    limitedAccess: 'Limited Access',
+    upgradeToUnlockFeatures: 'Upgrade to unlock premium features',
 
     // 删除账号相关
     deleteAccount: 'Delete Account',
@@ -815,6 +819,10 @@ export const translations: Translations = {
     subscriptionCancelled: '订阅已取消',
     subscriptionCancelledDesc: '您的订阅已成功取消，将在当前计费周期结束时生效。您仍可以继续使用服务直到到期日。',
     confirmCancelSubscription: '确定要取消订阅吗？订阅将在当前计费周期结束时停止。',
+    freePlan: '免费计划',
+    noActiveMembership: '无活跃会员',
+    limitedAccess: '有限访问',
+    upgradeToUnlockFeatures: '升级以解锁高级功能',
 
     // 删除账号相关
     deleteAccount: '删除账号',
@@ -1176,6 +1184,10 @@ export const translations: Translations = {
     subscriptionCancelled: 'Suscripción Cancelada',
     subscriptionCancelledDesc: 'Tu suscripción ha sido cancelada exitosamente y tomará efecto al final del ciclo de facturación actual. Puedes continuar usando el servicio hasta la fecha de expiración.',
     confirmCancelSubscription: '¿Estás seguro de que quieres cancelar tu suscripción? La suscripción se detendrá al final del ciclo de facturación actual.',
+    freePlan: 'Plan Gratuito',
+    noActiveMembership: 'Sin Membresía Activa',
+    limitedAccess: 'Acceso Limitado',
+    upgradeToUnlockFeatures: 'Actualizar para desbloquear funciones premium',
 
     // 删除账号相关
     deleteAccount: 'Eliminar Cuenta',
@@ -1537,6 +1549,10 @@ export const translations: Translations = {
     subscriptionCancelled: 'Abonnement Annulé',
     subscriptionCancelledDesc: 'Votre abonnement a été annulé avec succès et prendra effet à la fin du cycle de facturation actuel. Vous pouvez continuer à utiliser le service jusqu\'à la date d\'expiration.',
     confirmCancelSubscription: 'Êtes-vous sûr de vouloir annuler votre abonnement? L\'abonnement s\'arrêtera à la fin du cycle de facturation actuel.',
+    freePlan: 'Plan Gratuit',
+    noActiveMembership: 'Aucun Abonnement Actif',
+    limitedAccess: 'Accès Limité',
+    upgradeToUnlockFeatures: 'Mettre à niveau pour débloquer les fonctionnalités premium',
 
     // 删除账号相关
     deleteAccount: 'Supprimer le Compte',
@@ -1942,6 +1958,10 @@ export const translations: Translations = {
     subscriptionCancelled: 'サブスクリプションがキャンセルされました',
     subscriptionCancelledDesc: 'サブスクリプションが正常にキャンセルされ、現在の請求サイクル終了時に有効になります。有効期限まではサービスを継続してご利用いただけます。',
     confirmCancelSubscription: 'サブスクリプションをキャンセルしてもよろしいですか？現在の請求サイクル終了時に停止します。',
+    freePlan: '無料プラン',
+    noActiveMembership: 'アクティブなメンバーシップなし',
+    limitedAccess: '限定アクセス',
+    upgradeToUnlockFeatures: 'プレミアム機能を解除するためにアップグレード',
 
     // 删除账号相关
     deleteAccount: 'アカウント削除',

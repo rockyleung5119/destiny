@@ -466,13 +466,13 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                 </div>
               </div>
 
-              {/* Membership Information */}
-              {userProfile?.membership && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                    <CheckCircle className="mr-2 text-green-400" size={20} />
-                    {t('membershipStatus')}
-                  </h3>
+              {/* Membership Information - 显示给所有用户 */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <CheckCircle className="mr-2 text-green-400" size={20} />
+                  {t('membershipStatus')}
+                </h3>
+                {userProfile?.membership ? (
                   <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-400/30 rounded-lg p-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
@@ -521,8 +521,49 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  // 没有会员记录时显示基础状态
+                  <div className="bg-gradient-to-r from-gray-500/20 to-gray-600/20 border border-gray-400/30 rounded-lg p-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-gray-100 text-sm">{t('plan')}</p>
+                        <p className="text-white font-medium">
+                          {t('freePlan') || 'Free Plan'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-100 text-sm">{t('status')}</p>
+                        <p className="font-medium text-gray-300">
+                          {t('noActiveMembership') || 'No Active Membership'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-100 text-sm">{t('renewalDate')}</p>
+                        <p className="text-white font-medium">
+                          {t('noExpiration') || 'No Expiration'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-100 text-sm">{t('usageLimit')}</p>
+                        <p className="text-white font-medium">
+                          {t('limitedAccess') || 'Limited Access'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-400/30">
+                      <p className="text-gray-300 text-sm mb-3">
+                        {t('upgradeToUnlockFeatures') || 'Upgrade to unlock premium features'}
+                      </p>
+                      <button
+                        onClick={() => window.location.href = '/pricing'}
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-sm font-medium"
+                      >
+                        {t('viewPlans') || 'View Plans'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <form onSubmit={handleProfileSubmit} className="space-y-6">
                 {/* Basic Information */}
