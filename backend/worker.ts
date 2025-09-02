@@ -484,12 +484,28 @@ class CloudflareStripeService {
 
     try {
       // 从session中获取用户信息 - 支持多种方式获取用户ID
-      const userId = session.client_reference_id ||
-                    session.metadata?.userId ||
-                    session.metadata?.user_id ||
-                    session.customer_details?.email; // 如果没有ID，尝试用邮箱查找用户
+      let userId = session.client_reference_id ||
+                   session.metadata?.userId ||
+                   session.metadata?.user_id;
 
-      const planId = session.metadata?.planId || session.metadata?.plan_id;
+      // 如果client_reference_id包含用户信息，解析它
+      if (userId && typeof userId === 'string' && userId.includes('user_')) {
+        const match = userId.match(/user_(\d+)/);
+        if (match) {
+          userId = match[1];
+        }
+      }
+
+      let planId = session.metadata?.planId || session.metadata?.plan_id;
+
+      // 如果client_reference_id包含套餐信息，解析它
+      if (session.client_reference_id && session.client_reference_id.includes('plan_')) {
+        const match = session.client_reference_id.match(/plan_(\w+)/);
+        if (match) {
+          planId = match[1];
+        }
+      }
+
       const customerEmail = session.customer_details?.email;
 
       console.log('📋 Session数据:', {
@@ -514,10 +530,23 @@ class CloudflareStripeService {
           if (user) {
             finalUserId = user.id.toString();
             console.log(`✅ 通过邮箱 ${customerEmail} 找到用户ID: ${finalUserId}`);
+          } else {
+            console.log(`⚠️ 未找到邮箱 ${customerEmail} 对应的用户`);
           }
         } catch (error) {
           console.error('❌ 通过邮箱查找用户失败:', error);
         }
+      }
+
+      // 如果仍然没有找到用户ID，记录详细信息用于调试
+      if (!finalUserId) {
+        console.error('❌ 无法确定用户ID，session详细信息:', {
+          sessionId: session.id,
+          client_reference_id: session.client_reference_id,
+          metadata: session.metadata,
+          customer_details: session.customer_details,
+          mode: session.mode
+        });
       }
 
       if (!finalUserId || !planId) {
@@ -527,6 +556,23 @@ class CloudflareStripeService {
           customerEmail,
           sessionMetadata: session.metadata
         });
+
+        // 记录失败到系统日志
+        await this.env.DB.prepare(`
+          INSERT INTO system_logs (
+            level, message, details, created_at
+          ) VALUES ('error', 'Webhook缺少用户或套餐信息', ?, ?)
+        `).bind(
+          JSON.stringify({
+            sessionId: session.id,
+            userId: finalUserId,
+            planId,
+            customerEmail,
+            metadata: session.metadata
+          }),
+          new Date().toISOString()
+        ).run();
+
         return;
       }
 
@@ -544,6 +590,21 @@ class CloudflareStripeService {
 
         console.log('✅ 用户会员状态更新成功');
 
+        // 记录成功支付到支付日志
+        await this.env.DB.prepare(`
+          INSERT INTO payment_logs (
+            user_id, plan_id, stripe_subscription_id, amount, status,
+            credits_granted, created_at
+          ) VALUES (?, ?, ?, ?, 'completed', ?, ?)
+        `).bind(
+          parseInt(finalUserId),
+          planId,
+          session.subscription || session.id,
+          session.amount_total || 0,
+          planId === 'single' ? 1 : planId === 'monthly' || planId === 'yearly' ? 0 : 1,
+          new Date().toISOString()
+        ).run();
+
         // 发送确认邮件（如果有邮箱）
         if (customerEmail) {
           try {
@@ -558,16 +619,34 @@ class CloudflareStripeService {
         console.log('⚠️ 支付状态不是paid:', session.payment_status);
 
         // 记录失败的支付尝试
+        if (finalUserId && planId) {
+          await this.env.DB.prepare(`
+            INSERT INTO payment_logs (
+              user_id, plan_id, stripe_subscription_id, status,
+              error_message, created_at
+            ) VALUES (?, ?, ?, 'failed', ?, ?)
+          `).bind(
+            parseInt(finalUserId),
+            planId,
+            session.id,
+            `Payment status: ${session.payment_status}`,
+            new Date().toISOString()
+          ).run();
+        }
+
+        // 记录到系统日志
         await this.env.DB.prepare(`
-          INSERT INTO payment_logs (
-            user_id, plan_id, stripe_subscription_id, status,
-            error_message, created_at
-          ) VALUES (?, ?, ?, 'failed', ?, ?)
+          INSERT INTO system_logs (
+            level, message, details, created_at
+          ) VALUES ('warning', 'Webhook支付状态异常', ?, ?)
         `).bind(
-          parseInt(finalUserId),
-          planId,
-          session.id,
-          `Payment status: ${session.payment_status}`,
+          JSON.stringify({
+            sessionId: session.id,
+            paymentStatus: session.payment_status,
+            userId: finalUserId,
+            planId,
+            amount: session.amount_total
+          }),
           new Date().toISOString()
         ).run();
       }

@@ -511,14 +511,28 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                       <div>
                         <p className="text-gray-600 text-sm font-medium">{t('usageLimit')}</p>
                         <p className="text-gray-900 font-semibold">
-                          {userProfile.membership.planId === 'single' ?
-                            `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}` :
-                            userProfile.membership.planId === 'paid' ?
-                            `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}` :
-                            userProfile.membership.planId === 'monthly' || userProfile.membership.planId === 'yearly' ?
-                            t('unlimitedUsage') :
-                            `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}`
-                          }
+                          {(() => {
+                            const credits = userProfile.membership.remainingCredits || 0;
+                            const planId = userProfile.membership.planId;
+
+                            // 单次服务显示剩余次数
+                            if (planId === 'single') {
+                              return `${credits} ${t('creditsRemaining')}`;
+                            }
+
+                            // 月度和年度套餐显示无限使用
+                            if (planId === 'monthly' || planId === 'yearly') {
+                              return t('unlimitedUsage');
+                            }
+
+                            // 其他付费套餐显示剩余次数
+                            if (planId === 'paid' || credits > 0) {
+                              return `${credits} ${t('creditsRemaining')}`;
+                            }
+
+                            // 默认显示有限访问
+                            return t('limitedAccess') || 'Limited Access';
+                          })()}
                         </p>
                       </div>
                     </div>

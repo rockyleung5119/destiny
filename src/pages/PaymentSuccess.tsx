@@ -200,13 +200,28 @@ const PaymentSuccess: React.FC = () => {
   }, [sessionId, planId, paymentIntent, redirectStatus, refreshUser]);
 
   const handleContinue = () => {
-    // 重新加载页面回到主页面
-    window.location.href = '/';
+    // 确保用户已登录状态，跳转到主页
+    if (user) {
+      // 用户已登录，直接跳转到主页
+      window.location.href = '/';
+    } else {
+      // 用户未登录，先刷新认证状态再跳转
+      if (refreshUser) {
+        refreshUser().then(() => {
+          window.location.href = '/';
+        }).catch(() => {
+          // 如果刷新失败，仍然跳转到主页
+          window.location.href = '/';
+        });
+      } else {
+        window.location.href = '/';
+      }
+    }
   };
 
   const handleRetry = () => {
-    // 重新加载页面回到主页面
-    window.location.href = '/';
+    // 跳转到定价页面重新选择套餐
+    window.location.href = '/pricing';
   };
 
   if (isVerifying) {
