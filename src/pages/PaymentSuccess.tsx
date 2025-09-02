@@ -159,7 +159,7 @@ const PaymentSuccess: React.FC = () => {
           return;
         }
 
-        // 原有的session验证逻辑
+        // 使用session验证逻辑
         const response = await fetch('/api/stripe/verify-payment', {
           method: 'POST',
           headers: {
@@ -168,7 +168,7 @@ const PaymentSuccess: React.FC = () => {
           },
           body: JSON.stringify({
             sessionId,
-            planId
+            planId: planId || urlParams.get('plan') || 'single'
           })
         });
 

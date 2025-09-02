@@ -1,31 +1,52 @@
-# 支付成功权限同步修复 ✅
+# 支付系统完整修复 ✅
 
 ## 🎯 问题描述
-生产环境中，用户支付成功后：
-1. **不会返回项目主页** - 停留在支付成功页面
-2. **权限没有同步** - 用户账号没有增加服务权限或会员状态
+生产环境中存在以下问题：
+1. **支付成功后不会跳转回网站** - 用户停留在Stripe支付页面
+2. **用户支付后没有自动开通次数或会员权限** - 权限同步失败
+3. **会员设置页面缺少取消订阅功能** - 用户无法管理订阅
 
 ## 🔍 问题根因
-预构建支付页面的PaymentSuccess组件只是简单地刷新用户信息，但没有调用后端API来实际更新用户的会员权限到数据库。
+1. **重定向问题**: 使用硬编码的预构建支付页面URL，无法动态设置success_url
+2. **权限同步问题**: 缺少checkout.session.completed webhook处理
+3. **订阅管理问题**: 前端缺少取消订阅功能和API端点
 
-## ✅ 修复方案
+## ✅ 完整修复方案
 
-### 1. 新增API端点
+### 1. 支付重定向修复
+**文件**: `backend/worker.ts`
+- **新增**: `/api/stripe/create-checkout-session` API端点
+- **功能**: 动态创建Stripe Checkout Session，设置正确的success_url和cancel_url
+- **优势**: 支持动态重定向URL，包含用户和套餐信息
+
+**文件**: `src/components/StripeCheckoutButton.tsx`
+- **修改**: 使用新API端点替代硬编码的预构建支付页面URL
+- **改进**: 动态创建支付会话，确保正确重定向
+
+### 2. Webhook事件处理
+**文件**: `backend/worker.ts`
+- **新增**: `handleCheckoutSessionCompleted` 方法
+- **功能**: 处理 `checkout.session.completed` webhook事件
+- **逻辑**: 自动更新用户会员权限到数据库
+
+### 3. 预构建支付成功处理
 **文件**: `backend/worker.ts`
 - **新增**: `/api/stripe/prebuilt-payment-success` API端点
-- **功能**: 处理预构建支付页面的成功回调
+- **功能**: 处理预构建支付页面的成功回调（向后兼容）
 - **逻辑**: 验证支付信息并调用 `updateUserMembership` 函数更新数据库
 
-```typescript
-// 预构建支付页面成功处理API端点
-app.post('/api/stripe/prebuilt-payment-success', jwtMiddleware, async (c) => {
-  // 验证用户身份和支付信息
-  // 调用 updateUserMembership 更新数据库
-  // 返回成功状态
-});
-```
+### 4. 取消订阅功能
+**文件**: `backend/worker.ts`
+- **新增**: `/api/membership/cancel-subscription` API端点
+- **新增**: `updateSubscription` 方法到StripeAPIClient
+- **功能**: 支持用户取消订阅，设置在计费周期结束时停止
 
-### 2. 修复前端处理逻辑
+**文件**: `src/components/MemberSettings.tsx`
+- **新增**: 订阅管理标签页
+- **功能**: 显示当前订阅状态，提供取消订阅按钮
+- **界面**: 完整的订阅管理界面
+
+### 5. 前端处理逻辑修复
 **文件**: `src/pages/PaymentSuccess.tsx`
 - **修复**: 预构建支付页面成功处理逻辑
 - **新增**: 调用新的API端点更新权限

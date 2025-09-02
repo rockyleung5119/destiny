@@ -41,15 +41,32 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
     setError(null);
 
     try {
-      console.log('🛒 使用预构建支付页面进行支付...');
+      console.log('🛒 创建Stripe Checkout Session...');
       console.log(`📋 套餐: ${plan.name} (${planId})`);
       console.log(`👤 用户: ${user.email}`);
 
-      // 使用配置文件构建支付URL
-      const paymentUrl = buildPaymentUrl(planId, user.email, user.id.toString());
+      // 调用新的API端点创建Checkout Session
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          planId
+        })
+      });
 
-      console.log('✅ 重定向到Stripe预构建支付页面...');
-      console.log(`🔗 支付URL: ${paymentUrl}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      console.log('✅ Checkout Session创建成功:', data.sessionId);
+
+      console.log('✅ 重定向到Stripe Checkout页面...');
+      console.log(`🔗 支付URL: ${data.url}`);
 
       // 保存支付信息到localStorage，用于支付成功后的处理
       localStorage.setItem('pendingPayment', JSON.stringify({
@@ -57,11 +74,12 @@ const StripeCheckoutButton: React.FC<StripeCheckoutButtonProps> = ({
         planName: plan.name,
         userEmail: user.email,
         userId: user.id,
+        sessionId: data.sessionId,
         timestamp: Date.now()
       }));
 
-      // 重定向到Stripe预构建支付页面
-      window.location.href = paymentUrl;
+      // 重定向到Stripe Checkout页面
+      window.location.href = data.url;
 
     } catch (error) {
       console.error('❌ 支付重定向失败:', error);

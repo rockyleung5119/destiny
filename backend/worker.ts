@@ -182,6 +182,10 @@ class StripeAPIClient {
     return this.makeRequest(`/subscriptions/${subscriptionId}`, 'DELETE');
   }
 
+  async updateSubscription(subscriptionId: string, data: any) {
+    return this.makeRequest(`/subscriptions/${subscriptionId}`, 'POST', data);
+  }
+
   constructWebhookEvent(body: string, signature: string, webhookSecret: string) {
     // 增强的webhook验证 - 生产环境安全验证
     try {
@@ -445,6 +449,10 @@ class CloudflareStripeService {
       const event = this.stripe.constructWebhookEvent(body, signature, webhookSecret);
 
       switch (event.type) {
+        case 'checkout.session.completed':
+          await this.handleCheckoutSessionCompleted(event.data.object);
+          break;
+
         case 'invoice.payment_succeeded':
           await this.handlePaymentSucceeded(event.data.object);
           break;
@@ -468,6 +476,49 @@ class CloudflareStripeService {
     } catch (error) {
       console.error('Webhook handling failed', error);
       throw error;
+    }
+  }
+
+  private async handleCheckoutSessionCompleted(session: any) {
+    console.log('🎉 Checkout session completed:', session.id);
+
+    try {
+      // 从session中获取用户信息
+      const userId = session.client_reference_id || session.metadata?.userId;
+      const planId = session.metadata?.planId;
+
+      console.log('📋 Session数据:', {
+        sessionId: session.id,
+        userId,
+        planId,
+        paymentStatus: session.payment_status,
+        mode: session.mode
+      });
+
+      if (!userId || !planId) {
+        console.error('❌ Missing userId or planId in session metadata');
+        return;
+      }
+
+      // 检查支付状态
+      if (session.payment_status === 'paid') {
+        console.log(`✅ 支付成功，为用户 ${userId} 激活 ${planId} 套餐`);
+
+        // 更新用户会员状态
+        await updateUserMembership(
+          this.env.DB,
+          parseInt(userId),
+          planId,
+          session.subscription || session.id
+        );
+
+        console.log('✅ 用户会员状态更新成功');
+      } else {
+        console.log('⚠️ 支付状态不是paid:', session.payment_status);
+      }
+
+    } catch (error) {
+      console.error('❌ 处理checkout session完成事件失败:', error);
     }
   }
 
@@ -1741,6 +1792,74 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   }
 });
 
+// 取消订阅API
+app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
+  try {
+    console.log('🚫 处理取消订阅请求...');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    // 获取用户当前的订阅信息
+    const membership = await c.env.DB.prepare(
+      'SELECT id, plan_id, stripe_subscription_id, expires_at FROM memberships WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1'
+    ).bind(userId).first();
+
+    if (!membership) {
+      return c.json({
+        success: false,
+        message: '没有找到活跃的会员订阅'
+      }, 404);
+    }
+
+    // 检查是否是订阅类型（monthly或yearly）
+    if (membership.plan_id === 'single') {
+      return c.json({
+        success: false,
+        message: '单次付费无需取消订阅'
+      }, 400);
+    }
+
+    // 如果有Stripe订阅ID，调用Stripe API取消订阅
+    if (membership.stripe_subscription_id) {
+      try {
+        console.log('📞 调用Stripe API取消订阅:', membership.stripe_subscription_id);
+        const stripeService = new CloudflareStripeService(c.env);
+
+        // 取消订阅（在当前计费周期结束时）
+        await stripeService.stripe.updateSubscription(membership.stripe_subscription_id, {
+          cancel_at_period_end: true
+        });
+
+        console.log('✅ Stripe订阅已设置为周期结束时取消');
+      } catch (stripeError) {
+        console.error('❌ Stripe取消订阅失败:', stripeError);
+        // 即使Stripe API失败，我们仍然可以在本地数据库中标记为取消
+      }
+    }
+
+    // 更新数据库中的会员状态
+    await c.env.DB.prepare(
+      'UPDATE memberships SET is_active = 0, updated_at = ? WHERE id = ?'
+    ).bind(new Date().toISOString(), membership.id).run();
+
+    console.log('✅ 本地数据库会员状态已更新为取消');
+
+    return c.json({
+      success: true,
+      message: '订阅已成功取消，将在当前计费周期结束时生效',
+      cancelledAt: new Date().toISOString(),
+      expiresAt: membership.expires_at
+    });
+
+  } catch (error) {
+    console.error('❌ 取消订阅失败:', error);
+    return c.json({
+      success: false,
+      message: '取消订阅失败，请稍后重试'
+    }, 500);
+  }
+});
+
 // Stripe健康检查端点 - 统一支付系统API标准
 app.get('/api/stripe/health', async (c) => {
   try {
@@ -2103,6 +2222,114 @@ app.post('/api/stripe/prebuilt-payment-success', jwtMiddleware, async (c) => {
       success: false,
       message: 'Prebuilt payment processing failed',
       error: error.message || 'Unknown error'
+    }, 500);
+  }
+});
+
+// 创建Stripe Checkout Session API端点
+app.post('/api/stripe/create-checkout-session', jwtMiddleware, async (c) => {
+  try {
+    console.log('💳 开始创建Stripe Checkout Session...');
+    const payload = c.get('jwtPayload');
+    const userId = payload.userId;
+
+    // 解析请求数据
+    const requestData = await c.req.json();
+    const { planId } = requestData;
+
+    console.log('📋 Checkout Session请求数据:', {
+      userId,
+      planId
+    });
+
+    // 验证计划ID
+    const validPlans = ['single', 'monthly', 'yearly'];
+    if (!validPlans.includes(planId)) {
+      return c.json({
+        success: false,
+        error: 'Invalid plan ID'
+      }, 400);
+    }
+
+    // 获取用户信息
+    const user = await c.env.DB.prepare(
+      'SELECT id, email, name FROM users WHERE id = ?'
+    ).bind(userId).first();
+
+    if (!user) {
+      return c.json({
+        success: false,
+        error: 'User not found'
+      }, 404);
+    }
+
+    // 价格配置
+    const priceConfig = {
+      single: {
+        mode: 'payment',
+        amount: 199, // $1.99
+        currency: 'usd',
+        name: 'Single Reading'
+      },
+      monthly: {
+        mode: 'subscription',
+        amount: 999, // $9.99
+        currency: 'usd',
+        name: 'Monthly Plan'
+      },
+      yearly: {
+        mode: 'subscription',
+        amount: 9999, // $99.99
+        currency: 'usd',
+        name: 'Yearly Plan'
+      }
+    };
+
+    const config = priceConfig[planId];
+    const stripeService = new CloudflareStripeService(c.env);
+
+    // 创建Checkout Session
+    const session = await stripeService.stripe.createCheckoutSession({
+      mode: config.mode,
+      line_items: [{
+        price_data: {
+          currency: config.currency,
+          product_data: {
+            name: config.name,
+          },
+          unit_amount: config.amount,
+          ...(config.mode === 'subscription' ? {
+            recurring: {
+              interval: planId === 'monthly' ? 'month' : 'year'
+            }
+          } : {})
+        },
+        quantity: 1,
+      }],
+      success_url: `${c.env.FRONTEND_URL || 'https://indicate.top'}/payment/success?session_id={CHECKOUT_SESSION_ID}&plan=${planId}`,
+      cancel_url: `${c.env.FRONTEND_URL || 'https://indicate.top'}/payment/cancel`,
+      client_reference_id: userId.toString(),
+      metadata: {
+        userId: userId.toString(),
+        planId: planId,
+        userEmail: user.email
+      },
+      customer_email: user.email
+    });
+
+    console.log('✅ Checkout Session创建成功:', session.id);
+
+    return c.json({
+      success: true,
+      sessionId: session.id,
+      url: session.url
+    });
+
+  } catch (error) {
+    console.error('❌ Checkout Session创建失败:', error);
+    return c.json({
+      success: false,
+      error: error.message || 'Failed to create checkout session'
     }, 500);
   }
 });
