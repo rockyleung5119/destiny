@@ -506,8 +506,8 @@ class CloudflareStripeService {
           console.log('✅ 从client_reference_id解析到用户ID:', userId);
         }
 
-        // 解析套餐ID
-        const planMatch = clientRef.match(/plan_(\w+)/);
+        // 解析套餐ID (修复正则表达式，只匹配套餐名称，不包括时间戳)
+        const planMatch = clientRef.match(/plan_(single|monthly|yearly)(?:_|$)/);
         if (planMatch) {
           planId = planMatch[1];
           console.log('✅ 从client_reference_id解析到套餐ID:', planId);
