@@ -483,42 +483,115 @@ class CloudflareStripeService {
     console.log('🎉 Checkout session completed:', session.id);
 
     try {
-      // 从session中获取用户信息
-      const userId = session.client_reference_id || session.metadata?.userId;
-      const planId = session.metadata?.planId;
+      // 从session中获取用户信息 - 支持多种方式获取用户ID
+      const userId = session.client_reference_id ||
+                    session.metadata?.userId ||
+                    session.metadata?.user_id ||
+                    session.customer_details?.email; // 如果没有ID，尝试用邮箱查找用户
+
+      const planId = session.metadata?.planId || session.metadata?.plan_id;
+      const customerEmail = session.customer_details?.email;
 
       console.log('📋 Session数据:', {
         sessionId: session.id,
         userId,
         planId,
+        customerEmail,
         paymentStatus: session.payment_status,
-        mode: session.mode
+        mode: session.mode,
+        amountTotal: session.amount_total,
+        currency: session.currency
       });
 
-      if (!userId || !planId) {
-        console.error('❌ Missing userId or planId in session metadata');
+      // 如果没有直接的userId，尝试通过邮箱查找
+      let finalUserId = userId;
+      if (!finalUserId && customerEmail) {
+        try {
+          const user = await this.env.DB.prepare(`
+            SELECT id FROM users WHERE email = ?
+          `).bind(customerEmail).first();
+
+          if (user) {
+            finalUserId = user.id.toString();
+            console.log(`✅ 通过邮箱 ${customerEmail} 找到用户ID: ${finalUserId}`);
+          }
+        } catch (error) {
+          console.error('❌ 通过邮箱查找用户失败:', error);
+        }
+      }
+
+      if (!finalUserId || !planId) {
+        console.error('❌ Missing userId or planId in session metadata', {
+          userId: finalUserId,
+          planId,
+          customerEmail,
+          sessionMetadata: session.metadata
+        });
         return;
       }
 
       // 检查支付状态
       if (session.payment_status === 'paid') {
-        console.log(`✅ 支付成功，为用户 ${userId} 激活 ${planId} 套餐`);
+        console.log(`✅ 支付成功，为用户 ${finalUserId} 激活 ${planId} 套餐`);
 
         // 更新用户会员状态
         await updateUserMembership(
           this.env.DB,
-          parseInt(userId),
+          parseInt(finalUserId),
           planId,
           session.subscription || session.id
         );
 
         console.log('✅ 用户会员状态更新成功');
+
+        // 发送确认邮件（如果有邮箱）
+        if (customerEmail) {
+          try {
+            await this.sendPaymentConfirmationEmail(customerEmail, planId, finalUserId);
+          } catch (emailError) {
+            console.error('❌ 发送确认邮件失败:', emailError);
+            // 不影响主流程
+          }
+        }
+
       } else {
         console.log('⚠️ 支付状态不是paid:', session.payment_status);
+
+        // 记录失败的支付尝试
+        await this.env.DB.prepare(`
+          INSERT INTO payment_logs (
+            user_id, plan_id, stripe_subscription_id, status,
+            error_message, created_at
+          ) VALUES (?, ?, ?, 'failed', ?, ?)
+        `).bind(
+          parseInt(finalUserId),
+          planId,
+          session.id,
+          `Payment status: ${session.payment_status}`,
+          new Date().toISOString()
+        ).run();
       }
 
     } catch (error) {
       console.error('❌ 处理checkout session完成事件失败:', error);
+
+      // 记录错误到数据库
+      try {
+        await this.env.DB.prepare(`
+          INSERT INTO system_logs (
+            level, message, details, created_at
+          ) VALUES ('error', 'Webhook处理失败', ?, ?)
+        `).bind(
+          JSON.stringify({
+            error: error.message,
+            sessionId: session.id,
+            stack: error.stack
+          }),
+          new Date().toISOString()
+        ).run();
+      } catch (logError) {
+        console.error('❌ 记录错误日志失败:', logError);
+      }
     }
   }
 
@@ -572,44 +645,130 @@ class CloudflareStripeService {
   async cancelSubscription(subscriptionId: string) {
     return await this.stripe.cancelSubscription(subscriptionId);
   }
+
+  // 发送支付确认邮件
+  private async sendPaymentConfirmationEmail(email: string, planId: string, userId: string) {
+    try {
+      const planNames = {
+        'single': 'Single Reading',
+        'monthly': 'Monthly Plan',
+        'yearly': 'Yearly Plan'
+      };
+
+      const planName = planNames[planId] || planId;
+
+      console.log(`📧 发送支付确认邮件给 ${email}, 套餐: ${planName}`);
+
+      // 这里可以集成邮件服务，比如SendGrid, Mailgun等
+      // 暂时只记录日志
+      await this.env.DB.prepare(`
+        INSERT INTO email_logs (
+          user_id, email, subject, content, status, created_at
+        ) VALUES (?, ?, ?, ?, 'sent', ?)
+      `).bind(
+        parseInt(userId),
+        email,
+        `Payment Confirmation - ${planName}`,
+        `Your payment for ${planName} has been processed successfully.`,
+        new Date().toISOString()
+      ).run();
+
+      console.log('✅ 支付确认邮件记录已保存');
+    } catch (error) {
+      console.error('❌ 发送确认邮件失败:', error);
+      throw error;
+    }
+  }
 }
 
 // 更新用户会员状态的辅助函数
 async function updateUserMembership(db: D1Database, userId: number, planId: string, subscriptionId?: string) {
   const now = new Date();
   let expiresAt: Date;
+  let remainingCredits: number;
 
-  // 根据计划类型设置过期时间
+  // 根据计划类型设置过期时间和积分次数
   switch (planId) {
     case 'single':
-      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24小时
+      expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1年有效期
+      remainingCredits = 1; // 单次服务1次积分
       break;
     case 'monthly':
       expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30天
+      remainingCredits = 9999; // 月度套餐无限使用
       break;
     case 'yearly':
       expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 365天
+      remainingCredits = 9999; // 年度套餐无限使用
       break;
     default:
       expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 默认24小时
+      remainingCredits = 1; // 默认1次
   }
 
-  // 插入或更新会员记录
-  await db.prepare(`
-    INSERT OR REPLACE INTO memberships (
-      user_id, plan_id, is_active, expires_at, stripe_subscription_id,
-      remaining_credits, created_at, updated_at
-    ) VALUES (?, ?, 1, ?, ?, 1000, ?, ?)
-  `).bind(
-    userId,
-    planId,
-    expiresAt.toISOString(),
-    subscriptionId || null,
-    now.toISOString(),
-    now.toISOString()
-  ).run();
+  try {
+    // 检查是否已有会员记录
+    const existingMembership = await db.prepare(`
+      SELECT remaining_credits FROM memberships WHERE user_id = ? AND plan_id = 'single'
+    `).bind(userId).first();
 
-  console.log(`✅ Updated membership for user ${userId}: ${planId} until ${expiresAt.toISOString()}`);
+    if (planId === 'single' && existingMembership) {
+      // 如果是单次服务且已有记录，累加积分
+      const currentCredits = existingMembership.remaining_credits || 0;
+      remainingCredits = currentCredits + 1;
+
+      // 更新现有记录
+      await db.prepare(`
+        UPDATE memberships
+        SET remaining_credits = ?, updated_at = ?, is_active = 1, expires_at = ?
+        WHERE user_id = ? AND plan_id = 'single'
+      `).bind(
+        remainingCredits,
+        now.toISOString(),
+        expiresAt.toISOString(),
+        userId
+      ).run();
+
+      console.log(`✅ 累加单次服务积分: 用户 ${userId} 现有 ${remainingCredits} 次积分`);
+    } else {
+      // 插入或替换会员记录
+      await db.prepare(`
+        INSERT OR REPLACE INTO memberships (
+          user_id, plan_id, is_active, expires_at, stripe_subscription_id,
+          remaining_credits, created_at, updated_at
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?)
+      `).bind(
+        userId,
+        planId,
+        expiresAt.toISOString(),
+        subscriptionId || null,
+        remainingCredits,
+        now.toISOString(),
+        now.toISOString()
+      ).run();
+
+      console.log(`✅ 创建新会员记录: 用户 ${userId}, 套餐 ${planId}, 积分 ${remainingCredits}, 到期 ${expiresAt.toISOString()}`);
+    }
+
+    // 记录支付成功日志到数据库
+    await db.prepare(`
+      INSERT INTO payment_logs (
+        user_id, plan_id, stripe_subscription_id, amount, status,
+        credits_granted, created_at
+      ) VALUES (?, ?, ?, ?, 'completed', ?, ?)
+    `).bind(
+      userId,
+      planId,
+      subscriptionId || 'webhook_payment',
+      planId === 'single' ? 500 : planId === 'monthly' ? 1500 : 5000, // 价格（分）
+      remainingCredits === 9999 ? 0 : remainingCredits, // 授予的积分
+      now.toISOString()
+    ).run();
+
+  } catch (error) {
+    console.error(`❌ 更新用户会员状态失败: ${error.message}`);
+    throw error;
+  }
 }
 
 // 使用类型别名创建Hono应用实例
@@ -648,6 +807,48 @@ async function ensureDemoUser(db: D1Database) {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         completed_at TEXT
+      )
+    `).run();
+
+    // 确保支付日志表存在
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS payment_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        plan_id TEXT NOT NULL,
+        stripe_subscription_id TEXT,
+        amount INTEGER,
+        status TEXT NOT NULL,
+        credits_granted INTEGER DEFAULT 0,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )
+    `).run();
+
+    // 确保邮件日志表存在
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS email_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        content TEXT,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )
+    `).run();
+
+    // 确保系统日志表存在
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        level TEXT NOT NULL,
+        message TEXT NOT NULL,
+        details TEXT,
+        created_at TEXT NOT NULL
       )
     `).run();
 

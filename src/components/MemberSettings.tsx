@@ -476,8 +476,8 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-400/30 rounded-lg p-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <p className="text-green-100 text-sm">{t('plan')}</p>
-                        <p className="text-white font-medium">
+                        <p className="text-gray-600 text-sm font-medium">{t('plan')}</p>
+                        <p className="text-gray-900 font-semibold">
                           {userProfile.membership.planId === 'basic' ? t('basicFortune') :
                            userProfile.membership.planId === 'premium' ? t('premiumDestiny') :
                            userProfile.membership.planId === 'master' ? t('masterFortune') :
@@ -489,14 +489,14 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                         </p>
                       </div>
                       <div>
-                        <p className="text-green-100 text-sm">{t('status')}</p>
-                        <p className={`font-medium ${userProfile.membership.isActive ? 'text-green-300' : 'text-red-300'}`}>
+                        <p className="text-gray-600 text-sm font-medium">{t('status')}</p>
+                        <p className={`font-semibold ${userProfile.membership.isActive ? 'text-green-600' : 'text-red-600'}`}>
                           {userProfile.membership.isActive ? t('activeStatus') : t('expiredStatus')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-green-100 text-sm">{t('renewalDate')}</p>
-                        <p className="text-white font-medium">
+                        <p className="text-gray-600 text-sm font-medium">{t('renewalDate')}</p>
+                        <p className="text-gray-900 font-semibold">
                           {userProfile.membership.expiresAt ?
                             new Date(userProfile.membership.expiresAt).toLocaleDateString(
                               currentLanguage === 'zh' ? 'zh-CN' :
@@ -509,13 +509,15 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                         </p>
                       </div>
                       <div>
-                        <p className="text-green-100 text-sm">{t('usageLimit')}</p>
-                        <p className="text-white font-medium">
+                        <p className="text-gray-600 text-sm font-medium">{t('usageLimit')}</p>
+                        <p className="text-gray-900 font-semibold">
                           {userProfile.membership.planId === 'single' ?
                             `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}` :
                             userProfile.membership.planId === 'paid' ?
                             `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}` :
-                            t('unlimitedUsage')
+                            userProfile.membership.planId === 'monthly' || userProfile.membership.planId === 'yearly' ?
+                            t('unlimitedUsage') :
+                            `${userProfile.membership.remainingCredits || 0} ${t('creditsRemaining')}`
                           }
                         </p>
                       </div>
@@ -526,32 +528,32 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
                   <div className="bg-gradient-to-r from-gray-500/20 to-gray-600/20 border border-gray-400/30 rounded-lg p-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <p className="text-gray-100 text-sm">{t('plan')}</p>
-                        <p className="text-white font-medium">
+                        <p className="text-gray-600 text-sm font-medium">{t('plan')}</p>
+                        <p className="text-gray-900 font-semibold">
                           {t('freePlan') || 'Free Plan'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-100 text-sm">{t('status')}</p>
-                        <p className="font-medium text-gray-300">
+                        <p className="text-gray-600 text-sm font-medium">{t('status')}</p>
+                        <p className="font-semibold text-gray-700">
                           {t('noActiveMembership') || 'No Active Membership'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-100 text-sm">{t('renewalDate')}</p>
-                        <p className="text-white font-medium">
+                        <p className="text-gray-600 text-sm font-medium">{t('renewalDate')}</p>
+                        <p className="text-gray-900 font-semibold">
                           {t('noExpiration') || 'No Expiration'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-100 text-sm">{t('usageLimit')}</p>
-                        <p className="text-white font-medium">
+                        <p className="text-gray-600 text-sm font-medium">{t('usageLimit')}</p>
+                        <p className="text-gray-900 font-semibold">
                           {t('limitedAccess') || 'Limited Access'}
                         </p>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-400/30">
-                      <p className="text-gray-300 text-sm mb-3">
+                      <p className="text-gray-700 text-sm mb-3 font-medium">
                         {t('upgradeToUnlockFeatures') || 'Upgrade to unlock premium features'}
                       </p>
                       <button
