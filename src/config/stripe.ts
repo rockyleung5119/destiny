@@ -11,9 +11,9 @@ const getCurrentDomain = () => {
 
 // 预构建支付页面配置
 export const STRIPE_PREBUILT_CONFIG = {
-  // 成功页面URL - Stripe会重定向到这里
-  successUrl: `${getCurrentDomain()}/payment/success`,
-  
+  // 成功页面URL - Stripe会重定向到这里 (使用新的success页面)
+  successUrl: `${getCurrentDomain()}/success`,
+
   // 取消页面URL - 用户取消支付时重定向到这里
   cancelUrl: `${getCurrentDomain()}/payment/cancel`,
   
@@ -33,11 +33,12 @@ export const buildPaymentUrl = (planId: string, userEmail: string, userId: strin
     throw new Error(`未找到套餐 ${planId} 的支付页面`);
   }
 
-  // 构建URL参数
+  // 构建URL参数 - 添加时间戳确保唯一性
+  const timestamp = Date.now();
   const params = new URLSearchParams({
     'prefilled_email': userEmail,
-    'client_reference_id': `user_${userId}_plan_${planId}`,
-    'success_url': STRIPE_PREBUILT_CONFIG.successUrl,
+    'client_reference_id': `user_${userId}_plan_${planId}_${timestamp}`,
+    'success_url': `${STRIPE_PREBUILT_CONFIG.successUrl}?order=paid&plan=${planId}&user=${userId}`,
     'cancel_url': STRIPE_PREBUILT_CONFIG.cancelUrl
   });
 

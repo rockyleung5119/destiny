@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Payment Link 诊断工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .diagnostic-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .diagnostic-section.success {
+            border-color: #10b981;
+            background: #ecfdf5;
+        }
+        .diagnostic-section.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+        .diagnostic-section.warning {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+        h1 {
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f3f4f6;
+            border-left: 4px solid #6b7280;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.success {
+            background: #ecfdf5;
+            border-left-color: #10b981;
+        }
+        .result.error {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+        .result.warning {
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }
+        .fix-summary {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .fix-summary h3 {
+            color: #1e40af;
+            margin-top: 0;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .url-display {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-indicator.success { background: #10b981; }
+        .status-indicator.error { background: #ef4444; }
+        .status-indicator.warning { background: #f59e0b; }
+        .status-indicator.info { background: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Stripe Payment Link 诊断工具</h1>
+        
+        <div class="fix-summary">
+            <h3>🎯 本次修复内容总结</h3>
+            <ul>
+                <li><strong>Success URL修复</strong>: 从 `/payment/success` 改为 `/success?order=paid`</li>
+                <li><strong>client_reference_id增强</strong>: 添加时间戳确保唯一性</li>
+                <li><strong>URL参数优化</strong>: 在success_url中包含用户和套餐信息</li>
+                <li><strong>Webhook处理完善</strong>: 增强用户识别和积分累加逻辑</li>
+                <li><strong>多语言Success页面</strong>: 支持5种语言的支付成功页面</li>
+            </ul>
+        </div>
+
+        <!-- 1. Payment Link URL测试 -->
+        <div class="diagnostic-section" id="url-test">
+            <h2>1. Payment Link URL 生成测试</h2>
+            <p>测试修复后的Payment Link URL生成逻辑</p>
+            
+            <div>
+                <label>用户ID: <input type="number" id="userId" value="123" style="margin-left: 10px; padding: 5px;"></label>
+                <label>用户邮箱: <input type="email" id="userEmail" value="test@example.com" style="margin-left: 10px; padding: 5px;"></label>
+            </div>
+            <br>
+            
+            <button onclick="testPaymentUrl('single')">测试单次套餐</button>
+            <button onclick="testPaymentUrl('monthly')">测试月度套餐</button>
+            <button onclick="testPaymentUrl('yearly')">测试年度套餐</button>
+            
+            <div class="result" id="url-result">
+                点击按钮测试Payment Link URL生成...
+            </div>
+        </div>
+
+        <!-- 2. Webhook模拟测试 -->
+        <div class="diagnostic-section" id="webhook-test">
+            <h2>2. Webhook 处理模拟</h2>
+            <p>模拟Stripe Webhook事件处理</p>
+            
+            <button onclick="simulateWebhookEvent('single')">模拟单次支付Webhook</button>
+            <button onclick="simulateWebhookEvent('monthly')">模拟月度支付Webhook</button>
+            <button onclick="simulateWebhookEvent('yearly')">模拟年度支付Webhook</button>
+            
+            <div class="result" id="webhook-result">
+                点击按钮模拟Webhook事件处理...
+            </div>
+        </div>
+
+        <!-- 3. API端点健康检查 -->
+        <div class="diagnostic-section" id="api-test">
+            <h2>3. API 端点健康检查</h2>
+            <p>检查关键API端点的可用性</p>
+            
+            <button onclick="checkApiHealth()">检查API健康状态</button>
+            <button onclick="testWebhookEndpoint()">测试Webhook端点</button>
+            <button onclick="checkStripeConfig()">检查Stripe配置</button>
+            
+            <div class="result" id="api-result">
+                点击按钮开始API健康检查...
+            </div>
+        </div>
+
+        <!-- 4. 数据库状态检查 -->
+        <div class="diagnostic-section" id="database-test">
+            <h2>4. 数据库状态检查指南</h2>
+            <p>使用以下命令检查数据库状态</p>
+            
+            <div class="result">
+# 检查最新的会员记录
+wrangler d1 execute destiny-db --command="
+  SELECT u.email, m.plan_id, m.remaining_credits, m.expires_at, m.is_active, m.created_at 
+  FROM users u 
+  JOIN memberships m ON u.id = m.user_id 
+  WHERE m.is_active = 1 
+  ORDER BY m.created_at DESC LIMIT 10;
+"
+
+# 检查支付日志
+wrangler d1 execute destiny-db --command="
+  SELECT user_id, plan_id, amount, status, credits_granted, created_at 
+  FROM payment_logs 
+  ORDER BY created_at DESC LIMIT 10;
+"
+
+# 检查系统错误日志
+wrangler d1 execute destiny-db --command="
+  SELECT level, message, details, created_at 
+  FROM system_logs 
+  WHERE level IN ('error', 'warning') 
+  ORDER BY created_at DESC LIMIT 10;
+"
+
+# 检查特定用户的会员状态
+wrangler d1 execute destiny-db --command="
+  SELECT * FROM memberships 
+  WHERE user_id = [USER_ID] 
+  ORDER BY created_at DESC;
+"
+            </div>
+        </div>
+
+        <!-- 5. 实时监控指南 -->
+        <div class="diagnostic-section">
+            <h2>5. 实时监控指南</h2>
+            <div class="result">
+# 实时日志监控 (在新终端窗口运行)
+wrangler tail destiny-backend --format=pretty
+
+# 关键监控点:
+1. Payment Link创建: 查看client_reference_id格式
+2. Webhook接收: 查看checkout.session.completed事件
+3. 用户识别: 确认从client_reference_id正确解析用户信息
+4. 数据库写入: 验证会员权限更新
+5. 错误处理: 查看详细的错误日志
+
+# 成功的日志标识:
+- "✅ 从client_reference_id解析到用户ID"
+- "✅ 支付成功，为用户 X 激活 Y 套餐"
+- "✅ 用户会员状态更新成功"
+- "✅ 累加单次服务积分" (针对single套餐)
+            </div>
+        </div>
+
+        <!-- 6. 测试流程指南 -->
+        <div class="diagnostic-section">
+            <h2>6. 完整测试流程</h2>
+            <div class="test-grid">
+                <div>
+                    <h4>🧪 测试步骤</h4>
+                    <ol>
+                        <li>登录系统 (https://indicate.top)</li>
+                        <li>选择任意套餐进行支付</li>
+                        <li>在Stripe支付页面完成支付</li>
+                        <li>检查是否跳转到 /success?order=paid</li>
+                        <li>验证多语言支付成功页面</li>
+                        <li>点击"返回主页"按钮</li>
+                        <li>确认保持登录状态</li>
+                        <li>检查用户设置中的会员状态</li>
+                    </ol>
+                </div>
+                <div>
+                    <h4>✅ 预期结果</h4>
+                    <ul>
+                        <li>支付成功后正确跳转</li>
+                        <li>多语言页面正常显示</li>
+                        <li>用户保持登录状态</li>
+                        <li>会员权限正确更新</li>
+                        <li>积分次数正确累加</li>
+                        <li>Webhook日志正常</li>
+                        <li>数据库记录完整</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.indicate.top';
+        
+        // 模拟Payment Link URL生成
+        function testPaymentUrl(planId) {
+            const resultEl = document.getElementById('url-result');
+            const userId = document.getElementById('userId').value;
+            const userEmail = document.getElementById('userEmail').value;
+            
+            if (!userId || !userEmail) {
+                resultEl.className = 'result error';
+                resultEl.textContent = '❌ 请填写用户ID和邮箱';
+                return;
+            }
+            
+            try {
+                // 模拟修复后的URL生成逻辑
+                const timestamp = Date.now();
+                const baseUrls = {
+                    single: 'https://buy.stripe.com/test_00w5kCewC7OY4D7g0Mfw400',
+                    monthly: 'https://buy.stripe.com/test_3cI7sK88eglu1qVdSEfw401',
+                    yearly: 'https://buy.stripe.com/8x29AV6FHaSq16X1qK9AA02'
+                };
+                
+                const baseUrl = baseUrls[planId];
+                const params = new URLSearchParams({
+                    'prefilled_email': userEmail,
+                    'client_reference_id': `user_${userId}_plan_${planId}_${timestamp}`,
+                    'success_url': `https://indicate.top/success?order=paid&plan=${planId}&user=${userId}`,
+                    'cancel_url': 'https://indicate.top/payment/cancel'
+                });
+                
+                const fullUrl = `${baseUrl}?${params.toString()}`;
+                
+                resultEl.className = 'result success';
+                resultEl.innerHTML = `✅ ${planId} 套餐 Payment Link 生成成功
+
+🔗 完整URL:
+${fullUrl}
+
+📋 关键参数:
+- client_reference_id: user_${userId}_plan_${planId}_${timestamp}
+- success_url: https://indicate.top/success?order=paid&plan=${planId}&user=${userId}
+- prefilled_email: ${userEmail}
+
+🎯 修复要点:
+1. client_reference_id 包含时间戳确保唯一性
+2. success_url 指向新的多语言页面
+3. URL参数包含用户和套餐信息便于处理`;
+                
+            } catch (error) {
+                resultEl.className = 'result error';
+                resultEl.textContent = `❌ URL生成失败: ${error.message}`;
+            }
+        }
+
+        // 模拟Webhook事件处理
+        function simulateWebhookEvent(planId) {
+            const resultEl = document.getElementById('webhook-result');
+            const userId = document.getElementById('userId').value || '123';
+            const userEmail = document.getElementById('userEmail').value || 'test@example.com';
+            
+            resultEl.className = 'result';
+            resultEl.innerHTML = `🔄 模拟 ${planId} 套餐的Webhook处理...
+
+📨 模拟Stripe事件:
+{
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_${Date.now()}",
+      "client_reference_id": "user_${userId}_plan_${planId}_${Date.now()}",
+      "payment_status": "paid",
+      "customer_details": {
+        "email": "${userEmail}"
+      },
+      "amount_total": ${planId === 'single' ? 199 : planId === 'monthly' ? 1990 : 18800},
+      "currency": "usd"
+    }
+  }
+}
+
+🔍 处理步骤:
+1. ✅ 验证Webhook签名
+2. ✅ 解析client_reference_id: user_${userId}_plan_${planId}
+3. ✅ 提取用户ID: ${userId}
+4. ✅ 提取套餐ID: ${planId}
+5. ✅ 确认支付状态: paid
+6. ✅ 更新用户会员状态
+
+💾 数据库更新:
+- 用户ID: ${userId}
+- 套餐: ${planId}
+- 积分: ${planId === 'single' ? '累加1次' : '9999次(无限)'}
+- 有效期: ${planId === 'single' ? '1年' : planId === 'monthly' ? '30天' : '365天'}
+
+📝 日志记录:
+- payment_logs 表记录支付信息
+- system_logs 表记录处理日志`;
+
+            setTimeout(() => {
+                resultEl.className = 'result success';
+                resultEl.innerHTML += '\n\n✅ Webhook事件处理模拟完成';
+            }, 2000);
+        }
+
+        // 检查API健康状态
+        async function checkApiHealth() {
+            const resultEl = document.getElementById('api-result');
+            resultEl.className = 'result';
+            resultEl.textContent = '🔄 检查API健康状态...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultEl.className = 'result success';
+                    resultEl.textContent = `✅ API健康检查通过\n状态: ${data.status}\n时间: ${new Date().toLocaleString()}`;
+                } else {
+                    resultEl.className = 'result error';
+                    resultEl.textContent = `❌ API健康检查失败: ${response.status}`;
+                }
+            } catch (error) {
+                resultEl.className = 'result error';
+                resultEl.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        // 测试Webhook端点
+        async function testWebhookEndpoint() {
+            const resultEl = document.getElementById('api-result');
+            resultEl.className = 'result';
+            resultEl.textContent = '🔄 测试Webhook端点...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/stripe/webhook`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'stripe-signature': 'test_signature'
+                    },
+                    body: JSON.stringify({
+                        type: 'test.event',
+                        data: { object: { test: true } }
+                    })
+                });
+                
+                if (response.status === 400) {
+                    resultEl.className = 'result success';
+                    resultEl.textContent = `✅ Webhook端点正常响应\n状态: ${response.status} (预期的签名验证失败)\n这表明端点正在工作并验证签名`;
+                } else {
+                    resultEl.className = 'result warning';
+                    resultEl.textContent = `⚠️ Webhook端点响应异常: ${response.status}`;
+                }
+            } catch (error) {
+                resultEl.className = 'result error';
+                resultEl.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        // 检查Stripe配置
+        async function checkStripeConfig() {
+            const resultEl = document.getElementById('api-result');
+            resultEl.className = 'result';
+            resultEl.textContent = '🔄 检查Stripe配置...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/stripe/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultEl.className = 'result success';
+                    resultEl.textContent = `✅ Stripe配置检查通过\n` +
+                        `Secret Key: ${data.stripe?.secretKey ? '已配置' : '未配置'}\n` +
+                        `Webhook Secret: ${data.stripe?.webhookSecret ? '已配置' : '未配置'}\n` +
+                        `状态: ${data.status}`;
+                } else {
+                    resultEl.className = 'result error';
+                    resultEl.textContent = `❌ Stripe配置检查失败: ${response.status}`;
+                }
+            } catch (error) {
+                resultEl.className = 'result error';
+                resultEl.textContent = `❌ 网络错误: ${error.message}`;
+            }
+        }
+
+        // 页面加载时显示修复状态
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔧 Stripe Payment Link 诊断工具已加载');
+            console.log('📋 主要修复内容:');
+            console.log('1. Success URL: /payment/success → /success?order=paid');
+            console.log('2. client_reference_id: 添加时间戳确保唯一性');
+            console.log('3. Webhook处理: 增强用户识别和积分累加');
+            console.log('4. 多语言支持: 5种语言的支付成功页面');
+        });
+    </script>
+</body>
+</html>

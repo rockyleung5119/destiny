@@ -13,6 +13,7 @@ import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import ContactPage from './components/ContactPage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentCancel from './pages/PaymentCancel';
+import SuccessPage from './pages/SuccessPage';
 
 import Navigation from './components/Navigation';
 import MemberSettings from './components/MemberSettings';
@@ -23,7 +24,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 // 内部组件，使用AuthContext
 function AppContent() {
-  const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact' | 'payment-success' | 'payment-cancel'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'settings' | 'test' | 'terms' | 'privacy' | 'contact' | 'payment-success' | 'payment-cancel' | 'success'>('main');
   const { user, isAuthenticated, logout } = useAuth();
 
   // 检查URL参数来确定初始视图
@@ -37,7 +38,9 @@ function AppContent() {
     const redirectStatus = urlParams.get('redirect_status');
 
     // 检查是否是支付成功页面
-    if (window.location.pathname.includes('/payment/success') ||
+    if (window.location.pathname.includes('/success') && urlParams.get('order') === 'paid') {
+      setCurrentView('success');
+    } else if (window.location.pathname.includes('/payment/success') ||
         sessionId ||
         paymentIntent ||
         redirectStatus === 'succeeded') {
@@ -168,6 +171,10 @@ function AppContent() {
 
   if (currentView === 'payment-cancel') {
     return <PaymentCancel />;
+  }
+
+  if (currentView === 'success') {
+    return <SuccessPage />;
   }
 
   return (
