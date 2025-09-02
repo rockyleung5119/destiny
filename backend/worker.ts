@@ -883,6 +883,129 @@ async function updateUserMembership(db: D1Database, userId: number, planId: stri
   }
 }
 
+// 检查会员权限的辅助函数
+async function checkMembershipAccess(db: D1Database, userId: number) {
+  console.log(`🔍 检查用户 ${userId} 的会员权限`);
+
+  try {
+    // 获取用户会员信息
+    const membership = await db.prepare(`
+      SELECT plan_id, is_active, expires_at, remaining_credits
+      FROM memberships
+      WHERE user_id = ? AND is_active = 1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(userId).first();
+
+    // 检查是否有有效会员
+    if (!membership) {
+      return {
+        hasAccess: false,
+        message: 'Premium membership required to access fortune telling features.',
+        code: 'MEMBERSHIP_REQUIRED',
+        membership: null
+      };
+    }
+
+    // 检查会员是否过期
+    if (membership.expires_at) {
+      const expiryDate = new Date(membership.expires_at);
+      const now = new Date();
+
+      if (now > expiryDate) {
+        // 更新会员状态为过期
+        await db.prepare(`
+          UPDATE memberships
+          SET is_active = 0
+          WHERE user_id = ? AND plan_id = ?
+        `).bind(userId, membership.plan_id).run();
+
+        return {
+          hasAccess: false,
+          message: 'Your membership has expired. Please renew to continue using fortune telling features.',
+          code: 'MEMBERSHIP_EXPIRED',
+          membership: null
+        };
+      }
+    }
+
+    // 检查剩余次数（如果是按次数计费的会员）
+    if (membership.remaining_credits !== null && membership.remaining_credits <= 0) {
+      return {
+        hasAccess: false,
+        message: 'You have used all your fortune telling credits. Please upgrade your plan.',
+        code: 'CREDITS_EXHAUSTED',
+        membership: membership
+      };
+    }
+
+    console.log(`✅ 用户 ${userId} 权限检查通过，套餐: ${membership.plan_id}, 剩余积分: ${membership.remaining_credits}`);
+    return {
+      hasAccess: true,
+      membership: membership
+    };
+
+  } catch (error) {
+    console.error(`❌ 会员权限检查失败: ${error.message}`);
+    return {
+      hasAccess: false,
+      message: 'Failed to verify membership status',
+      code: 'SYSTEM_ERROR',
+      membership: null
+    };
+  }
+}
+
+// 扣减会员积分的辅助函数
+async function deductMembershipCredit(db: D1Database, userId: number, membership: any) {
+  console.log(`💳 扣减用户 ${userId} 的积分，当前套餐: ${membership.plan_id}`);
+
+  try {
+    // 如果是无限制会员（monthly或yearly），跳过扣费
+    if (['monthly', 'yearly'].includes(membership.plan_id)) {
+      console.log(`✅ 无限制会员 ${membership.plan_id}，跳过积分扣减`);
+      return {
+        success: true,
+        remainingCredits: 9999, // 无限使用
+        hasUnlimitedAccess: true
+      };
+    }
+
+    // 如果有剩余次数限制，扣除一次
+    if (membership.remaining_credits !== null && membership.remaining_credits > 0) {
+      const newCredits = membership.remaining_credits - 1;
+
+      await db.prepare(`
+        UPDATE memberships
+        SET remaining_credits = ?, updated_at = ?
+        WHERE user_id = ? AND plan_id = ? AND is_active = 1
+      `).bind(newCredits, new Date().toISOString(), userId, membership.plan_id).run();
+
+      console.log(`✅ 积分扣减成功，用户 ${userId} 剩余积分: ${newCredits}`);
+      return {
+        success: true,
+        remainingCredits: newCredits,
+        hasUnlimitedAccess: false
+      };
+    } else {
+      console.log(`❌ 用户 ${userId} 积分不足`);
+      return {
+        success: false,
+        message: 'No credits available',
+        remainingCredits: 0
+      };
+    }
+
+  } catch (error) {
+    console.error(`❌ 积分扣减失败: ${error.message}`);
+    return {
+      success: false,
+      message: 'Failed to deduct credit',
+      remainingCredits: membership.remaining_credits || 0
+    };
+  }
+}
+
 // 使用类型别名创建Hono应用实例
 const app = new Hono<Env>();
 
@@ -3283,6 +3406,16 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
 
+    // 🔑 检查会员权限和积分
+    const membershipCheck = await checkMembershipAccess(c.env.DB, userId);
+    if (!membershipCheck.hasAccess) {
+      return c.json({
+        success: false,
+        message: membershipCheck.message,
+        code: membershipCheck.code
+      }, 403);
+    }
+
     // 获取用户完整信息
     const user = await c.env.DB.prepare(`
       SELECT id, name, email, gender, birth_year, birth_month, birth_day,
@@ -3303,6 +3436,16 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       }, 400);
     }
 
+    // 🔑 立即扣减积分（在创建任务前）
+    const deductResult = await deductMembershipCredit(c.env.DB, userId, membershipCheck.membership);
+    if (!deductResult.success) {
+      return c.json({
+        success: false,
+        message: deductResult.message,
+        code: 'CREDIT_DEDUCTION_FAILED'
+      }, 400);
+    }
+
     // 创建异步任务，由Cron触发器处理
     const taskId = generateTaskId();
     const inputData = JSON.stringify({ user, language });
@@ -3312,7 +3455,7 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(taskId, userId, 'bazi', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`🔮 BaZi task created for Cron processing: ${taskId}`);
+    console.log(`🔮 BaZi task created for Cron processing: ${taskId}, remaining credits: ${deductResult.remainingCredits}`);
 
     // 立即返回任务ID，Cron触发器将在后台处理
     return c.json({
@@ -3322,6 +3465,7 @@ app.post('/api/fortune/bazi', jwtMiddleware, async (c) => {
         taskId: taskId,
         status: 'pending',
         type: 'bazi',
+        remainingCredits: deductResult.remainingCredits,
         note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
@@ -3364,6 +3508,16 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
 
+    // 🔑 检查会员权限和积分
+    const membershipCheck = await checkMembershipAccess(c.env.DB, userId);
+    if (!membershipCheck.hasAccess) {
+      return c.json({
+        success: false,
+        message: membershipCheck.message,
+        code: membershipCheck.code
+      }, 403);
+    }
+
     const user = await c.env.DB.prepare(`
       SELECT id, name, email, gender, birth_year, birth_month, birth_day,
              birth_hour, birth_minute, birth_place, timezone
@@ -3372,6 +3526,16 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
 
     if (!user) {
       return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    // 🔑 立即扣减积分（在创建任务前）
+    const deductResult = await deductMembershipCredit(c.env.DB, userId, membershipCheck.membership);
+    if (!deductResult.success) {
+      return c.json({
+        success: false,
+        message: deductResult.message,
+        code: 'CREDIT_DEDUCTION_FAILED'
+      }, 400);
     }
 
     // 创建异步任务，由Cron触发器处理
@@ -3383,7 +3547,7 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(taskId, userId, 'daily', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`🔮 Daily Fortune task created for Cron processing: ${taskId}`);
+    console.log(`🔮 Daily Fortune task created for Cron processing: ${taskId}, remaining credits: ${deductResult.remainingCredits}`);
 
     return c.json({
       success: true,
@@ -3392,6 +3556,7 @@ app.post('/api/fortune/daily', jwtMiddleware, async (c) => {
         taskId: taskId,
         status: 'pending',
         type: 'daily',
+        remainingCredits: deductResult.remainingCredits,
         note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
@@ -3431,6 +3596,16 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
     const userId = payload.userId;
     const { question = '', language = 'zh' } = await c.req.json().catch(() => ({}));
 
+    // 🔑 检查会员权限和积分
+    const membershipCheck = await checkMembershipAccess(c.env.DB, userId);
+    if (!membershipCheck.hasAccess) {
+      return c.json({
+        success: false,
+        message: membershipCheck.message,
+        code: membershipCheck.code
+      }, 403);
+    }
+
     const user = await c.env.DB.prepare(`
       SELECT id, name, email, gender, birth_year, birth_month, birth_day,
              birth_hour, birth_minute, birth_place, timezone
@@ -3439,6 +3614,16 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
 
     if (!user) {
       return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    // 🔑 立即扣减积分（在创建任务前）
+    const deductResult = await deductMembershipCredit(c.env.DB, userId, membershipCheck.membership);
+    if (!deductResult.success) {
+      return c.json({
+        success: false,
+        message: deductResult.message,
+        code: 'CREDIT_DEDUCTION_FAILED'
+      }, 400);
     }
 
     // 创建异步任务，由Cron触发器处理
@@ -3450,7 +3635,7 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(taskId, userId, 'tarot', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`🔮 Tarot Reading task created for Cron processing: ${taskId}`);
+    console.log(`🔮 Tarot Reading task created for Cron processing: ${taskId}, remaining credits: ${deductResult.remainingCredits}`);
 
     return c.json({
       success: true,
@@ -3460,6 +3645,7 @@ app.post('/api/fortune/tarot', jwtMiddleware, async (c) => {
         status: 'pending',
         type: 'tarot',
         question: question,
+        remainingCredits: deductResult.remainingCredits,
         note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
@@ -3502,6 +3688,16 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
     const userId = payload.userId;
     const { language = 'zh' } = await c.req.json().catch(() => ({}));
 
+    // 🔑 检查会员权限和积分
+    const membershipCheck = await checkMembershipAccess(c.env.DB, userId);
+    if (!membershipCheck.hasAccess) {
+      return c.json({
+        success: false,
+        message: membershipCheck.message,
+        code: membershipCheck.code
+      }, 403);
+    }
+
     const user = await c.env.DB.prepare(`
       SELECT id, name, email, gender, birth_year, birth_month, birth_day,
              birth_hour, birth_minute, birth_place, timezone
@@ -3510,6 +3706,16 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
 
     if (!user) {
       return c.json({ success: false, message: 'User not found' }, 404);
+    }
+
+    // 🔑 立即扣减积分（在创建任务前）
+    const deductResult = await deductMembershipCredit(c.env.DB, userId, membershipCheck.membership);
+    if (!deductResult.success) {
+      return c.json({
+        success: false,
+        message: deductResult.message,
+        code: 'CREDIT_DEDUCTION_FAILED'
+      }, 400);
     }
 
     // 创建异步任务，由Cron触发器处理
@@ -3521,7 +3727,7 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(taskId, userId, 'lucky', 'pending', inputData, new Date().toISOString(), new Date().toISOString()).run();
 
-    console.log(`🔮 Lucky Items task created for Cron processing: ${taskId}`);
+    console.log(`🔮 Lucky Items task created for Cron processing: ${taskId}, remaining credits: ${deductResult.remainingCredits}`);
 
     return c.json({
       success: true,
@@ -3530,6 +3736,7 @@ app.post('/api/fortune/lucky', jwtMiddleware, async (c) => {
         taskId: taskId,
         status: 'pending',
         type: 'lucky',
+        remainingCredits: deductResult.remainingCredits,
         note: 'Task will be processed by Cron trigger within 2 minutes'
       }
     });
