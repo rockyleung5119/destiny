@@ -5504,10 +5504,77 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
     console.log('🔐 Marking verification code as used...');
     await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
 
-    // 删除用户相关的所有数据（由于外键约束，会级联删除）
-    console.log('🗑️ Deleting user from database...');
+    // 手动删除用户相关的所有数据（确保完全删除，不依赖外键约束）
+    console.log('🗑️ Starting manual deletion of user data...');
+
+    // 1. 删除异步任务
+    try {
+      const asyncTasksResult = await c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId).run();
+      console.log('🗑️ Deleted async_tasks:', asyncTasksResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ async_tasks table not found or error:', error.message);
+    }
+
+    // 2. 删除API使用记录
+    try {
+      const apiUsageResult = await c.env.DB.prepare('DELETE FROM api_usage WHERE user_id = ?').bind(userId).run();
+      console.log('🗑️ Deleted api_usage records:', apiUsageResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ api_usage table not found or error:', error.message);
+    }
+
+    // 3. 删除算命记录
+    try {
+      const fortuneResult = await c.env.DB.prepare('DELETE FROM fortune_readings WHERE user_id = ?').bind(userId).run();
+      console.log('🗑️ Deleted fortune_readings:', fortuneResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ fortune_readings table not found or error:', error.message);
+    }
+
+    // 4. 删除用户会话
+    try {
+      const sessionsResult = await c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(userId).run();
+      console.log('🗑️ Deleted user_sessions:', sessionsResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ user_sessions table not found or error:', error.message);
+    }
+
+    // 5. 删除会员信息
+    try {
+      const membershipsResult = await c.env.DB.prepare('DELETE FROM memberships WHERE user_id = ?').bind(userId).run();
+      console.log('🗑️ Deleted memberships:', membershipsResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ memberships table not found or error:', error.message);
+    }
+
+    // 6. 删除邮箱验证记录（通过邮箱）
+    try {
+      const emailVerificationResult = await c.env.DB.prepare('DELETE FROM email_verifications WHERE email = ?').bind(user.email).run();
+      console.log('🗑️ Deleted email_verifications:', emailVerificationResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ email_verifications table not found or error:', error.message);
+    }
+
+    // 7. 删除验证码记录（通过邮箱）
+    try {
+      const verificationCodesResult = await c.env.DB.prepare('DELETE FROM verification_codes WHERE email = ?').bind(user.email).run();
+      console.log('🗑️ Deleted verification_codes:', verificationCodesResult.changes || 0);
+    } catch (error) {
+      console.log('ℹ️ verification_codes table not found or error:', error.message);
+    }
+
+    // 8. 最后删除用户记录
+    console.log('🗑️ Deleting user record...');
     const deleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
-    console.log('🗑️ Delete result:', deleteResult);
+    console.log('🗑️ User delete result:', deleteResult);
+
+    if (deleteResult.changes === 0) {
+      console.log('❌ User record was not deleted');
+      return c.json({
+        success: false,
+        message: 'Failed to delete user record'
+      }, 500);
+    }
 
     console.log('✅ Account deleted successfully');
     return c.json({

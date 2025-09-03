@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试删除账号修复</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+        }
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 删除账号功能修复测试</h1>
+        <p>测试修复后的删除账号功能，特别针对 494159635@qq.com 账号的问题</p>
+
+        <!-- 登录部分 -->
+        <div class="section">
+            <h3>1. 用户登录</h3>
+            <input type="email" id="email" placeholder="邮箱" value="494159635@qq.com">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="login()">登录</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <!-- 发送删除验证码 -->
+        <div class="section">
+            <h3>2. 发送删除验证码</h3>
+            <button onclick="sendDeleteCode()" id="sendCodeBtn" disabled>发送删除验证码</button>
+            <div id="sendCodeResult" class="result"></div>
+        </div>
+
+        <!-- 删除账号 -->
+        <div class="section">
+            <h3>3. 删除账号</h3>
+            <input type="text" id="verificationCode" placeholder="6位验证码" maxlength="6">
+            <button onclick="deleteAccount()" id="deleteBtn" class="delete-btn" disabled>⚠️ 删除账号</button>
+            <div id="deleteResult" class="result"></div>
+        </div>
+
+        <!-- 测试结果汇总 -->
+        <div class="section">
+            <h3>4. 测试结果汇总</h3>
+            <div id="summary" class="result info">等待测试...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://destiny-backend.rocky-liang.workers.dev';
+        let authToken = '';
+        let testResults = {
+            login: '⏳ 待测试',
+            sendCode: '⏳ 待测试',
+            deleteAccount: '⏳ 待测试'
+        };
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function updateSummary() {
+            const summary = document.getElementById('summary');
+            const summaryText = `测试结果汇总：
+登录: ${testResults.login}
+发送验证码: ${testResults.sendCode}
+删除账号: ${testResults.deleteAccount}
+
+时间: ${new Date().toLocaleString()}`;
+            summary.textContent = summaryText;
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                showResult('loginResult', '❌ 请输入邮箱和密码', 'error');
+                return;
+            }
+
+            try {
+                console.log('🔐 尝试登录...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('登录响应:', data);
+
+                if (data.success && data.token) {
+                    authToken = data.token;
+                    testResults.login = '✅ 成功';
+                    document.getElementById('sendCodeBtn').disabled = false;
+                    showResult('loginResult', `✅ 登录成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}`, 'success');
+                } else {
+                    testResults.login = '❌ 失败: ' + data.message;
+                    showResult('loginResult', `❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('登录错误:', error);
+                testResults.login = '❌ 错误: ' + error.message;
+                showResult('loginResult', `❌ 登录错误: ${error.message}`, 'error');
+            }
+            updateSummary();
+        }
+
+        async function sendDeleteCode() {
+            if (!authToken) {
+                showResult('sendCodeResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            try {
+                console.log('📧 发送删除验证码...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/send-delete-verification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                console.log('发送验证码响应:', data);
+
+                if (data.success) {
+                    testResults.sendCode = '✅ 成功';
+                    document.getElementById('deleteBtn').disabled = false;
+                    showResult('sendCodeResult', `✅ 验证码发送成功！\n${data.message}\n请检查您的邮箱`, 'success');
+                } else {
+                    testResults.sendCode = '❌ 失败: ' + data.message;
+                    showResult('sendCodeResult', `❌ 验证码发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('发送验证码错误:', error);
+                testResults.sendCode = '❌ 错误: ' + error.message;
+                showResult('sendCodeResult', `❌ 发送验证码错误: ${error.message}`, 'error');
+            }
+            updateSummary();
+        }
+
+        async function deleteAccount() {
+            if (!authToken) {
+                showResult('deleteResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            const verificationCode = document.getElementById('verificationCode').value;
+            if (!verificationCode || verificationCode.length !== 6) {
+                showResult('deleteResult', '❌ 请输入6位验证码', 'error');
+                return;
+            }
+
+            if (!confirm('⚠️ 确认删除账号？此操作不可撤销！\n\n这将永久删除所有用户数据，包括：\n- 用户信息\n- 会员记录\n- 算命历史\n- 所有相关数据')) {
+                return;
+            }
+
+            try {
+                console.log('🗑️ 删除账号...');
+                const response = await fetch(`${API_BASE_URL}/api/auth/delete-account`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ verificationCode })
+                });
+
+                const data = await response.json();
+                console.log('删除账号响应:', data);
+
+                if (data.success) {
+                    testResults.deleteAccount = '✅ 成功';
+                    authToken = ''; // 清除token
+                    showResult('deleteResult', `✅ 账号删除成功！\n${data.message}\n\n修复验证：删除功能现在可以正常工作了！`, 'success');
+                } else {
+                    testResults.deleteAccount = '❌ 失败: ' + data.message;
+                    showResult('deleteResult', `❌ 账号删除失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('删除账号错误:', error);
+                testResults.deleteAccount = '❌ 错误: ' + error.message;
+                showResult('deleteResult', `❌ 删除账号错误: ${error.message}`, 'error');
+            }
+            updateSummary();
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            updateSummary();
+            console.log('🧪 删除账号修复测试页面已加载');
+            console.log('API Base URL:', API_BASE_URL);
+        };
+    </script>
+</body>
+</html>
