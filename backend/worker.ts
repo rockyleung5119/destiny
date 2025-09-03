@@ -5504,90 +5504,154 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
     console.log('🔐 Marking verification code as used...');
     await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
 
-    // 手动删除用户相关的所有数据（确保完全删除，不依赖外键约束）
-    console.log('🗑️ Starting manual deletion of user data...');
+    // 使用逐步删除方式，确保每个步骤都成功
+    console.log('🗑️ Starting step-by-step user data deletion...');
+    let totalDeleted = 0;
+    const deletionSteps = [];
 
     // 1. 删除异步任务
     try {
-      const asyncTasksResult = await c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId).run();
-      console.log('🗑️ Deleted async_tasks:', asyncTasksResult.changes || 0);
+      const result1 = await c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId).run();
+      const deleted1 = result1.changes || 0;
+      totalDeleted += deleted1;
+      deletionSteps.push(`async_tasks: ${deleted1}`);
+      console.log('🗑️ Deleted async_tasks:', deleted1);
     } catch (error) {
-      console.log('ℹ️ async_tasks table not found or error:', error.message);
+      console.log('ℹ️ async_tasks deletion skipped:', error.message);
+      deletionSteps.push(`async_tasks: skipped (${error.message})`);
     }
 
     // 2. 删除API使用记录
     try {
-      const apiUsageResult = await c.env.DB.prepare('DELETE FROM api_usage WHERE user_id = ?').bind(userId).run();
-      console.log('🗑️ Deleted api_usage records:', apiUsageResult.changes || 0);
+      const result2 = await c.env.DB.prepare('DELETE FROM api_usage WHERE user_id = ?').bind(userId).run();
+      const deleted2 = result2.changes || 0;
+      totalDeleted += deleted2;
+      deletionSteps.push(`api_usage: ${deleted2}`);
+      console.log('🗑️ Deleted api_usage:', deleted2);
     } catch (error) {
-      console.log('ℹ️ api_usage table not found or error:', error.message);
+      console.log('ℹ️ api_usage deletion skipped:', error.message);
+      deletionSteps.push(`api_usage: skipped (${error.message})`);
     }
 
     // 3. 删除算命记录
     try {
-      const fortuneResult = await c.env.DB.prepare('DELETE FROM fortune_readings WHERE user_id = ?').bind(userId).run();
-      console.log('🗑️ Deleted fortune_readings:', fortuneResult.changes || 0);
+      const result3 = await c.env.DB.prepare('DELETE FROM fortune_readings WHERE user_id = ?').bind(userId).run();
+      const deleted3 = result3.changes || 0;
+      totalDeleted += deleted3;
+      deletionSteps.push(`fortune_readings: ${deleted3}`);
+      console.log('🗑️ Deleted fortune_readings:', deleted3);
     } catch (error) {
-      console.log('ℹ️ fortune_readings table not found or error:', error.message);
+      console.log('ℹ️ fortune_readings deletion skipped:', error.message);
+      deletionSteps.push(`fortune_readings: skipped (${error.message})`);
     }
 
     // 4. 删除用户会话
     try {
-      const sessionsResult = await c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(userId).run();
-      console.log('🗑️ Deleted user_sessions:', sessionsResult.changes || 0);
+      const result4 = await c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(userId).run();
+      const deleted4 = result4.changes || 0;
+      totalDeleted += deleted4;
+      deletionSteps.push(`user_sessions: ${deleted4}`);
+      console.log('🗑️ Deleted user_sessions:', deleted4);
     } catch (error) {
-      console.log('ℹ️ user_sessions table not found or error:', error.message);
+      console.log('ℹ️ user_sessions deletion skipped:', error.message);
+      deletionSteps.push(`user_sessions: skipped (${error.message})`);
     }
 
     // 5. 删除会员信息
     try {
-      const membershipsResult = await c.env.DB.prepare('DELETE FROM memberships WHERE user_id = ?').bind(userId).run();
-      console.log('🗑️ Deleted memberships:', membershipsResult.changes || 0);
+      const result5 = await c.env.DB.prepare('DELETE FROM memberships WHERE user_id = ?').bind(userId).run();
+      const deleted5 = result5.changes || 0;
+      totalDeleted += deleted5;
+      deletionSteps.push(`memberships: ${deleted5}`);
+      console.log('🗑️ Deleted memberships:', deleted5);
     } catch (error) {
-      console.log('ℹ️ memberships table not found or error:', error.message);
+      console.log('ℹ️ memberships deletion skipped:', error.message);
+      deletionSteps.push(`memberships: skipped (${error.message})`);
     }
 
-    // 6. 删除邮箱验证记录（通过邮箱）
+    // 6. 删除邮箱验证记录
     try {
-      const emailVerificationResult = await c.env.DB.prepare('DELETE FROM email_verifications WHERE email = ?').bind(user.email).run();
-      console.log('🗑️ Deleted email_verifications:', emailVerificationResult.changes || 0);
+      const result6 = await c.env.DB.prepare('DELETE FROM email_verifications WHERE email = ?').bind(user.email).run();
+      const deleted6 = result6.changes || 0;
+      totalDeleted += deleted6;
+      deletionSteps.push(`email_verifications: ${deleted6}`);
+      console.log('🗑️ Deleted email_verifications:', deleted6);
     } catch (error) {
-      console.log('ℹ️ email_verifications table not found or error:', error.message);
+      console.log('ℹ️ email_verifications deletion skipped:', error.message);
+      deletionSteps.push(`email_verifications: skipped (${error.message})`);
     }
 
-    // 7. 删除验证码记录（通过邮箱）
+    // 7. 删除验证码记录（除了当前使用的）
     try {
-      const verificationCodesResult = await c.env.DB.prepare('DELETE FROM verification_codes WHERE email = ?').bind(user.email).run();
-      console.log('🗑️ Deleted verification_codes:', verificationCodesResult.changes || 0);
+      const result7 = await c.env.DB.prepare('DELETE FROM verification_codes WHERE email = ? AND id != ?').bind(user.email, storedCode.id).run();
+      const deleted7 = result7.changes || 0;
+      totalDeleted += deleted7;
+      deletionSteps.push(`verification_codes: ${deleted7}`);
+      console.log('🗑️ Deleted verification_codes:', deleted7);
     } catch (error) {
-      console.log('ℹ️ verification_codes table not found or error:', error.message);
+      console.log('ℹ️ verification_codes deletion skipped:', error.message);
+      deletionSteps.push(`verification_codes: skipped (${error.message})`);
     }
 
     // 8. 最后删除用户记录
     console.log('🗑️ Deleting user record...');
-    const deleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
-    console.log('🗑️ User delete result:', deleteResult);
+    try {
+      const userDeleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+      const deletedUser = userDeleteResult.changes || 0;
+      totalDeleted += deletedUser;
+      deletionSteps.push(`users: ${deletedUser}`);
+      console.log('🗑️ Deleted users:', deletedUser);
 
-    if (deleteResult.changes === 0) {
-      console.log('❌ User record was not deleted');
+      if (deletedUser === 0) {
+        console.log('❌ User record was not deleted');
+        return c.json({
+          success: false,
+          message: 'Failed to delete user record',
+          deletionSteps: deletionSteps
+        }, 500);
+      }
+    } catch (error) {
+      console.error('❌ Failed to delete user record:', error);
       return c.json({
         success: false,
-        message: 'Failed to delete user record'
+        message: 'Failed to delete user record: ' + error.message,
+        deletionSteps: deletionSteps
       }, 500);
     }
 
+    // 最后删除当前验证码
+    try {
+      await c.env.DB.prepare('DELETE FROM verification_codes WHERE id = ?').bind(storedCode.id).run();
+      console.log('🗑️ Deleted current verification code');
+    } catch (error) {
+      console.log('ℹ️ Current verification code deletion skipped:', error.message);
+    }
+
     console.log('✅ Account deleted successfully');
+    console.log('🗑️ Deletion summary:', deletionSteps);
+
     return c.json({
       success: true,
-      message: 'Account deleted successfully'
+      message: 'Account deleted successfully',
+      deletedRecords: totalDeleted,
+      deletionSteps: deletionSteps
     });
+
   } catch (error) {
     console.error('❌ Delete account error:', error);
     console.error('❌ Error stack:', error.stack);
+
+    // 提供更详细的错误信息
+    let errorMessage = 'Failed to delete account';
+    if (error.message) {
+      errorMessage += ': ' + error.message;
+    }
+
     return c.json({
       success: false,
-      message: 'Failed to delete account',
-      error: error.message
+      message: errorMessage,
+      error: error.message,
+      stack: error.stack
     }, 500);
   }
 });

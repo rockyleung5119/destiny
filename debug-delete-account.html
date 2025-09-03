@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调试删除账号问题</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+        }
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 删除账号问题调试工具</h1>
+        <p>深度调试删除账号功能，查看详细的API响应和错误信息</p>
+
+        <!-- 登录部分 -->
+        <div class="section">
+            <h3>1. 用户登录</h3>
+            <input type="email" id="email" placeholder="邮箱" value="">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="login()">登录</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <!-- 发送删除验证码 -->
+        <div class="section">
+            <h3>2. 发送删除验证码</h3>
+            <button onclick="sendDeleteCode()" id="sendCodeBtn" disabled>发送删除验证码</button>
+            <div id="sendCodeResult" class="result"></div>
+        </div>
+
+        <!-- 检查验证码 -->
+        <div class="section">
+            <h3>3. 检查验证码状态</h3>
+            <button onclick="checkVerificationCodes()" id="checkCodesBtn" disabled>检查数据库中的验证码</button>
+            <div id="checkCodesResult" class="result"></div>
+        </div>
+
+        <!-- 删除账号 -->
+        <div class="section">
+            <h3>4. 删除账号</h3>
+            <input type="text" id="verificationCode" placeholder="6位验证码" maxlength="6">
+            <button onclick="deleteAccount()" id="deleteBtn" class="delete-btn" disabled>⚠️ 删除账号</button>
+            <div id="deleteResult" class="result"></div>
+        </div>
+
+        <!-- 调试信息 -->
+        <div class="section">
+            <h3>5. 调试信息</h3>
+            <div id="debugInfo" class="result info">等待调试信息...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://indicate.top';
+        let authToken = '';
+        let userEmail = '';
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function updateDebugInfo(info) {
+            const debugElement = document.getElementById('debugInfo');
+            const timestamp = new Date().toLocaleTimeString();
+            debugElement.textContent += `[${timestamp}] ${info}\n`;
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                showResult('loginResult', '❌ 请输入邮箱和密码', 'error');
+                return;
+            }
+
+            try {
+                updateDebugInfo(`尝试登录: ${email}`);
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`登录响应状态: ${response.status}`);
+                updateDebugInfo(`登录响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success && data.token) {
+                    authToken = data.token;
+                    userEmail = email;
+                    document.getElementById('sendCodeBtn').disabled = false;
+                    document.getElementById('checkCodesBtn').disabled = false;
+                    showResult('loginResult', `✅ 登录成功！\n用户: ${data.user.name}\n邮箱: ${data.user.email}\nToken: ${authToken.substring(0, 50)}...`, 'success');
+                } else {
+                    showResult('loginResult', `❌ 登录失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                updateDebugInfo(`登录错误: ${error.message}`);
+                showResult('loginResult', `❌ 登录错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function sendDeleteCode() {
+            if (!authToken) {
+                showResult('sendCodeResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            try {
+                updateDebugInfo('发送删除验证码请求');
+                const response = await fetch(`${API_BASE_URL}/api/auth/send-delete-verification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`发送验证码响应状态: ${response.status}`);
+                updateDebugInfo(`发送验证码响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    document.getElementById('deleteBtn').disabled = false;
+                    showResult('sendCodeResult', `✅ 验证码发送成功！\n${data.message}\n请检查您的邮箱: ${userEmail}`, 'success');
+                } else {
+                    showResult('sendCodeResult', `❌ 验证码发送失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                updateDebugInfo(`发送验证码错误: ${error.message}`);
+                showResult('sendCodeResult', `❌ 发送验证码错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkVerificationCodes() {
+            if (!authToken) {
+                showResult('checkCodesResult', '❌ 请先登录', 'error');
+                return;
+            }
+
+            try {
+                updateDebugInfo('检查验证码状态');
+                // 这里我们可以添加一个API端点来检查验证码状态
+                showResult('checkCodesResult', `📧 用户邮箱: ${userEmail}\n⏰ 当前时间: ${new Date().toISOString()}\n🔍 请检查邮箱中的验证码`, 'info');
+            } catch (error) {
+                updateDebugInfo(`检查验证码错误: ${error.message}`);
+                showResult('checkCodesResult', `❌ 检查验证码错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteAccount() {
+            if (!authToken) {
+                showResult('deleteResult', '❌ 请先登录获取Token', 'error');
+                return;
+            }
+
+            const verificationCode = document.getElementById('verificationCode').value;
+            if (!verificationCode || verificationCode.length !== 6) {
+                showResult('deleteResult', '❌ 请输入6位验证码', 'error');
+                return;
+            }
+
+            if (!confirm('⚠️ 确认删除账号？此操作不可撤销！')) {
+                return;
+            }
+
+            try {
+                updateDebugInfo(`删除账号请求，验证码: ${verificationCode}`);
+                const response = await fetch(`${API_BASE_URL}/api/auth/delete-account`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ verificationCode })
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`删除账号响应状态: ${response.status}`);
+                updateDebugInfo(`删除账号响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (data.success) {
+                    authToken = '';
+                    showResult('deleteResult', `✅ 账号删除成功！\n${data.message}\n删除记录数: ${data.deletedRecords || 'N/A'}`, 'success');
+                } else {
+                    showResult('deleteResult', `❌ 账号删除失败: ${data.message}\n错误详情: ${data.error || 'N/A'}\n堆栈: ${data.stack || 'N/A'}`, 'error');
+                }
+            } catch (error) {
+                updateDebugInfo(`删除账号错误: ${error.message}`);
+                showResult('deleteResult', `❌ 删除账号错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            updateDebugInfo('调试工具已加载');
+            updateDebugInfo(`API Base URL: ${API_BASE_URL}`);
+        };
+    </script>
+</body>
+</html>
