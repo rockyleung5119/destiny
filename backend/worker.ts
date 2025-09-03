@@ -203,22 +203,14 @@ class StripeAPIClient {
     return this.makeRequest(`/subscriptions/${subscriptionId}`, 'POST', data);
   }
 
-  async cancelSubscription(subscriptionId: string, cancelAtPeriodEnd: boolean = true) {
+  async cancelSubscription(subscriptionId: string) {
     // 按照Stripe官方文档：使用subscriptions.update设置cancel_at_period_end
-    if (cancelAtPeriodEnd) {
-      const data = {
-        cancel_at_period_end: true  // 修复：使用布尔值而不是字符串
-      };
-      return this.updateSubscription(subscriptionId, data);
-    } else {
-      // 立即取消：使用subscriptions.cancel
-      return this.cancelSubscriptionImmediately(subscriptionId);
-    }
-  }
-
-  async cancelSubscriptionImmediately(subscriptionId: string) {
-    // 修复：立即取消订阅应该使用POST方法调用cancel端点
-    return this.makeRequest(`/subscriptions/${subscriptionId}/cancel`, 'POST');
+    // 只支持周期结束时取消，保证用户可以使用到付费周期结束
+    const data = {
+      cancel_at_period_end: true  // 使用布尔值，makeRequest会正确转换为字符串
+    };
+    console.log(`🔄 设置订阅 ${subscriptionId} 在周期结束时取消`);
+    return this.updateSubscription(subscriptionId, data);
   }
 
   async retrieveSubscription(subscriptionId: string) {
@@ -1134,61 +1126,62 @@ class CloudflareStripeService {
     }
   }
 
-  async cancelSubscription(subscriptionId: string, cancelAtPeriodEnd: boolean = true) {
-    console.log(`🚫 取消订阅: ${subscriptionId}, 周期结束时取消: ${cancelAtPeriodEnd}`);
+  async cancelSubscription(subscriptionId: string) {
+    console.log(`🚫 取消订阅: ${subscriptionId} (周期结束时取消)`);
 
     try {
       // 先获取当前订阅状态
       const currentSubscription = await this.getSubscription(subscriptionId);
+      console.log('📋 当前订阅状态:', {
+        id: currentSubscription.id,
+        status: currentSubscription.status,
+        cancel_at_period_end: currentSubscription.cancel_at_period_end,
+        current_period_end: currentSubscription.current_period_end
+      });
 
       if (currentSubscription.status === 'canceled') {
         console.log('⚠️ 订阅已经被取消');
         return currentSubscription;
       }
 
-      if (currentSubscription.cancel_at_period_end === true && cancelAtPeriodEnd) {
+      if (currentSubscription.cancel_at_period_end === true) {
         console.log('⚠️ 订阅已经设置为周期结束时取消');
         return currentSubscription;
       }
 
-      const result = await this.stripe.cancelSubscription(subscriptionId, cancelAtPeriodEnd);
+      console.log('🔄 调用Stripe API设置订阅在周期结束时取消');
+      const result = await this.stripe.cancelSubscription(subscriptionId);
+
       console.log('✅ Stripe订阅取消成功:', {
         id: result.id,
         status: result.status,
         cancel_at_period_end: result.cancel_at_period_end,
-        canceled_at: result.canceled_at
+        canceled_at: result.canceled_at,
+        current_period_end: result.current_period_end
       });
+
       return result;
     } catch (error) {
-      console.error('❌ Stripe订阅取消失败:', error);
-      throw error;
-    }
-  }
+      console.error('❌ Stripe订阅取消失败:', {
+        subscriptionId,
+        error: error.message,
+        stack: error.stack?.substring(0, 500)
+      });
 
-  async cancelSubscriptionImmediately(subscriptionId: string) {
-    console.log(`🚫 立即取消订阅: ${subscriptionId}`);
-
-    try {
-      // 先获取当前订阅状态
-      const currentSubscription = await this.getSubscription(subscriptionId);
-
-      if (currentSubscription.status === 'canceled') {
-        console.log('⚠️ 订阅已经被取消');
-        return currentSubscription;
+      // 增强错误信息
+      if (error.message?.includes('No such subscription')) {
+        throw new Error(`Subscription ${subscriptionId} not found in Stripe`);
+      } else if (error.message?.includes('already canceled')) {
+        throw new Error(`Subscription ${subscriptionId} is already canceled`);
+      } else if (error.message?.includes('Invalid request')) {
+        throw new Error(`Invalid request to cancel subscription ${subscriptionId}: ${error.message}`);
+      } else {
+        throw new Error(`Failed to cancel subscription ${subscriptionId}: ${error.message}`);
       }
-
-      const result = await this.stripe.cancelSubscriptionImmediately(subscriptionId);
-      console.log('✅ Stripe订阅立即取消成功:', {
-        id: result.id,
-        status: result.status,
-        canceled_at: result.canceled_at
-      });
-      return result;
-    } catch (error) {
-      console.error('❌ Stripe订阅立即取消失败:', error);
-      throw error;
     }
   }
+
+
 
   // 发送支付确认邮件
   private async sendPaymentConfirmationEmail(email: string, planId: string, userId: string) {
@@ -2688,11 +2681,9 @@ app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     userId = payload.userId;
 
-    console.log(`🚫 用户 ${userId} 请求取消订阅 (直接处理)`);
+    console.log(`🚫 用户 ${userId} 请求取消订阅 (周期结束时取消)`);
 
-    // 获取请求参数
-    const requestBody = await c.req.json().catch(() => ({}));
-    const { immediate = false } = requestBody; // 是否立即取消
+    // 只支持周期结束时取消，保证用户可以使用到付费周期结束
 
     // 获取用户的活跃订阅信息
     subscriptionData = await c.env.DB.prepare(`
@@ -2733,21 +2724,11 @@ app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
 
     console.log(`🔧 开始取消Stripe订阅: ${subscriptionData.stripe_subscription_id}`);
 
-    // 调用Stripe API取消订阅
+    // 调用Stripe API取消订阅 - 只支持周期结束时取消
     const stripeService = new CloudflareStripeService(c.env);
-    let stripeResult;
-
-    if (immediate) {
-      // 立即取消订阅
-      console.log('🚫 执行立即取消订阅');
-      stripeResult = await stripeService.cancelSubscriptionImmediately(subscriptionData.stripe_subscription_id);
-      console.log('✅ Stripe订阅已立即取消');
-    } else {
-      // 在计费周期结束时取消
-      console.log('📅 执行周期结束时取消订阅');
-      stripeResult = await stripeService.cancelSubscription(subscriptionData.stripe_subscription_id, true);
-      console.log('✅ Stripe订阅已设置为周期结束时取消');
-    }
+    console.log('📅 执行周期结束时取消订阅');
+    const stripeResult = await stripeService.cancelSubscription(subscriptionData.stripe_subscription_id);
+    console.log('✅ Stripe订阅已设置为周期结束时取消');
 
     console.log('🔍 Stripe API响应:', stripeResult);
 
@@ -2761,30 +2742,15 @@ app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
       }, 500);
     }
 
-    // 更新数据库中的订阅状态
+    // 更新数据库中的订阅状态 - 周期结束时取消：保持活跃状态但记录取消时间
     const currentTime = new Date().toISOString();
-    let updateResult;
-
-    if (immediate) {
-      // 立即取消：直接设置为非活跃状态
-      updateResult = await c.env.DB.prepare(`
-        UPDATE memberships
-        SET
-          is_active = 0,
-          cancelled_at = ?,
-          updated_at = ?
-        WHERE id = ?
-      `).bind(currentTime, currentTime, subscriptionData.id).run();
-    } else {
-      // 周期结束时取消：保持活跃状态但记录取消时间
-      updateResult = await c.env.DB.prepare(`
-        UPDATE memberships
-        SET
-          cancelled_at = ?,
-          updated_at = ?
-        WHERE id = ?
-      `).bind(currentTime, currentTime, subscriptionData.id).run();
-    }
+    const updateResult = await c.env.DB.prepare(`
+      UPDATE memberships
+      SET
+        cancelled_at = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).bind(currentTime, currentTime, subscriptionData.id).run();
 
     console.log('📊 数据库更新结果:', updateResult);
 
@@ -2793,7 +2759,7 @@ app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
       subscriptionId: subscriptionData.stripe_subscription_id,
       cancelledAt: currentTime,
       expiresAt: subscriptionData.expires_at,
-      immediate: immediate,
+      cancelAtPeriodEnd: true,
       stripeData: stripeResult
     };
 
@@ -2801,9 +2767,7 @@ app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
 
     return c.json({
       success: true,
-      message: immediate
-        ? 'Subscription cancelled immediately'
-        : 'Subscription will be cancelled at the end of the current billing period',
+      message: 'Subscription will be cancelled at the end of the current billing period. You can continue using the service until then.',
       data: responseData
     });
 
@@ -3777,21 +3741,12 @@ app.post('/api/debug/test-membership-creation', async (c) => {
 // 🧪 测试取消订阅端点
 app.post('/api/debug/test-cancel-subscription', async (c) => {
   try {
-    const { userId, subscriptionId, immediate = false } = await c.req.json();
+    const { userId, subscriptionId } = await c.req.json();
 
-    console.log(`🧪 测试取消订阅: 用户${userId}, 订阅${subscriptionId}, 立即取消${immediate}`);
+    console.log(`🧪 测试取消订阅: 用户${userId}, 订阅${subscriptionId} (周期结束时取消)`);
 
     // 模拟JWT payload
     c.set('jwtPayload', { userId: parseInt(userId) });
-
-    // 创建新的请求到取消订阅端点
-    const cancelRequest = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ immediate })
-    };
 
     // 直接调用取消订阅逻辑（模拟内部调用）
     const stripeService = new CloudflareStripeService(c.env);
@@ -3810,13 +3765,8 @@ app.post('/api/debug/test-cancel-subscription', async (c) => {
       }, 404);
     }
 
-    // 测试Stripe API调用
-    let stripeResult;
-    if (immediate) {
-      stripeResult = await stripeService.cancelSubscriptionImmediately(subscription.stripe_subscription_id);
-    } else {
-      stripeResult = await stripeService.cancelSubscription(subscription.stripe_subscription_id, true);
-    }
+    // 测试Stripe API调用 - 只支持周期结束时取消
+    const stripeResult = await stripeService.cancelSubscription(subscription.stripe_subscription_id);
 
     return c.json({
       success: true,
@@ -3825,7 +3775,7 @@ app.post('/api/debug/test-cancel-subscription', async (c) => {
         userId,
         subscription,
         stripeResult,
-        immediate
+        cancelAtPeriodEnd: true
       }
     });
 
@@ -3979,11 +3929,9 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     userId = payload.userId;
 
-    console.log(`🚫 用户 ${userId} 请求取消订阅`);
+    console.log(`🚫 用户 ${userId} 请求取消订阅 (周期结束时取消)`);
 
-    // 获取请求参数
-    const requestBody = await c.req.json().catch(() => ({}));
-    const { immediate = false } = requestBody; // 是否立即取消
+    // 只支持周期结束时取消，保证用户可以使用到付费周期结束
 
     // 获取用户的活跃订阅信息
     subscriptionData = await c.env.DB.prepare(`
@@ -4034,21 +3982,11 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
 
     console.log(`🔧 开始取消Stripe订阅: ${subscriptionData.stripe_subscription_id}`);
 
-    // 调用Stripe API取消订阅
+    // 调用Stripe API取消订阅 - 只支持周期结束时取消
     const stripeService = new CloudflareStripeService(c.env);
-    let stripeResult;
-
-    if (immediate) {
-      // 立即取消订阅 - 会触发customer.subscription.deleted webhook
-      console.log('🚫 执行立即取消订阅');
-      stripeResult = await stripeService.cancelSubscriptionImmediately(subscriptionData.stripe_subscription_id);
-      console.log('✅ Stripe订阅已立即取消');
-    } else {
-      // 在计费周期结束时取消 - 会触发customer.subscription.updated webhook
-      console.log('📅 执行周期结束时取消订阅');
-      stripeResult = await stripeService.cancelSubscription(subscriptionData.stripe_subscription_id, true);
-      console.log('✅ Stripe订阅已设置为周期结束时取消');
-    }
+    console.log('📅 执行周期结束时取消订阅 - 会触发customer.subscription.updated webhook');
+    const stripeResult = await stripeService.cancelSubscription(subscriptionData.stripe_subscription_id);
+    console.log('✅ Stripe订阅已设置为周期结束时取消');
 
     // 记录取消操作到系统日志
     await c.env.DB.prepare(`
@@ -4060,7 +3998,7 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
         userId,
         subscriptionId: subscriptionData.stripe_subscription_id,
         planId: subscriptionData.plan_id,
-        immediate,
+        cancelAtPeriodEnd: true,
         stripeResponse: {
           id: stripeResult.id,
           status: stripeResult.status,
@@ -4068,7 +4006,7 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
           canceled_at: stripeResult.canceled_at
         },
         processingTime: Date.now() - startTime,
-        note: immediate ? '立即取消，等待webhook更新数据库' : '周期结束时取消，等待webhook更新数据库'
+        note: '周期结束时取消，等待webhook更新数据库'
       }),
       new Date().toISOString()
     ).run();
@@ -4077,15 +4015,8 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
     // 这确保了数据的一致性，避免竞态条件
     console.log('⏳ 等待Stripe webhook事件来更新数据库状态...');
 
-    // 根据取消类型返回不同的响应消息
-    let responseMessage, webhookEvent;
-    if (immediate) {
-      responseMessage = 'Subscription cancelled immediately. Your access will be revoked shortly.';
-      webhookEvent = 'customer.subscription.deleted';
-    } else {
-      responseMessage = 'Subscription will be cancelled at the end of the current billing period. You can continue using the service until then.';
-      webhookEvent = 'customer.subscription.updated';
-    }
+    const responseMessage = 'Subscription will be cancelled at the end of the current billing period. You can continue using the service until then.';
+    const webhookEvent = 'customer.subscription.updated';
 
     console.log(`🎉 用户 ${userId} 订阅取消请求成功，处理时间: ${Date.now() - startTime}ms`);
     console.log(`📡 等待 ${webhookEvent} webhook事件来更新数据库`);
@@ -4097,10 +4028,9 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
         subscriptionId: subscriptionData.stripe_subscription_id,
         planId: subscriptionData.plan_id,
         cancelledAt: new Date().toISOString(),
-        immediate,
+        cancelAtPeriodEnd: stripeResult.cancel_at_period_end,
         expiresAt: subscriptionData.expires_at,
         stripeStatus: stripeResult.status,
-        cancelAtPeriodEnd: stripeResult.cancel_at_period_end,
         expectedWebhookEvent: webhookEvent,
         note: 'Database will be updated via Stripe webhook'
       }
