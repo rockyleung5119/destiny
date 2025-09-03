@@ -317,50 +317,124 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
     setIsCancellingSubscription(true);
     setMessage('');
 
-    try {
-      const response = await fetch('/api/membership/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+    // 重试机制
+    const maxRetries = 3;
+    let retryCount = 0;
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`🔄 取消订阅尝试 ${retryCount + 1}/${maxRetries}`);
+
+
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+
+        const response = await fetch('/api/membership/cancel-subscription', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (data.success) {
+          setMessage(t('subscriptionCancelledDesc'));
+          setMessageType('success');
+          setSubscriptionCancelled(true);
+          // 刷新用户信息
+          await loadUserProfile();
+          return; // 成功，退出重试循环
+        } else {
+          // 改进的错误处理：显示更具体的错误信息
+          let errorMessage = data.message || t('cancelSubscription') + ' failed';
+
+          // 根据错误代码提供更友好的错误信息
+          if (data.code === 'ALREADY_CANCELLED') {
+            errorMessage = 'Your subscription is already cancelled.';
+            setMessage(errorMessage);
+            setMessageType('warning');
+            return; // 已取消，不需要重试
+          } else if (data.code === 'STRIPE_SUBSCRIPTION_NOT_FOUND') {
+            errorMessage = 'Subscription not found. It may have already been cancelled.';
+            setMessage(errorMessage);
+            setMessageType('warning');
+            return; // 订阅不存在，不需要重试
+          } else if (data.code === 'NO_ACTIVE_SUBSCRIPTION') {
+            errorMessage = 'No active subscription found.';
+            setMessage(errorMessage);
+            setMessageType('warning');
+            return; // 没有活跃订阅，不需要重试
+          } else if (data.code === 'NETWORK_ERROR') {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else if (data.code === 'AUTH_ERROR') {
+            errorMessage = 'Authentication error. Please refresh the page and try again.';
+            setMessage(errorMessage);
+            setMessageType('error');
+            return; // 认证错误，不需要重试
+          } else if (data.code === 'RATE_LIMIT') {
+            errorMessage = 'Too many requests. Please wait a moment and try again.';
+            // 对于限流错误，等待更长时间再重试
+            if (retryCount < maxRetries - 1) {
+              console.log('⏳ 限流错误，等待10秒后重试...');
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+          } else if (data.code === 'STRIPE_SERVICE_ERROR') {
+            errorMessage = 'Stripe service temporarily unavailable. Please try again later.';
+          }
+
+          // 如果是可重试的错误且还有重试次数，继续重试
+          if (retryCount < maxRetries - 1 &&
+              (data.code === 'NETWORK_ERROR' || data.code === 'RATE_LIMIT' || data.code === 'STRIPE_SERVICE_ERROR' || response.status >= 500)) {
+            retryCount++;
+            console.log(`⏳ 等待 ${retryCount * 2} 秒后重试...`);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 2000)); // 递增延迟
+            continue;
+          }
+
+          // 最终错误
+          setMessage(errorMessage);
+          setMessageType('error');
+          return;
         }
-      });
+      } catch (error) {
+        console.error('Cancel subscription error:', error);
 
-      const data = await response.json();
+        let errorMessage = 'Network error occurred. Please check your connection and try again.';
 
-      if (data.success) {
-        setMessage(t('subscriptionCancelledDesc'));
-        setMessageType('success');
-        setSubscriptionCancelled(true);
-        // 刷新用户信息
-        await loadUserProfile();
-      } else {
-        // 改进的错误处理：显示更具体的错误信息
-        let errorMessage = data.message || t('cancelSubscription') + ' failed';
-
-        // 根据错误代码提供更友好的错误信息
-        if (data.code === 'ALREADY_CANCELLED') {
-          errorMessage = 'Your subscription is already cancelled.';
-        } else if (data.code === 'STRIPE_SUBSCRIPTION_NOT_FOUND') {
-          errorMessage = 'Subscription not found. It may have already been cancelled.';
-        } else if (data.code === 'NETWORK_ERROR') {
-          errorMessage = 'Network error. Please check your connection and try again.';
-        } else if (data.code === 'AUTH_ERROR') {
-          errorMessage = 'Authentication error. Please refresh the page and try again.';
-        } else if (data.code === 'RATE_LIMIT') {
-          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        if (error.name === 'AbortError') {
+          errorMessage = 'Request timeout. Please try again.';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
+          errorMessage = 'Network connection failed. Please check your internet connection.';
+        } else if (error.message.includes('No internet connection')) {
+          errorMessage = error.message;
         }
 
+        // 如果是网络错误且还有重试次数，继续重试
+        if (retryCount < maxRetries - 1 &&
+            (error.name === 'AbortError' || error.message.includes('fetch') || error.message.includes('network'))) {
+          retryCount++;
+          console.log(`⏳ 网络错误，等待 ${retryCount * 2} 秒后重试...`);
+          await new Promise(resolve => setTimeout(resolve, retryCount * 2000)); // 递增延迟
+          continue;
+        }
+
+        // 最终错误
         setMessage(errorMessage);
         setMessageType('error');
+        return;
       }
-    } catch (error) {
-      console.error('Cancel subscription error:', error);
-      setMessage('Network error occurred. Please check your connection and try again.');
-      setMessageType('error');
-    } finally {
-      setIsCancellingSubscription(false);
     }
+
+    // 如果所有重试都失败了
+    setMessage('Failed to cancel subscription after multiple attempts. Please try again later.');
+    setMessageType('error');
+    setIsCancellingSubscription(false);
   };
 
   if (isLoading) {
