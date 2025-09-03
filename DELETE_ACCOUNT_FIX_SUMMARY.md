@@ -27,42 +27,78 @@ users (主表)
 └── email_verifications (邮箱验证，通过email关联)
 ```
 
-## 🔧 修复方案 (第二次)
+## 🔧 修复方案 (第三次 - 最终修复)
 
-### 1. 从批量操作改为逐步删除
+### 问题分析
+经过调查发现：
+- 用户 494159635@qq.com (ID: 7) 仍然存在于数据库中
+- 会员信息已被删除，但用户记录未删除
+- 说明删除过程在用户记录删除步骤失败
+
+### 1. 双重删除策略
 ```javascript
-// 修复前：使用batch操作
-const deleteOperations = [];
-deleteOperations.push(c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId));
-// ... 更多操作
-const batchResult = await c.env.DB.batch(deleteOperations);
-
-// 修复后：逐步删除，每个操作独立处理
+// 首先尝试批量删除（更高效）
 try {
-  const result1 = await c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId).run();
-  console.log('🗑️ Deleted async_tasks:', result1.changes || 0);
+  const deleteStatements = [
+    c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId),
+    // ... 其他表
+    c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId)
+  ];
+  const batchResult = await c.env.DB.batch(deleteStatements);
+
+  // 检查批量删除是否成功
+  const userCheck = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!userCheck) {
+    return success; // 批量删除成功
+  }
 } catch (error) {
-  console.log('ℹ️ async_tasks deletion skipped:', error.message);
+  // 批量删除失败，回退到逐个删除
+}
+
+// 回退到逐个删除
+// ... 逐个删除每个表的数据
+```
+
+### 2. 多次重试机制
+```javascript
+// 对用户记录删除进行多次重试
+let userDeleted = false;
+let attempts = 0;
+const maxAttempts = 3;
+
+while (!userDeleted && attempts < maxAttempts) {
+  attempts++;
+  try {
+    const userDeleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+    if (userDeleteResult.changes > 0) {
+      userDeleted = true;
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒重试
+    }
+  } catch (error) {
+    console.error(`删除尝试 ${attempts} 失败:`, error);
+  }
 }
 ```
 
-### 2. 增强错误处理和日志
-- 每个删除步骤都有独立的错误处理
-- 详细记录每个步骤的删除数量
-- 即使某个表删除失败也不影响其他表
-- 提供完整的删除步骤报告
-
-### 3. 智能验证码处理
+### 3. 最终验证机制
 ```javascript
-// 删除验证码时保留当前使用的验证码，最后再删除
-const result7 = await c.env.DB.prepare('DELETE FROM verification_codes WHERE email = ? AND id != ?')
-  .bind(user.email, storedCode.id).run();
+// 最终验证用户是否真的被删除
+const finalUserCheck = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+if (finalUserCheck) {
+  return {
+    success: false,
+    message: 'Critical error: User record still exists after deletion process',
+    userStillExists: true
+  };
+}
 ```
 
-### 4. 删除结果验证
-- 确保用户记录最终被删除
-- 返回详细的删除统计信息
-- 提供删除步骤的完整报告
+### 4. 详细的删除报告
+- 记录每个删除步骤的结果
+- 显示使用的删除方法（批量 vs 逐个）
+- 记录重试次数
+- 提供完整的错误信息
 
 ## 📝 修复的代码位置
 
@@ -107,13 +143,13 @@ try {
 - 删除步骤跟踪
 - 验证码状态检查
 
-## 🚀 部署状态 (第二次修复)
-- ✅ 代码已修复 (逐步删除方式)
-- ✅ 已部署到Cloudflare Workers
-- ✅ 生产环境可用
+## 🚀 部署状态 (第三次修复 - 最终版)
+- ✅ 代码已修复 (双重删除策略 + 重试机制)
+- ⏳ 准备部署到Cloudflare Workers
+- 🔗 生产域名: https://indicate.top
 - 🔗 Worker URL: https://destiny-backend.jerryliang5119.workers.dev
-- 📅 部署时间: 2025-09-03
-- 🆔 Version ID: a15180e4-5a9f-4978-8a4d-96146ae4804d
+- 📅 修复时间: 2025-09-03
+- 🆔 待更新 Version ID
 
 ## 🔒 安全考虑
 1. 保持原有的验证码验证机制
@@ -122,12 +158,14 @@ try {
 4. 所有敏感操作都有详细日志
 5. 验证码处理更加安全
 
-## 📊 预期效果 (第二次修复)
-- ✅ 494159635@qq.com 用户可以正常删除账号
+## 📊 预期效果 (第三次修复 - 最终版)
+- ✅ 494159635@qq.com 用户可以彻底删除账号
 - ✅ 所有用户的删除功能恢复正常
-- ✅ 删除过程更加稳定可靠
-- ✅ 提供详细的删除报告
-- ✅ 错误处理更加完善
+- ✅ 双重删除策略确保删除成功
+- ✅ 多次重试机制处理临时失败
+- ✅ 最终验证确保用户真正被删除
+- ✅ 详细的删除报告和错误信息
+- ✅ 不影响其他功能的正常运行
 
 ## 🔄 监控和调试
 1. 使用 `wrangler tail destiny-backend` 查看实时日志

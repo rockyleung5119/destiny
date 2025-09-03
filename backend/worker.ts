@@ -5504,10 +5504,80 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
     console.log('🔐 Marking verification code as used...');
     await c.env.DB.prepare('UPDATE verification_codes SET is_used = 1 WHERE id = ?').bind(storedCode.id).run();
 
-    // 使用逐步删除方式，确保每个步骤都成功
-    console.log('🗑️ Starting step-by-step user data deletion...');
+    // 使用强制删除方式，确保用户记录被删除
+    console.log('🗑️ Starting forced user data deletion...');
     let totalDeleted = 0;
     const deletionSteps = [];
+
+    try {
+      // 首先尝试使用事务进行批量删除
+      console.log('🗑️ Attempting transaction-based deletion...');
+
+      const deleteStatements = [
+        c.env.DB.prepare('DELETE FROM async_tasks WHERE user_id = ?').bind(userId),
+        c.env.DB.prepare('DELETE FROM api_usage WHERE user_id = ?').bind(userId),
+        c.env.DB.prepare('DELETE FROM fortune_readings WHERE user_id = ?').bind(userId),
+        c.env.DB.prepare('DELETE FROM user_sessions WHERE user_id = ?').bind(userId),
+        c.env.DB.prepare('DELETE FROM memberships WHERE user_id = ?').bind(userId),
+        c.env.DB.prepare('DELETE FROM email_verifications WHERE email = ?').bind(user.email),
+        c.env.DB.prepare('DELETE FROM verification_codes WHERE email = ? AND id != ?').bind(user.email, storedCode.id),
+        c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId)
+      ];
+
+      const batchResult = await c.env.DB.batch(deleteStatements);
+      console.log('🗑️ Batch deletion result:', batchResult);
+
+      // 检查批量删除结果
+      let batchSuccess = true;
+      for (let i = 0; i < batchResult.length; i++) {
+        const result = batchResult[i];
+        if (result.success) {
+          const changes = result.meta?.changes || 0;
+          totalDeleted += changes;
+          const tableName = ['async_tasks', 'api_usage', 'fortune_readings', 'user_sessions', 'memberships', 'email_verifications', 'verification_codes', 'users'][i];
+          deletionSteps.push(`${tableName}: ${changes}`);
+          console.log(`🗑️ Batch deleted from ${tableName}:`, changes);
+        } else {
+          batchSuccess = false;
+          console.error(`❌ Batch deletion failed for step ${i + 1}:`, result.error);
+          break;
+        }
+      }
+
+      // 如果批量删除成功，检查用户是否真的被删除
+      if (batchSuccess) {
+        const userCheck = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+        if (!userCheck) {
+          console.log('✅ Batch deletion successful - user record deleted');
+          // 删除当前验证码
+          try {
+            await c.env.DB.prepare('DELETE FROM verification_codes WHERE id = ?').bind(storedCode.id).run();
+            console.log('🗑️ Deleted current verification code');
+          } catch (error) {
+            console.log('ℹ️ Current verification code deletion skipped:', error.message);
+          }
+
+          return c.json({
+            success: true,
+            message: 'Account deleted successfully',
+            deletedRecords: totalDeleted,
+            deletionSteps: deletionSteps,
+            method: 'batch'
+          });
+        } else {
+          console.log('❌ Batch deletion completed but user still exists, trying individual deletion...');
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Batch deletion failed:', error);
+      console.log('🔄 Falling back to individual deletion...');
+    }
+
+    // 如果批量删除失败，回退到逐个删除
+    console.log('🗑️ Starting individual deletion fallback...');
+    totalDeleted = 0;
+    deletionSteps.length = 0;
 
     // 1. 删除异步任务
     try {
@@ -5593,29 +5663,49 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
       deletionSteps.push(`verification_codes: skipped (${error.message})`);
     }
 
-    // 8. 最后删除用户记录
-    console.log('🗑️ Deleting user record...');
-    try {
-      const userDeleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
-      const deletedUser = userDeleteResult.changes || 0;
-      totalDeleted += deletedUser;
-      deletionSteps.push(`users: ${deletedUser}`);
-      console.log('🗑️ Deleted users:', deletedUser);
+    // 8. 强制删除用户记录 - 多次尝试
+    console.log('🗑️ Force deleting user record...');
+    let userDeleted = false;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-      if (deletedUser === 0) {
-        console.log('❌ User record was not deleted');
-        return c.json({
-          success: false,
-          message: 'Failed to delete user record',
-          deletionSteps: deletionSteps
-        }, 500);
+    while (!userDeleted && attempts < maxAttempts) {
+      attempts++;
+      console.log(`🗑️ User deletion attempt ${attempts}/${maxAttempts}...`);
+
+      try {
+        const userDeleteResult = await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+        const deletedUser = userDeleteResult.changes || 0;
+        console.log(`🗑️ User deletion attempt ${attempts} result:`, deletedUser);
+
+        if (deletedUser > 0) {
+          userDeleted = true;
+          totalDeleted += deletedUser;
+          deletionSteps.push(`users: ${deletedUser} (attempt ${attempts})`);
+          console.log('✅ User record successfully deleted');
+        } else {
+          console.log(`❌ User deletion attempt ${attempts} failed - no changes`);
+          if (attempts < maxAttempts) {
+            console.log('⏳ Waiting 1 second before retry...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      } catch (error) {
+        console.error(`❌ User deletion attempt ${attempts} error:`, error);
+        if (attempts < maxAttempts) {
+          console.log('⏳ Waiting 1 second before retry...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
-    } catch (error) {
-      console.error('❌ Failed to delete user record:', error);
+    }
+
+    if (!userDeleted) {
+      console.error('❌ Failed to delete user record after all attempts');
       return c.json({
         success: false,
-        message: 'Failed to delete user record: ' + error.message,
-        deletionSteps: deletionSteps
+        message: 'Failed to delete user record after multiple attempts',
+        deletionSteps: deletionSteps,
+        attempts: attempts
       }, 500);
     }
 
@@ -5627,14 +5717,29 @@ app.delete('/api/auth/delete-account', jwtMiddleware, async (c) => {
       console.log('ℹ️ Current verification code deletion skipped:', error.message);
     }
 
-    console.log('✅ Account deleted successfully');
+    // 最终验证用户是否真的被删除
+    const finalUserCheck = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+    if (finalUserCheck) {
+      console.error('❌ CRITICAL: User still exists after deletion process');
+      return c.json({
+        success: false,
+        message: 'Critical error: User record still exists after deletion process',
+        deletionSteps: deletionSteps,
+        userId: userId,
+        userStillExists: true
+      }, 500);
+    }
+
+    console.log('✅ Account deleted successfully - final verification passed');
     console.log('🗑️ Deletion summary:', deletionSteps);
 
     return c.json({
       success: true,
       message: 'Account deleted successfully',
       deletedRecords: totalDeleted,
-      deletionSteps: deletionSteps
+      deletionSteps: deletionSteps,
+      method: 'individual',
+      attempts: attempts
     });
 
   } catch (error) {

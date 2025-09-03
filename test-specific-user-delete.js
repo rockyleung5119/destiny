@@ -1,7 +1,7 @@
 // 测试特定用户删除功能的脚本
 // 专门针对 494159635@qq.com 账号的删除问题
 
-const API_BASE_URL = 'https://destiny-backend.jerryliang5119.workers.dev';
+const API_BASE_URL = 'https://indicate.top';
 
 async function testUserDeletion() {
     console.log('🧪 开始测试用户删除功能修复...');
