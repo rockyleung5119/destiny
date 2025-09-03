@@ -3,6 +3,12 @@
 /**
  * 测试取消订阅功能
  * 验证修复后的取消订阅流程是否正常工作
+ *
+ * 修复内容:
+ * 1. 修复Stripe API调用方法 (POST + cancel_at_period_end=true)
+ * 2. 修复立即取消订阅方法 (POST /subscriptions/{id}/cancel)
+ * 3. 增强错误处理和用户反馈
+ * 4. 添加详细的API调用日志
  */
 
 const API_BASE = 'https://api.indicate.top';

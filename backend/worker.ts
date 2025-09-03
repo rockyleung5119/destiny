@@ -121,32 +121,52 @@ class StripeAPIClient {
       headers
     };
 
+    // 增强的请求日志
+    console.log(`🔄 Stripe API Request: ${method} ${url}`);
     if (data && method !== 'GET') {
-      options.body = new URLSearchParams(data).toString();
+      console.log('📋 Request data:', data);
+    }
+
+    if (data && method !== 'GET') {
+      // 修复：正确处理布尔值参数，确保Stripe API接收正确的数据类型
+      const formData = new URLSearchParams();
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined && value !== null) {
+          // 布尔值转换为字符串，但保持正确的格式
+          formData.append(key, String(value));
+        }
+      }
+      options.body = formData.toString();
+      console.log('📤 Request body:', options.body);
     }
 
     try {
       const response = await fetch(url, options);
+      console.log(`📥 Stripe API Response: ${response.status} ${response.statusText}`);
 
       // 检查响应是否为空或无效
       const responseText = await response.text();
 
       if (!responseText || responseText.trim() === '') {
+        console.error('❌ Empty response from Stripe API');
         throw new Error(`Empty response from Stripe API: ${response.status} ${response.statusText}`);
       }
 
       let result;
       try {
         result = JSON.parse(responseText);
+        console.log('✅ Stripe API response parsed successfully');
       } catch (jsonError) {
         console.error('❌ Failed to parse Stripe API response as JSON:', responseText);
         throw new Error(`Invalid JSON response from Stripe API: ${responseText.substring(0, 200)}...`);
       }
 
       if (!response.ok) {
+        console.error('❌ Stripe API error response:', result);
         throw new Error(result.error?.message || `Stripe API error: ${response.status} ${response.statusText}`);
       }
 
+      console.log('✅ Stripe API request successful');
       return result;
     } catch (error) {
       console.error(`❌ Stripe API request failed for ${method} ${url}:`, error);
@@ -187,7 +207,7 @@ class StripeAPIClient {
     // 按照Stripe官方文档：使用subscriptions.update设置cancel_at_period_end
     if (cancelAtPeriodEnd) {
       const data = {
-        cancel_at_period_end: 'true'
+        cancel_at_period_end: true  // 修复：使用布尔值而不是字符串
       };
       return this.updateSubscription(subscriptionId, data);
     } else {
@@ -197,8 +217,8 @@ class StripeAPIClient {
   }
 
   async cancelSubscriptionImmediately(subscriptionId: string) {
-    // 立即取消订阅：使用DELETE方法
-    return this.makeRequest(`/subscriptions/${subscriptionId}`, 'DELETE');
+    // 修复：立即取消订阅应该使用POST方法调用cancel端点
+    return this.makeRequest(`/subscriptions/${subscriptionId}/cancel`, 'POST');
   }
 
   async retrieveSubscription(subscriptionId: string) {
@@ -3991,18 +4011,31 @@ app.post('/api/stripe/cancel-subscription', jwtMiddleware, async (c) => {
     let errorMessage = 'Cancel subscription failed, please try again later';
     let errorCode = 'UNKNOWN_ERROR';
 
+    // 增强的Stripe错误处理
     if (error.message.includes('No such subscription')) {
-      errorMessage = 'Subscription not found in Stripe';
+      errorMessage = 'Subscription not found in Stripe. It may have already been cancelled.';
       errorCode = 'STRIPE_SUBSCRIPTION_NOT_FOUND';
-    } else if (error.message.includes('already canceled')) {
+    } else if (error.message.includes('already canceled') || error.message.includes('already cancelled')) {
       errorMessage = 'Subscription is already cancelled';
       errorCode = 'ALREADY_CANCELLED';
-    } else if (error.message.includes('network') || error.message.includes('fetch')) {
+    } else if (error.message.includes('cancel_at_period_end')) {
+      errorMessage = 'Subscription is already set to cancel at period end';
+      errorCode = 'ALREADY_SET_TO_CANCEL';
+    } else if (error.message.includes('Invalid request') || error.message.includes('400')) {
+      errorMessage = 'Invalid subscription data. Please contact support.';
+      errorCode = 'INVALID_REQUEST';
+    } else if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('timeout')) {
       errorMessage = 'Network error, please check your connection and try again';
       errorCode = 'NETWORK_ERROR';
-    } else if (error.message.includes('authentication') || error.message.includes('unauthorized')) {
+    } else if (error.message.includes('authentication') || error.message.includes('unauthorized') || error.message.includes('401')) {
       errorMessage = 'Authentication error, please try again';
       errorCode = 'AUTH_ERROR';
+    } else if (error.message.includes('rate limit') || error.message.includes('429')) {
+      errorMessage = 'Too many requests, please wait a moment and try again';
+      errorCode = 'RATE_LIMIT';
+    } else if (error.message.includes('Stripe API')) {
+      errorMessage = 'Stripe service temporarily unavailable, please try again later';
+      errorCode = 'STRIPE_SERVICE_ERROR';
     }
 
     return c.json({

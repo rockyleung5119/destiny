@@ -335,12 +335,28 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
         // 刷新用户信息
         await loadUserProfile();
       } else {
-        setMessage(data.message || t('cancelSubscription') + ' failed');
+        // 改进的错误处理：显示更具体的错误信息
+        let errorMessage = data.message || t('cancelSubscription') + ' failed';
+
+        // 根据错误代码提供更友好的错误信息
+        if (data.code === 'ALREADY_CANCELLED') {
+          errorMessage = 'Your subscription is already cancelled.';
+        } else if (data.code === 'STRIPE_SUBSCRIPTION_NOT_FOUND') {
+          errorMessage = 'Subscription not found. It may have already been cancelled.';
+        } else if (data.code === 'NETWORK_ERROR') {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (data.code === 'AUTH_ERROR') {
+          errorMessage = 'Authentication error. Please refresh the page and try again.';
+        } else if (data.code === 'RATE_LIMIT') {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        }
+
+        setMessage(errorMessage);
         setMessageType('error');
       }
     } catch (error) {
       console.error('Cancel subscription error:', error);
-      setMessage(t('cancelSubscription') + ' failed, please try again later');
+      setMessage('Network error occurred. Please check your connection and try again.');
       setMessageType('error');
     } finally {
       setIsCancellingSubscription(false);
