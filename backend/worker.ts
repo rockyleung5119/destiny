@@ -708,18 +708,176 @@ class CloudflareStripeService {
   }
 
   private async handlePaymentSucceeded(invoice: any) {
+    console.log('💰 Invoice payment succeeded:', invoice.id);
+    console.log('📋 Invoice详细信息:', {
+      id: invoice.id,
+      subscription: invoice.subscription,
+      customer: invoice.customer,
+      amount_paid: invoice.amount_paid,
+      metadata: invoice.metadata
+    });
+
     const subscriptionId = invoice.subscription;
     const customerId = invoice.customer;
 
-    if (subscriptionId) {
-      // 简化处理：从invoice的metadata中获取信息
-      const userId = invoice.metadata?.userId;
-      const planId = invoice.metadata?.planId;
+    if (!subscriptionId) {
+      console.log('⚠️ 非订阅支付，跳过处理');
+      return;
+    }
+
+    try {
+      // 🔧 修复：从多个来源获取用户和套餐信息
+      let userId = invoice.metadata?.userId;
+      let planId = invoice.metadata?.planId;
+
+      // 如果invoice metadata中没有信息，尝试从subscription中获取
+      if (!userId || !planId) {
+        console.log('🔍 Invoice metadata缺失，从subscription获取信息...');
+
+        const subscription = await this.stripe.retrieveSubscription(subscriptionId);
+        console.log('📋 Subscription详细信息:', {
+          id: subscription.id,
+          metadata: subscription.metadata,
+          customer: subscription.customer
+        });
+
+        userId = userId || subscription.metadata?.userId;
+        planId = planId || subscription.metadata?.planId;
+      }
+
+      // 如果仍然没有信息，尝试从数据库中查找现有的订阅记录
+      if (!userId || !planId) {
+        console.log('🔍 Subscription metadata也缺失，从数据库查找...');
+
+        const existingMembership = await this.env.DB.prepare(`
+          SELECT user_id, plan_id FROM memberships
+          WHERE stripe_subscription_id = ? AND is_active = 1
+          ORDER BY created_at DESC LIMIT 1
+        `).bind(subscriptionId).first();
+
+        if (existingMembership) {
+          userId = userId || existingMembership.user_id.toString();
+          planId = planId || existingMembership.plan_id;
+          console.log('✅ 从数据库找到订阅信息:', { userId, planId });
+        }
+      }
+
+      // 如果还是没有用户信息，尝试通过customer查找
+      if (!userId && customerId) {
+        console.log('🔍 通过customer查找用户...');
+
+        const user = await this.env.DB.prepare(`
+          SELECT id FROM users WHERE stripe_customer_id = ?
+        `).bind(customerId).first();
+
+        if (user) {
+          userId = user.id.toString();
+          console.log('✅ 通过customer找到用户ID:', userId);
+
+          // 如果找到了用户但没有planId，尝试从invoice金额推断套餐
+          if (!planId) {
+            const amountPaid = invoice.amount_paid; // 金额以分为单位
+            console.log('🔍 根据支付金额推断套餐:', amountPaid);
+
+            // 根据金额推断套餐类型 (需要根据实际价格调整)
+            if (amountPaid === 1990) { // $19.90
+              planId = 'monthly';
+              console.log('✅ 根据金额推断为月度套餐');
+            } else if (amountPaid === 18800) { // $188.00
+              planId = 'yearly';
+              console.log('✅ 根据金额推断为年度套餐');
+            } else if (amountPaid === 199) { // $1.99
+              planId = 'single';
+              console.log('✅ 根据金额推断为单次套餐');
+            } else {
+              console.log('⚠️ 无法根据金额推断套餐类型:', amountPaid);
+              // 默认为月度套餐（最常见的订阅类型）
+              planId = 'monthly';
+              console.log('🔄 默认设置为月度套餐');
+            }
+          }
+        }
+      }
+
+      console.log('📋 最终解析结果:', {
+        userId,
+        planId,
+        subscriptionId,
+        customerId
+      });
 
       if (userId && planId) {
-        await updateUserMembership(this.env.DB, parseInt(userId), planId, subscriptionId);
+        console.log(`✅ 订阅支付成功，为用户 ${userId} 续费 ${planId} 套餐`);
+
+        await updateUserMembership(
+          this.env.DB,
+          parseInt(userId),
+          planId,
+          subscriptionId
+        );
+
+        console.log('✅ 订阅会员状态更新成功');
+
+        // 记录成功支付到支付日志
+        await this.env.DB.prepare(`
+          INSERT INTO payment_logs (
+            user_id, plan_id, stripe_subscription_id, amount, status,
+            credits_granted, created_at
+          ) VALUES (?, ?, ?, ?, 'completed', ?, ?)
+        `).bind(
+          parseInt(userId),
+          planId,
+          subscriptionId,
+          invoice.amount_paid || 0,
+          planId === 'single' ? 1 : 0, // 订阅套餐不增加积分
+          new Date().toISOString()
+        ).run();
+
       } else {
-        console.log('Missing metadata in invoice for payment succeeded event');
+        console.error('❌ 无法确定用户ID或套餐ID', {
+          userId,
+          planId,
+          subscriptionId,
+          customerId,
+          invoiceMetadata: invoice.metadata
+        });
+
+        // 记录错误到系统日志
+        await this.env.DB.prepare(`
+          INSERT INTO system_logs (
+            level, message, details, created_at
+          ) VALUES ('error', 'Invoice支付成功但无法识别用户', ?, ?)
+        `).bind(
+          JSON.stringify({
+            invoiceId: invoice.id,
+            subscriptionId,
+            customerId,
+            metadata: invoice.metadata
+          }),
+          new Date().toISOString()
+        ).run();
+      }
+
+    } catch (error) {
+      console.error('❌ 处理invoice支付成功事件失败:', error);
+
+      // 记录错误到数据库
+      try {
+        await this.env.DB.prepare(`
+          INSERT INTO system_logs (
+            level, message, details, created_at
+          ) VALUES ('error', 'Invoice支付处理失败', ?, ?)
+        `).bind(
+          JSON.stringify({
+            error: error.message,
+            invoiceId: invoice.id,
+            subscriptionId,
+            stack: error.stack
+          }),
+          new Date().toISOString()
+        ).run();
+      } catch (logError) {
+        console.error('❌ 记录错误日志失败:', logError);
       }
     }
   }
@@ -2970,10 +3128,16 @@ app.get('/api/debug/user/:userId/membership', jwtMiddleware, async (c) => {
       ORDER BY created_at DESC LIMIT 10
     `).bind(`%"userId":"${userId}"%`, `%"finalUserId":"${userId}"%`).all();
 
+    // 获取用户的Stripe信息
+    const userInfo = await c.env.DB.prepare(`
+      SELECT id, email, stripe_customer_id FROM users WHERE id = ?
+    `).bind(userId).first();
+
     return c.json({
       success: true,
       data: {
         userId: userId,
+        userInfo: userInfo || null,
         memberships: memberships.results || [],
         paymentLogs: paymentLogs.results || [],
         systemLogs: systemLogs.results || [],
@@ -2984,6 +3148,177 @@ app.get('/api/debug/user/:userId/membership', jwtMiddleware, async (c) => {
   } catch (error) {
     console.error('❌ Debug endpoint error:', error);
     return c.json({ error: 'Debug query failed' }, 500);
+  }
+});
+
+// 🔧 手动修复端点：为用户手动激活订阅会员
+app.post('/api/debug/user/:userId/fix-subscription', jwtMiddleware, async (c) => {
+  try {
+    const userId = c.req.param('userId');
+    const payload = c.get('jwtPayload');
+    const { planId, subscriptionId } = await c.req.json();
+
+    // 只允许用户修复自己的信息
+    if (payload.userId.toString() !== userId) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+
+    if (!planId || !['monthly', 'yearly'].includes(planId)) {
+      return c.json({ error: 'Invalid planId. Must be monthly or yearly' }, 400);
+    }
+
+    console.log(`🔧 手动修复用户 ${userId} 的订阅会员，套餐: ${planId}`);
+
+    // 调用updateUserMembership函数
+    await updateUserMembership(
+      c.env.DB,
+      parseInt(userId),
+      planId,
+      subscriptionId || `manual_fix_${Date.now()}`
+    );
+
+    // 记录手动修复日志
+    await c.env.DB.prepare(`
+      INSERT INTO system_logs (
+        level, message, details, created_at
+      ) VALUES ('info', '手动修复用户订阅会员', ?, ?)
+    `).bind(
+      JSON.stringify({
+        userId,
+        planId,
+        subscriptionId,
+        fixedBy: payload.userId,
+        timestamp: new Date().toISOString()
+      }),
+      new Date().toISOString()
+    ).run();
+
+    return c.json({
+      success: true,
+      message: `用户 ${userId} 的 ${planId} 订阅会员已手动激活`,
+      data: {
+        userId,
+        planId,
+        subscriptionId,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Manual fix error:', error);
+    return c.json({ error: 'Manual fix failed: ' + error.message }, 500);
+  }
+});
+
+// 🔍 Webhook事件监控端点
+app.get('/api/debug/webhook-events', async (c) => {
+  try {
+    // 获取最近的webhook相关系统日志
+    const webhookLogs = await c.env.DB.prepare(`
+      SELECT * FROM system_logs
+      WHERE message LIKE '%webhook%' OR message LIKE '%Webhook%'
+      ORDER BY created_at DESC LIMIT 20
+    `).all();
+
+    // 获取最近的支付日志
+    const recentPayments = await c.env.DB.prepare(`
+      SELECT * FROM payment_logs
+      ORDER BY created_at DESC LIMIT 10
+    `).all();
+
+    return c.json({
+      success: true,
+      data: {
+        webhookLogs: webhookLogs.results || [],
+        recentPayments: recentPayments.results || [],
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Webhook events debug error:', error);
+    return c.json({ error: 'Failed to get webhook events' }, 500);
+  }
+});
+
+// 🔧 Stripe订阅状态同步端点
+app.post('/api/debug/sync-subscription/:subscriptionId', async (c) => {
+  try {
+    const subscriptionId = c.req.param('subscriptionId');
+
+    if (!subscriptionId) {
+      return c.json({ error: 'Missing subscriptionId' }, 400);
+    }
+
+    console.log(`🔄 同步Stripe订阅状态: ${subscriptionId}`);
+
+    const stripeService = new CloudflareStripeService(c.env);
+
+    // 从Stripe获取订阅信息
+    const subscription = await stripeService.stripe.retrieveSubscription(subscriptionId);
+
+    console.log('📋 Stripe订阅信息:', {
+      id: subscription.id,
+      status: subscription.status,
+      customer: subscription.customer,
+      metadata: subscription.metadata
+    });
+
+    // 如果订阅是活跃的，尝试同步到数据库
+    if (subscription.status === 'active' && subscription.metadata?.userId && subscription.metadata?.planId) {
+      const userId = subscription.metadata.userId;
+      const planId = subscription.metadata.planId;
+
+      console.log(`🔧 同步订阅到数据库: 用户 ${userId}, 套餐 ${planId}`);
+
+      await updateUserMembership(
+        c.env.DB,
+        parseInt(userId),
+        planId,
+        subscriptionId
+      );
+
+      // 记录同步日志
+      await c.env.DB.prepare(`
+        INSERT INTO system_logs (
+          level, message, details, created_at
+        ) VALUES ('info', 'Stripe订阅状态同步', ?, ?)
+      `).bind(
+        JSON.stringify({
+          subscriptionId,
+          userId,
+          planId,
+          stripeStatus: subscription.status,
+          timestamp: new Date().toISOString()
+        }),
+        new Date().toISOString()
+      ).run();
+
+      return c.json({
+        success: true,
+        message: '订阅状态同步成功',
+        data: {
+          subscriptionId,
+          userId,
+          planId,
+          stripeStatus: subscription.status
+        }
+      });
+    } else {
+      return c.json({
+        success: false,
+        message: '订阅状态无效或缺少metadata',
+        data: {
+          subscriptionId,
+          status: subscription.status,
+          metadata: subscription.metadata
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Subscription sync error:', error);
+    return c.json({ error: 'Subscription sync failed: ' + error.message }, 500);
   }
 });
 
