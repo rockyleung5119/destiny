@@ -3210,6 +3210,130 @@ app.post('/api/debug/user/:userId/fix-subscription', jwtMiddleware, async (c) =>
   }
 });
 
+// 🔧 数据库结构修复端点
+app.post('/api/debug/fix-database-schema', async (c) => {
+  try {
+    console.log('🔧 开始修复数据库结构...');
+
+    // 1. 检查并添加memberships表的缺失字段
+    try {
+      await c.env.DB.prepare(`
+        ALTER TABLE memberships ADD COLUMN stripe_subscription_id TEXT
+      `).run();
+      console.log('✅ 添加stripe_subscription_id字段成功');
+    } catch (error) {
+      if (error.message.includes('duplicate column name')) {
+        console.log('✅ stripe_subscription_id字段已存在');
+      } else {
+        console.log('⚠️ 添加stripe_subscription_id字段失败:', error.message);
+      }
+    }
+
+    try {
+      await c.env.DB.prepare(`
+        ALTER TABLE memberships ADD COLUMN stripe_customer_id TEXT
+      `).run();
+      console.log('✅ 添加stripe_customer_id字段成功');
+    } catch (error) {
+      if (error.message.includes('duplicate column name')) {
+        console.log('✅ stripe_customer_id字段已存在');
+      } else {
+        console.log('⚠️ 添加stripe_customer_id字段失败:', error.message);
+      }
+    }
+
+    // 2. 创建支付日志表
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS payment_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          plan_id TEXT NOT NULL,
+          stripe_subscription_id TEXT,
+          amount INTEGER,
+          status TEXT NOT NULL,
+          credits_granted INTEGER DEFAULT 0,
+          error_message TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      `).run();
+      console.log('✅ 创建payment_logs表成功');
+    } catch (error) {
+      console.log('⚠️ 创建payment_logs表失败:', error.message);
+    }
+
+    // 3. 创建系统日志表
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS system_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          level TEXT NOT NULL,
+          message TEXT NOT NULL,
+          details TEXT,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+      console.log('✅ 创建system_logs表成功');
+    } catch (error) {
+      console.log('⚠️ 创建system_logs表失败:', error.message);
+    }
+
+    // 4. 创建webhook日志表
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS webhook_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_type TEXT NOT NULL,
+          event_id TEXT,
+          status TEXT NOT NULL,
+          details TEXT,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+      console.log('✅ 创建webhook_logs表成功');
+    } catch (error) {
+      console.log('⚠️ 创建webhook_logs表失败:', error.message);
+    }
+
+    // 5. 创建邮件日志表
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS email_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          email TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          content TEXT,
+          status TEXT NOT NULL,
+          error_message TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      `).run();
+      console.log('✅ 创建email_logs表成功');
+    } catch (error) {
+      console.log('⚠️ 创建email_logs表失败:', error.message);
+    }
+
+    console.log('🎉 数据库结构修复完成');
+
+    return c.json({
+      success: true,
+      message: '数据库结构修复完成',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ 数据库结构修复失败:', error);
+    return c.json({
+      success: false,
+      message: '数据库结构修复失败',
+      error: error.message
+    }, 500);
+  }
+});
+
 // 🔍 Webhook事件监控端点
 app.get('/api/debug/webhook-events', async (c) => {
   try {
@@ -3238,6 +3362,38 @@ app.get('/api/debug/webhook-events', async (c) => {
   } catch (error) {
     console.error('❌ Webhook events debug error:', error);
     return c.json({ error: 'Failed to get webhook events' }, 500);
+  }
+});
+
+// 🧪 测试会员记录创建端点
+app.post('/api/debug/test-membership-creation', async (c) => {
+  try {
+    const { userId, planId, subscriptionId } = await c.req.json();
+
+    console.log(`🧪 测试创建会员记录: 用户${userId}, 套餐${planId}, 订阅${subscriptionId}`);
+
+    // 调用updateUserMembership函数测试
+    await updateUserMembership(c.env.DB, parseInt(userId), planId, subscriptionId);
+
+    // 查询创建的记录
+    const membership = await c.env.DB.prepare(`
+      SELECT * FROM memberships
+      WHERE user_id = ? AND plan_id = ? AND is_active = 1
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(userId, planId).first();
+
+    return c.json({
+      success: true,
+      message: '测试会员记录创建成功',
+      membership: membership
+    });
+
+  } catch (error) {
+    console.error('❌ Test membership creation error:', error);
+    return c.json({
+      success: false,
+      error: 'Test failed: ' + error.message
+    }, 500);
   }
 });
 
