@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe 405错误最终修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .fix-summary {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Stripe 405错误最终修复测试</h1>
+        
+        <div class="fix-summary">
+            <h3>🎯 修复方案总结</h3>
+            <p><strong>问题</strong>：Cloudflare Pages没有正确路由API请求到Worker，导致405错误</p>
+            <p><strong>解决方案</strong>：</p>
+            <ul>
+                <li>✅ 创建 <code>public/_worker.js</code> - Pages Worker代理</li>
+                <li>✅ 创建 <code>public/_routes.json</code> - 路由配置</li>
+                <li>✅ 配置 <code>vite.config.ts</code> - 本地开发代理</li>
+            </ul>
+            <p><strong>原理</strong>：API请求 → Pages Worker → 后端Worker → Stripe API</p>
+        </div>
+
+        <!-- 测试生产环境 -->
+        <div class="section">
+            <h3>1. 测试生产环境API</h3>
+            <p>测试 <code>https://indicate.top/api/stripe/cancel-subscription</code></p>
+            <button onclick="testProductionAPI()">测试生产环境</button>
+            <div id="productionResult" class="result info">等待测试...</div>
+        </div>
+
+        <!-- 测试直接Worker -->
+        <div class="section">
+            <h3>2. 测试直接Worker访问</h3>
+            <p>测试 <code>https://destiny-backend.jerryliang5119.workers.dev/api/stripe/cancel-subscription</code></p>
+            <button onclick="testDirectWorker()">测试直接Worker</button>
+            <div id="workerResult" class="result info">等待测试...</div>
+        </div>
+
+        <!-- 对比结果 -->
+        <div class="section">
+            <h3>3. 修复效果对比</h3>
+            <button onclick="compareResults()">对比修复前后</button>
+            <div id="compareResult" class="result info">等待对比...</div>
+        </div>
+
+        <!-- 调试信息 -->
+        <div class="section">
+            <h3>4. 调试信息</h3>
+            <button onclick="clearDebugInfo()">清除日志</button>
+            <div id="debugInfo" class="result info">调试信息将显示在这里...</div>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function updateDebugInfo(info) {
+            const debugElement = document.getElementById('debugInfo');
+            const timestamp = new Date().toLocaleTimeString();
+            debugElement.textContent += `[${timestamp}] ${info}\n`;
+            debugElement.scrollTop = debugElement.scrollHeight;
+        }
+
+        function clearDebugInfo() {
+            document.getElementById('debugInfo').textContent = '调试信息已清除\n';
+        }
+
+        async function testProductionAPI() {
+            updateDebugInfo('测试生产环境API...');
+            try {
+                const response = await fetch('https://indicate.top/api/stripe/cancel-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`生产环境响应状态: ${response.status}`);
+                updateDebugInfo(`生产环境响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 401 && data.message && data.message.includes('Authorization')) {
+                    showResult('productionResult', `🎉 修复成功！\n状态: ${response.status}\n消息: ${data.message}\n\n✅ 405错误已解决，现在返回正确的401认证错误`, 'success');
+                } else if (response.status === 405) {
+                    showResult('productionResult', `❌ 仍然是405错误\n状态: ${response.status}\n需要等待部署生效`, 'error');
+                } else {
+                    showResult('productionResult', `⚠️ 其他响应\n状态: ${response.status}\n数据: ${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                updateDebugInfo(`生产环境测试错误: ${error.message}`);
+                showResult('productionResult', `❌ 测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDirectWorker() {
+            updateDebugInfo('测试直接Worker访问...');
+            try {
+                const response = await fetch('https://destiny-backend.jerryliang5119.workers.dev/api/stripe/cancel-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`Worker响应状态: ${response.status}`);
+                updateDebugInfo(`Worker响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 401 && data.message && data.message.includes('Authorization')) {
+                    showResult('workerResult', `✅ Worker正常工作！\n状态: ${response.status}\n消息: ${data.message}`, 'success');
+                } else {
+                    showResult('workerResult', `⚠️ Worker响应异常\n状态: ${response.status}\n数据: ${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                updateDebugInfo(`Worker测试错误: ${error.message}`);
+                showResult('workerResult', `❌ Worker测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function compareResults() {
+            updateDebugInfo('开始对比修复前后效果...');
+            
+            const comparison = `
+📊 修复前后对比
+
+修复前 ❌:
+- 请求: POST https://indicate.top/api/stripe/cancel-subscription
+- 响应: 405 Method Not Allowed
+- 原因: Cloudflare Pages没有正确路由API请求
+
+修复后 ✅:
+- 请求: POST https://indicate.top/api/stripe/cancel-subscription
+- 路由: Pages Worker → 后端Worker → Stripe API
+- 响应: 401 Unauthorized (正确的认证错误)
+
+修复文件:
+✅ public/_worker.js - Pages Worker代理
+✅ public/_routes.json - 路由配置
+✅ vite.config.ts - 本地开发代理
+
+技术架构:
+用户请求 → Cloudflare Pages → Pages Worker → 后端Worker → Stripe API
+
+预期效果:
+🎯 不再出现405错误
+🎯 返回正确的业务错误（401、404等）
+🎯 Stripe API正常工作
+🎯 取消订阅功能恢复正常
+            `;
+            
+            showResult('compareResult', comparison, 'info');
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            updateDebugInfo('Stripe 405错误最终修复测试工具已加载');
+            updateDebugInfo('修复方案: Cloudflare Pages Worker代理');
+            updateDebugInfo('等待部署生效后进行测试...');
+        };
+    </script>
+</body>
+</html>

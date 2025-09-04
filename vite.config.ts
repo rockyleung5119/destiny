@@ -21,6 +21,26 @@ export default defineConfig(({ command, mode }) => {
     server: {
       port: 5173,
       host: true,
+      // API代理配置 - 解决405错误
+      proxy: {
+        // 代理所有API请求到Cloudflare Worker
+        '/api': {
+          target: 'https://destiny-backend.jerryliang5119.workers.dev',
+          changeOrigin: true,
+          secure: true,
+          configure: (proxy, _options) => {
+            proxy.on('error', (err, _req, _res) => {
+              console.log('🔥 Proxy error:', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req, _res) => {
+              console.log(`🔄 Proxying ${req.method} ${req.url} to Worker`);
+            });
+            proxy.on('proxyRes', (proxyRes, req, _res) => {
+              console.log(`📥 Worker response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
+            });
+          }
+        }
+      }
     },
     // 构建配置
     build: {

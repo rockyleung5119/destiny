@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "description": "Cloudflare Pages路由配置 - 解决Stripe API 405错误",
+  "include": [
+    "/api/*"
+  ],
+  "exclude": []
+}
