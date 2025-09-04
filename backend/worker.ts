@@ -203,14 +203,28 @@ class StripeAPIClient {
     return this.makeRequest(`/subscriptions/${subscriptionId}`, 'POST', data);
   }
 
-  async cancelSubscription(subscriptionId: string) {
-    // 按照Stripe官方文档：使用subscriptions.update设置cancel_at_period_end
-    // 只支持周期结束时取消，保证用户可以使用到付费周期结束
-    const data = {
-      cancel_at_period_end: true  // 使用布尔值，makeRequest会正确转换为字符串
-    };
-    console.log(`🔄 设置订阅 ${subscriptionId} 在周期结束时取消`);
-    return this.updateSubscription(subscriptionId, data);
+  async cancelSubscription(subscriptionId: string, cancelAtPeriodEnd: boolean = true) {
+    console.log(`🚫 取消订阅: ${subscriptionId}, 周期结束时取消: ${cancelAtPeriodEnd}`);
+
+    if (cancelAtPeriodEnd) {
+      // 按照Stripe官方文档：使用subscriptions.update设置cancel_at_period_end
+      // 保证用户可以使用到付费周期结束
+      const data = {
+        cancel_at_period_end: 'true'  // Stripe API要求字符串格式
+      };
+      console.log(`🔄 设置订阅 ${subscriptionId} 在周期结束时取消`);
+      return this.updateSubscription(subscriptionId, data);
+    } else {
+      // 立即取消订阅
+      console.log(`🔄 立即取消订阅 ${subscriptionId}`);
+      return this.makeRequest(`/subscriptions/${subscriptionId}`, 'DELETE');
+    }
+  }
+
+  async cancelSubscriptionImmediately(subscriptionId: string) {
+    // 立即取消订阅的专用方法
+    console.log(`🚫 立即取消订阅: ${subscriptionId}`);
+    return this.makeRequest(`/subscriptions/${subscriptionId}`, 'DELETE');
   }
 
   async retrieveSubscription(subscriptionId: string) {
@@ -2672,147 +2686,8 @@ app.get('/api/membership/status', jwtMiddleware, async (c) => {
   }
 });
 
-// 取消订阅API - 直接处理，避免重定向导致的网络问题
-app.post('/api/membership/cancel-subscription', jwtMiddleware, async (c) => {
-  let userId;
-  let subscriptionData;
-
-  try {
-    const payload = c.get('jwtPayload');
-    userId = payload.userId;
-
-    console.log(`🚫 用户 ${userId} 请求取消订阅 (周期结束时取消)`);
-
-    // 只支持周期结束时取消，保证用户可以使用到付费周期结束
-
-    // 获取用户的活跃订阅信息
-    subscriptionData = await c.env.DB.prepare(`
-      SELECT
-        id,
-        stripe_subscription_id,
-        plan_id,
-        expires_at,
-        remaining_credits,
-        created_at
-      FROM memberships
-      WHERE user_id = ? AND is_active = 1
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).bind(userId).first();
-
-    console.log('📋 用户订阅信息:', subscriptionData);
-
-    // 验证订阅存在性
-    if (!subscriptionData) {
-      console.log(`⚠️ 用户 ${userId} 没有活跃的订阅`);
-      return c.json({
-        success: false,
-        message: 'No active subscription found',
-        code: 'NO_ACTIVE_SUBSCRIPTION'
-      }, 404);
-    }
-
-    // 验证Stripe订阅ID
-    if (!subscriptionData.stripe_subscription_id) {
-      console.log(`⚠️ 用户 ${userId} 的订阅缺少Stripe订阅ID`);
-      return c.json({
-        success: false,
-        message: 'Invalid subscription data',
-        code: 'INVALID_SUBSCRIPTION_DATA'
-      }, 400);
-    }
-
-    console.log(`🔧 开始取消Stripe订阅: ${subscriptionData.stripe_subscription_id}`);
-
-    // 调用Stripe API取消订阅 - 只支持周期结束时取消
-    const stripeService = new CloudflareStripeService(c.env);
-    console.log('📅 执行周期结束时取消订阅');
-    const stripeResult = await stripeService.cancelSubscription(subscriptionData.stripe_subscription_id);
-    console.log('✅ Stripe订阅已设置为周期结束时取消');
-
-    console.log('🔍 Stripe API响应:', stripeResult);
-
-    // 验证Stripe API调用结果
-    if (!stripeResult || !stripeResult.id) {
-      console.error('❌ Stripe API调用失败或返回无效数据');
-      return c.json({
-        success: false,
-        message: 'Failed to cancel subscription with Stripe',
-        code: 'STRIPE_API_ERROR'
-      }, 500);
-    }
-
-    // 更新数据库中的订阅状态 - 周期结束时取消：保持活跃状态但记录取消时间
-    const currentTime = new Date().toISOString();
-    const updateResult = await c.env.DB.prepare(`
-      UPDATE memberships
-      SET
-        cancelled_at = ?,
-        updated_at = ?
-      WHERE id = ?
-    `).bind(currentTime, currentTime, subscriptionData.id).run();
-
-    console.log('📊 数据库更新结果:', updateResult);
-
-    // 构建响应数据
-    const responseData = {
-      subscriptionId: subscriptionData.stripe_subscription_id,
-      cancelledAt: currentTime,
-      expiresAt: subscriptionData.expires_at,
-      cancelAtPeriodEnd: true,
-      stripeData: stripeResult
-    };
-
-    console.log(`✅ 用户 ${userId} 订阅取消成功`);
-
-    return c.json({
-      success: true,
-      message: 'Subscription will be cancelled at the end of the current billing period. You can continue using the service until then.',
-      data: responseData
-    });
-
-  } catch (error) {
-    console.error('❌ 取消订阅失败:', error);
-    console.error('❌ 错误详情:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack?.substring(0, 500),
-      userId,
-      subscriptionData
-    });
-
-    // 根据错误类型返回不同的错误信息
-    let errorMessage = 'Failed to cancel subscription';
-    let errorCode = 'UNKNOWN_ERROR';
-
-    if (error.message.includes('subscription') && error.message.includes('not found')) {
-      errorMessage = 'Subscription not found or already cancelled';
-      errorCode = 'STRIPE_SUBSCRIPTION_NOT_FOUND';
-    } else if (error.message.includes('already') && error.message.includes('cancel')) {
-      errorMessage = 'Subscription is already cancelled';
-      errorCode = 'ALREADY_CANCELLED';
-    } else if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('timeout')) {
-      errorMessage = 'Network error, please check your connection and try again';
-      errorCode = 'NETWORK_ERROR';
-    } else if (error.message.includes('authentication') || error.message.includes('unauthorized') || error.message.includes('401')) {
-      errorMessage = 'Authentication error, please try again';
-      errorCode = 'AUTH_ERROR';
-    } else if (error.message.includes('rate limit') || error.message.includes('429')) {
-      errorMessage = 'Too many requests, please wait a moment and try again';
-      errorCode = 'RATE_LIMIT';
-    } else if (error.message.includes('Stripe API')) {
-      errorMessage = 'Stripe service temporarily unavailable, please try again later';
-      errorCode = 'STRIPE_SERVICE_ERROR';
-    }
-
-    return c.json({
-      success: false,
-      message: errorMessage,
-      code: errorCode,
-      error: error.message
-    }, 500);
-  }
-});
+// 注意：取消订阅功能已迁移到 /api/stripe/cancel-subscription 端点
+// 该端点提供更完善的错误处理和webhook集成
 
 // Stripe健康检查端点 - 统一支付系统API标准
 app.get('/api/stripe/health', async (c) => {

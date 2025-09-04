@@ -1,5 +1,5 @@
 // 测试取消订阅功能修复
-const PROD_API_URL = 'https://destiny-backend.wlk8s6v9y.workers.dev';
+const PROD_API_URL = 'https://indicate.top';
 
 async function testCancelSubscriptionFix() {
   console.log('🧪 测试取消订阅功能修复');

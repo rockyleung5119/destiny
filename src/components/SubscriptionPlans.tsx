@@ -216,8 +216,12 @@ export const SubscriptionPlans: React.FC = () => {
       content: 'Are you sure you want to cancel your subscription? You will lose access to premium features.',
       onOk: async () => {
         try {
-          const response = await fetch('/api/subscription/cancel', {
+          const response = await fetch('/api/stripe/cancel-subscription', {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
           });
 
           const data = await response.json();

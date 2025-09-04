@@ -330,7 +330,8 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
 
-        const response = await fetch('/api/membership/cancel-subscription', {
+        // 使用统一的取消订阅API端点 - 增强版
+        const response = await fetch('/api/stripe/cancel-subscription', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
