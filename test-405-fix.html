@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试405错误修复</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, button, select {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 测试405错误修复</h1>
+        <p>测试Stripe取消订阅的405 Method Not Allowed错误修复</p>
+
+        <!-- 问题诊断 -->
+        <div class="section">
+            <h3>🔍 问题诊断</h3>
+            <p><strong>原问题</strong>：请求 <code>https://indicate.top/api/stripe/cancel-subscription</code> 返回405错误</p>
+            <p><strong>根因</strong>：域名路由配置问题，API请求被前端处理而不是后端Worker</p>
+            <p><strong>解决方案</strong>：创建Next.js代理路由，将请求转发到Cloudflare Worker</p>
+        </div>
+
+        <!-- 测试直接Worker访问 -->
+        <div class="section">
+            <h3>1. 测试直接Worker访问</h3>
+            <button onclick="testDirectWorker()">测试Worker直接访问</button>
+            <div id="directWorkerResult" class="result info">等待测试...</div>
+        </div>
+
+        <!-- 测试代理路由 -->
+        <div class="section">
+            <h3>2. 测试所有代理路由</h3>
+            <button onclick="testCancelSubscriptionProxy()">测试取消订阅代理</button>
+            <button onclick="testCreatePaymentProxy()">测试创建支付代理</button>
+            <button onclick="testSubscriptionStatusProxy()">测试订阅状态代理</button>
+            <button onclick="testCreateCheckoutProxy()">测试Checkout代理</button>
+            <div id="proxyRouteResult" class="result info">等待测试...</div>
+        </div>
+
+        <!-- 测试完整流程 -->
+        <div class="section">
+            <h3>3. 测试完整流程（需要登录）</h3>
+            <input type="email" id="email" placeholder="邮箱" value="">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="testFullFlow()">测试完整流程</button>
+            <div id="fullFlowResult" class="result info">等待测试...</div>
+        </div>
+
+        <!-- 调试信息 -->
+        <div class="section">
+            <h3>4. 调试信息</h3>
+            <button onclick="clearDebugInfo()">清除日志</button>
+            <div id="debugInfo" class="result info">调试信息将显示在这里...</div>
+        </div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+        }
+
+        function updateDebugInfo(info) {
+            const debugElement = document.getElementById('debugInfo');
+            const timestamp = new Date().toLocaleTimeString();
+            debugElement.textContent += `[${timestamp}] ${info}\n`;
+            debugElement.scrollTop = debugElement.scrollHeight;
+        }
+
+        function clearDebugInfo() {
+            document.getElementById('debugInfo').textContent = '调试信息已清除\n';
+        }
+
+        async function testDirectWorker() {
+            updateDebugInfo('测试直接Worker访问...');
+            try {
+                const response = await fetch('https://destiny-backend.jerryliang5119.workers.dev/api/stripe/cancel-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`Worker响应状态: ${response.status}`);
+                updateDebugInfo(`Worker响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 401 && data.message.includes('Authorization')) {
+                    showResult('directWorkerResult', `✅ Worker正常工作！\n状态: ${response.status}\n消息: ${data.message}`, 'success');
+                } else {
+                    showResult('directWorkerResult', `⚠️ Worker响应异常\n状态: ${response.status}\n数据: ${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                updateDebugInfo(`Worker访问错误: ${error.message}`);
+                showResult('directWorkerResult', `❌ Worker访问失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCancelSubscriptionProxy() {
+            updateDebugInfo('测试取消订阅代理路由...');
+            try {
+                const response = await fetch('/api/stripe/cancel-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`取消订阅代理响应状态: ${response.status}`);
+                updateDebugInfo(`取消订阅代理响应数据: ${JSON.stringify(data, null, 2)}`);
+
+                if (response.status === 401 && data.message.includes('Authorization')) {
+                    showResult('proxyRouteResult', `✅ 取消订阅代理正常工作！\n状态: ${response.status}\n消息: ${data.message}`, 'success');
+                } else if (response.status === 405) {
+                    showResult('proxyRouteResult', `❌ 取消订阅仍然是405错误\n状态: ${response.status}`, 'error');
+                } else {
+                    showResult('proxyRouteResult', `⚠️ 取消订阅代理响应异常\n状态: ${response.status}\n数据: ${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                updateDebugInfo(`取消订阅代理访问错误: ${error.message}`);
+                showResult('proxyRouteResult', `❌ 取消订阅代理访问失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreatePaymentProxy() {
+            updateDebugInfo('测试创建支付代理路由...');
+            try {
+                const response = await fetch('/api/stripe/create-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test: true })
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`创建支付代理响应状态: ${response.status}`);
+
+                if (response.status === 401 || (response.status >= 400 && response.status < 500)) {
+                    showResult('proxyRouteResult', `✅ 创建支付代理正常工作！\n状态: ${response.status}\n消息: ${data.message || '正常的业务错误'}`, 'success');
+                } else if (response.status === 405) {
+                    showResult('proxyRouteResult', `❌ 创建支付仍然是405错误`, 'error');
+                } else {
+                    showResult('proxyRouteResult', `⚠️ 创建支付代理响应: ${response.status}`, 'warning');
+                }
+            } catch (error) {
+                showResult('proxyRouteResult', `❌ 创建支付代理失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSubscriptionStatusProxy() {
+            updateDebugInfo('测试订阅状态代理路由...');
+            try {
+                const response = await fetch('/api/stripe/subscription-status', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`订阅状态代理响应状态: ${response.status}`);
+
+                if (response.status === 401 || (response.status >= 400 && response.status < 500)) {
+                    showResult('proxyRouteResult', `✅ 订阅状态代理正常工作！\n状态: ${response.status}`, 'success');
+                } else if (response.status === 405) {
+                    showResult('proxyRouteResult', `❌ 订阅状态仍然是405错误`, 'error');
+                } else {
+                    showResult('proxyRouteResult', `⚠️ 订阅状态代理响应: ${response.status}`, 'warning');
+                }
+            } catch (error) {
+                showResult('proxyRouteResult', `❌ 订阅状态代理失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCreateCheckoutProxy() {
+            updateDebugInfo('测试Checkout代理路由...');
+            try {
+                const response = await fetch('/api/stripe/create-checkout-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test: true })
+                });
+
+                const data = await response.json();
+                updateDebugInfo(`Checkout代理响应状态: ${response.status}`);
+
+                if (response.status === 401 || (response.status >= 400 && response.status < 500)) {
+                    showResult('proxyRouteResult', `✅ Checkout代理正常工作！\n状态: ${response.status}`, 'success');
+                } else if (response.status === 405) {
+                    showResult('proxyRouteResult', `❌ Checkout仍然是405错误`, 'error');
+                } else {
+                    showResult('proxyRouteResult', `⚠️ Checkout代理响应: ${response.status}`, 'warning');
+                }
+            } catch (error) {
+                showResult('proxyRouteResult', `❌ Checkout代理失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFullFlow() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                showResult('fullFlowResult', '❌ 请输入邮箱和密码', 'error');
+                return;
+            }
+
+            updateDebugInfo('测试完整流程...');
+            try {
+                // 1. 登录
+                updateDebugInfo('步骤1: 用户登录');
+                const loginResponse = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const loginData = await loginResponse.json();
+                updateDebugInfo(`登录响应: ${JSON.stringify(loginData, null, 2)}`);
+
+                if (!loginData.success || !loginData.token) {
+                    showResult('fullFlowResult', `❌ 登录失败: ${loginData.message}`, 'error');
+                    return;
+                }
+
+                // 2. 测试取消订阅
+                updateDebugInfo('步骤2: 测试取消订阅');
+                const cancelResponse = await fetch('/api/stripe/cancel-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${loginData.token}`
+                    }
+                });
+
+                const cancelData = await cancelResponse.json();
+                updateDebugInfo(`取消订阅响应: ${JSON.stringify(cancelData, null, 2)}`);
+
+                if (cancelResponse.status === 404 && cancelData.code === 'NO_ACTIVE_SUBSCRIPTION') {
+                    showResult('fullFlowResult', `✅ 完整流程正常！\n登录成功，API正常响应\n状态: ${cancelResponse.status}\n消息: ${cancelData.message}\n\n🎉 405错误已完全修复！`, 'success');
+                } else if (cancelResponse.status === 405) {
+                    showResult('fullFlowResult', `❌ 仍然是405错误\n状态: ${cancelResponse.status}`, 'error');
+                } else {
+                    showResult('fullFlowResult', `✅ API正常响应\n状态: ${cancelResponse.status}\n消息: ${cancelData.message}`, 'success');
+                }
+            } catch (error) {
+                updateDebugInfo(`完整流程错误: ${error.message}`);
+                showResult('fullFlowResult', `❌ 完整流程失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时初始化
+        window.onload = function() {
+            updateDebugInfo('405错误修复测试工具已加载');
+            updateDebugInfo('修复方案: Next.js代理路由 -> Cloudflare Worker');
+        };
+    </script>
+</body>
+</html>

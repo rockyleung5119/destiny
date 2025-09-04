@@ -216,6 +216,7 @@ export const SubscriptionPlans: React.FC = () => {
       content: 'Are you sure you want to cancel your subscription? You will lose access to premium features.',
       onOk: async () => {
         try {
+          // 使用代理路由，通过Next.js代理到Cloudflare Worker
           const response = await fetch('/api/stripe/cancel-subscription', {
             method: 'POST',
             headers: {

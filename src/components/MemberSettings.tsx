@@ -330,7 +330,7 @@ const MemberSettings: React.FC<MemberSettingsProps> = ({ onBack }) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
 
-        // 使用统一的取消订阅API端点 - 增强版
+        // 使用代理路由，通过Next.js代理到Cloudflare Worker
         const response = await fetch('/api/stripe/cancel-subscription', {
           method: 'POST',
           headers: {
