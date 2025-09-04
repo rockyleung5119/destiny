@@ -19,9 +19,9 @@ export const STRIPE_PREBUILT_CONFIG = {
   
   // 套餐对应的预构建支付页面URL (测试模式)
   checkoutUrls: {
-    single: 'https://buy.stripe.com/test_00w5kCewC7OY4D7g0Mfw400',  // Single Reading (测试)
-    monthly: 'https://buy.stripe.com/test_3cI7sK88eglu1qVdSEfw401', // Monthly Plan (测试)
-    yearly: 'https://buy.stripe.com/8x29AV6FHaSq16X1qK9AA02'       // Yearly Plan (生产，暂未提供测试链接)
+    single: 'https://buy.stripe.com/3cI4gBfcd9OmbLB8Tc9AA00',  // Single Reading (生产)
+    monthly: 'https://buy.stripe.com/fZu8wR4xzgcK4j94CW9AA01', // Monthly Plan (生产)
+    yearly: 'https://buy.stripe.com/8x29AV6FHaSq16X1qK9AA02'       // Yearly Plan (生产)
   }
 };
 
